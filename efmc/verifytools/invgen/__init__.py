@@ -1,3 +1,6 @@
+"""
+For calling invgen tool to generate invariants.
+"""
 from tempfile import NamedTemporaryFile
 from subprocess import call, check_output, STDOUT, check_call, \
         CalledProcessError

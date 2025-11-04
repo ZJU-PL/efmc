@@ -1,6 +1,6 @@
 # pylint: disable=global-variable-not-assigned,no-self-argument
 import efmc.verifytools.boogie.ast as ast
-import z3;
+import z3
 
 from threading import Condition, local
 from time import sleep, time
