@@ -341,35 +341,6 @@ class FramaCChecker(Checker):
                         code_lines[line_no] = ""
                     code_queue.append("\n".join(code_lines))
 
-            # This section would be used if we want to use the CSV dump instead of the JSON report
-            # else:
-            #     # What about TIMEOUT?
-            #     # If any invariant causes a Timeout, it's marked as "Unknown"
-            #     # because the prover could not prove it. So removing it.
-            #     unknown_inv_lines = self.get_unknown_inv_no_from_error_msg(
-            #         checker_message
-            #     )
-            #     if len(unknown_inv_lines) > 0:
-            #         for line_no in unknown_inv_lines:
-            #             code_lines[line_no] = ""
-            #         code_queue.append("\n".join(code_lines))
-            #     else:
-            #         # Push code with one "Partially proven" invariant removed to the queue
-            #         partially_proven_inv_line_nos = (
-            #             self.get_partially_proven_inv_from_error_msg(checker_message)
-            #         )
-            #         if self.get_invariants_count(input_code) == len(
-            #             partially_proven_inv_line_nos
-            #         ):
-            #             # If all invariants are partially proven, then we can't afford
-            #             # to prune further. example, there's an assertion inside the loop which is Unknown
-            #             break
-
-            #         # for line_no in partially_proven_inv_line_nos:
-            #         #     code_lines__ = deepcopy(code_lines)
-            #         #     code_lines__[line_no] = ""
-            #         #     code_queue.append("\n".join(code_lines__))
-
             num_frama_c_calls += 1
 
         if num_frama_c_calls == 1000 and not success:
