@@ -14,7 +14,7 @@ from setuptools import find_packages, setup, Command
 # Package meta-data.
 NAME = 'pyefmc'
 DESCRIPTION = 'An SMT-based Software Model Checker.'
-URL = ' https://github.com/ZJU-Automated-Reasoning-Group/efmc'
+URL = ' https://github.com/ZJU-PL/efmc'
 EMAIL = 'rainoftime@gmail.com'
 AUTHOR = 'rainoftime'
 REQUIRES_PYTHON = '>=3.6.0'
