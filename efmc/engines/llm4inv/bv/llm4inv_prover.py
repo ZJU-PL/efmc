@@ -12,8 +12,8 @@ import z3
 
 from efmc.sts import TransitionSystem
 from efmc.utils.verification_utils import VerificationResult
-from .cegis_loop import LLMInvariantCEGIS
-from .prompt_manager import extract_bit_width_from_sts
+from efmc.engines.llm4inv.bv.cegis_loop import LLMInvariantCEGIS
+from efmc.engines.llm4inv.bv.prompt_manager import extract_bit_width_from_sts
 
 logger = logging.getLogger(__name__)
 

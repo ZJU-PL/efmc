@@ -67,6 +67,10 @@ You can verify programs using different engines:
 
     efmc --engine kind --lang chc --file your_file.smt2
 
+4. LLM4Inv (LLM-guided Invariant Synthesis)::
+
+    efmc --engine llm4inv --lang chc --file your_file.smt2
+
 Understanding Results
 ~~~~~~~~~~~~~~~~~~~
 
@@ -93,16 +97,34 @@ Template-Based Verification
 
 Supports different templates:
 
-- ``bv_interval``: Bit-vector intervals
-- ``octagon``: Octagonal constraints
-- ``polyhedra``: Polyhedral constraints
+**Integer/Real Templates:**
+- ``interval``, ``power_interval``: Interval constraints
+- ``zone``, ``power_zone``: Zone constraints
+- ``octagon``, ``power_octagon``: Octagonal constraints
+- ``affine``, ``power_affine``: Affine constraints
+- ``poly``, ``power_poly``: Polyhedral constraints
+
+**Bitvector Templates:**
+- ``bv_interval``, ``power_bv_interval``: Bit-vector intervals
+- ``bv_zone``, ``power_bv_zone``: Bit-vector zones
+- ``bv_octagon``, ``power_bv_octagon``: Bit-vector octagons
+- ``bv_poly``, ``power_bv_poly``: Bit-vector polyhedra
+- ``knownbits``: Known bits analysis
+- ``bitpredabs``: Bit-level predicate abstraction
+- ``bv_pattern``, ``power_bv_pattern``: Pattern-based templates
+- ``bv_xor_parity``, ``power_bv_xor_parity``: XOR parity templates
+- ``bv_rotation``, ``power_bv_rotation``: Rotation templates
+
+**Floating-Point Templates:**
+- ``fp_interval``: Floating-point intervals
+- ``fp_poly``: Floating-point polyhedra
 
 Example::
 
-    efmc --engine ef --template polyhedra --lang chc --file your_file.smt2
+    efmc --engine ef --template bv_poly --lang chc --file your_file.smt2
 
 Property-Directed Reachability (PDR)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Uses Z3's Spacer engine for incremental invariant building::
 
@@ -128,10 +150,16 @@ Try different engines:
     efmc --engine pdr --lang chc --file your_file.smt2
 
     # Try k-induction
-    efmc --engine kind --k 2 --lang chc --file your_file.smt2
+    efmc --engine kind --kind-k 30 --lang chc --file your_file.smt2
 
     # Try template-based approach
     efmc --engine ef --template bv_interval --lang chc --file your_file.smt2
+
+    # Try LLM4Inv with remote model
+    efmc --engine llm4inv --llm4inv-provider remote --llm4inv-remote-model deepseek-v3 --lang chc --file your_file.smt2
+
+    # Try LLM4Inv with local model
+    efmc --engine llm4inv --llm4inv-provider local --llm4inv-local-model qwen/qwen3-coder-30b --lang chc --file your_file.smt2
 
 
 7. References

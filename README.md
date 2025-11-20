@@ -44,12 +44,21 @@ The main difference lies in the third condition: here, the "post-condition" refe
 
 Currently, the users can choose various verification engines:
 
+**Main Engines:**
 - Template-based (Constraint-based) Approach
 - Property-Directed Reachability (PDR)
 - K-Induction
-- Quantifier Instantiation (NOT Stable)
-- Houdini (NOT Stable)
-- Abductive Inference (NOT Stable)
+- LLM4Inv (LLM-guided Invariant Synthesis)
+
+**Additional Engines:**
+- Quantifier Instantiation (QI)
+- Houdini
+- Abductive Inference
+- Quantifier Elimination (QE)
+- Predicate Abstraction
+- Symbolic Abstraction
+- BDD (Binary Decision Diagrams)
+- K-Safety (Relational Verification for Hyperproperties)
 
 For detailed information about each engine, including usage examples and related work, see [OVERVIEW.md](OVERVIEW.md).
 
