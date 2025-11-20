@@ -7,6 +7,7 @@ Welcome to EFMC's documentation
 
    
    verification
+   boogie_frontend
    absint
    ltl
    abduction
@@ -23,6 +24,11 @@ Welcome to EFMC's documentation
    qi
    qe
    pdr
+   llm4inv
+   ksafety
+   symabs
+   danger
+   termination
 
 
 Indices and tables

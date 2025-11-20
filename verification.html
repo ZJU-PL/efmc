@@ -18,7 +18,7 @@
     
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Abstraction Interpretation" href="absint.html" />
+    <link rel="next" title="Boogie Frontend for EFMC" href="boogie_frontend.html" />
     <link rel="prev" title="Welcome to EFMC’s documentation" href="index.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -28,7 +28,7 @@
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
-          <a href="absint.html" title="Abstraction Interpretation"
+          <a href="boogie_frontend.html" title="Boogie Frontend for EFMC"
              accesskey="N">next</a> |</li>
         <li class="right" >
           <a href="index.html" title="Welcome to EFMC’s documentation"
@@ -46,6 +46,27 @@
   <section id="program-verification">
 <h1>Program Verification<a class="headerlink" href="#program-verification" title="Permalink to this heading">¶</a></h1>
 <p>Program verification is the process of checking whether a program satisfies a given specification. The specification can be a set of properties that the program must satisfy, such as correctness, safety, or liveness. Verification can be done using various techniques, such as model checking, static analysis, and theorem proving.</p>
+<section id="available-verification-engines">
+<h2>Available Verification Engines<a class="headerlink" href="#available-verification-engines" title="Permalink to this heading">¶</a></h2>
+<p>EFMC provides multiple verification engines, each suited for different types of programs and properties:</p>
+<p><strong>Main Engines:</strong>
+- <strong>Template-based (EF)</strong>: Constraint-based invariant generation using predefined templates
+- <strong>PDR</strong>: Property-Directed Reachability using Z3’s Spacer engine
+- <strong>K-Induction</strong>: K-induction based verification with optional auxiliary invariants
+- <strong>LLM4Inv</strong>: LLM-guided invariant synthesis using a CEGIS loop</p>
+<p><strong>Additional Engines:</strong>
+- <strong>Houdini</strong>: Iterative weakening for conjunctive invariant inference
+- <strong>Abduction</strong>: Abductive inference for invariant generation
+- <strong>Quantifier Instantiation (QI)</strong>: Direct solving via quantifier instantiation
+- <strong>Quantifier Elimination (QE)</strong>: Quantifier elimination based verification
+- <strong>Predicate Abstraction</strong>: Finite-state abstraction using predicates
+- <strong>Symbolic Abstraction</strong>: Symbolic abstraction-based verification
+- <strong>BDD</strong>: Binary Decision Diagram based verification
+- <strong>K-Safety</strong>: Relational verification for hyperproperties (programmatic API)</p>
+<p><strong>Specialized Engines:</strong>
+- <strong>PolyHorn</strong>: Polynomial invariant generation for Horn clauses
+- <strong>Abstract Interpretation</strong>: Abstract interpretation based analysis</p>
+</section>
 <section id="correctness">
 <h2>Correctness<a class="headerlink" href="#correctness" title="Permalink to this heading">¶</a></h2>
 <p>Consider the following program that computes the factorial of a number
@@ -87,6 +108,7 @@
     <h3><a href="index.html">Table of Contents</a></h3>
     <ul>
 <li><a class="reference internal" href="#">Program Verification</a><ul>
+<li><a class="reference internal" href="#available-verification-engines">Available Verification Engines</a></li>
 <li><a class="reference internal" href="#correctness">Correctness</a></li>
 </ul>
 </li>
@@ -100,8 +122,8 @@
   </div>
   <div>
     <h4>Next topic</h4>
-    <p class="topless"><a href="absint.html"
-                          title="next chapter">Abstraction Interpretation</a></p>
+    <p class="topless"><a href="boogie_frontend.html"
+                          title="next chapter">Boogie Frontend for EFMC</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -131,7 +153,7 @@
           <a href="genindex.html" title="General Index"
              >index</a></li>
         <li class="right" >
-          <a href="absint.html" title="Abstraction Interpretation"
+          <a href="boogie_frontend.html" title="Boogie Frontend for EFMC"
              >next</a> |</li>
         <li class="right" >
           <a href="index.html" title="Welcome to EFMC’s documentation"

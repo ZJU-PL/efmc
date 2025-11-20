@@ -1,0 +1,285 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>Termination Verification &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css" />
+    
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Danger Invariants" href="danger.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="danger.html" title="Danger Invariants"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Termination Verification</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="termination-verification">
+<h1>Termination Verification<a class="headerlink" href="#termination-verification" title="Permalink to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading">¶</a></h2>
+<p>Termination verification determines whether a program loop will eventually terminate or run forever. EFMC provides template-based termination verification using two complementary approaches:</p>
+<ol class="arabic simple">
+<li><p><strong>Ranking Function Synthesis</strong>: Proves termination by finding a ranking function that decreases on each loop iteration</p></li>
+<li><p><strong>Recurrence Set Synthesis</strong>: Proves non-termination by finding a recurrence set (a set of states that the loop can return to infinitely often)</p></li>
+</ol>
+<p>The termination prover supports bit-vector programs and uses various template-based techniques for both termination and non-termination analysis.</p>
+</section>
+<section id="ranking-functions">
+<h2>Ranking Functions<a class="headerlink" href="#ranking-functions" title="Permalink to this heading">¶</a></h2>
+<p>A ranking function R(x) proves termination if:</p>
+<ol class="arabic simple">
+<li><p><strong>Base Case</strong>: R(x) ≥ 0 for all initial states</p></li>
+<li><p><strong>Decreasing</strong>: For each transition, R(x’) &lt; R(x) when the loop guard is true</p></li>
+<li><p><strong>Bounded</strong>: R(x) is bounded from below (typically R(x) ≥ 0)</p></li>
+</ol>
+<p>If such a ranking function exists, the loop must terminate because the ranking function cannot decrease indefinitely.</p>
+</section>
+<section id="supported-ranking-function-templates">
+<h2>Supported Ranking Function Templates<a class="headerlink" href="#supported-ranking-function-templates" title="Permalink to this heading">¶</a></h2>
+<p><strong>Linear Ranking Functions:</strong>
+- Simple linear combinations: R(x) = a₁x₁ + a₂x₂ + … + c
+- Suitable for programs with linear arithmetic</p>
+<p><strong>Lexicographic Ranking Functions:</strong>
+- Multiple components: R(x) = (R₁(x), R₂(x), …)
+- Decreases lexicographically: first component decreases, or if it stays the same, second decreases, etc.
+- More expressive than linear ranking functions</p>
+<p><strong>Conditional Ranking Functions:</strong>
+- Different ranking functions for different program branches
+- Handles programs with multiple execution paths</p>
+</section>
+<section id="recurrence-sets">
+<h2>Recurrence Sets<a class="headerlink" href="#recurrence-sets" title="Permalink to this heading">¶</a></h2>
+<p>A recurrence set S(x) proves non-termination if:</p>
+<ol class="arabic simple">
+<li><p><strong>Reachability</strong>: S(x) is reachable from initial states</p></li>
+<li><p><strong>Closure</strong>: From any state in S(x), there exists a transition back to S(x)</p></li>
+<li><p><strong>Progress</strong>: The transition maintains the loop guard (loop continues)</p></li>
+</ol>
+<p>If such a recurrence set exists, the loop can execute infinitely often.</p>
+</section>
+<section id="supported-recurrence-set-templates">
+<h2>Supported Recurrence Set Templates<a class="headerlink" href="#supported-recurrence-set-templates" title="Permalink to this heading">¶</a></h2>
+<p><strong>Linear Recurrence Sets:</strong>
+- Linear constraints defining the recurrence set
+- Suitable for programs with linear arithmetic</p>
+<p><strong>Interval Recurrence Sets:</strong>
+- Interval constraints defining the recurrence set
+- More general than linear constraints</p>
+<p><strong>Disjunctive Recurrence Sets:</strong>
+- Union of multiple recurrence sets
+- Handles complex non-termination patterns</p>
+</section>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this heading">¶</a></h2>
+<p>The termination prover is used programmatically:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.engines.ef.termination</span><span class="w"> </span><span class="kn">import</span> <span class="n">TerminationProver</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.sts</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransitionSystem</span>
+
+<span class="c1"># Create transition system</span>
+<span class="n">sts</span> <span class="o">=</span> <span class="n">TransitionSystem</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+
+<span class="c1"># Create termination prover</span>
+<span class="n">prover</span> <span class="o">=</span> <span class="n">TerminationProver</span><span class="p">(</span><span class="n">sts</span><span class="p">,</span> <span class="n">solver</span><span class="o">=</span><span class="s1">&#39;z3api&#39;</span><span class="p">)</span>
+
+<span class="c1"># Set ranking function template</span>
+<span class="n">prover</span><span class="o">.</span><span class="n">set_ranking_template</span><span class="p">(</span><span class="s1">&#39;bv_linear_ranking&#39;</span><span class="p">)</span>
+
+<span class="c1"># Try to prove termination</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">prover</span><span class="o">.</span><span class="n">prove_termination</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">result</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Termination proven!&quot;</span><span class="p">)</span>
+    <span class="n">ranking_func</span> <span class="o">=</span> <span class="n">prover</span><span class="o">.</span><span class="n">_extract_ranking_function</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ranking function: </span><span class="si">{</span><span class="n">ranking_func</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Could not prove termination&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">error</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="proving-non-termination">
+<h2>Proving Non-Termination<a class="headerlink" href="#proving-non-termination" title="Permalink to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Set recurrence set template</span>
+<span class="n">prover</span><span class="o">.</span><span class="n">set_recurrence_template</span><span class="p">(</span><span class="s1">&#39;bv_linear_recurrence&#39;</span><span class="p">)</span>
+
+<span class="c1"># Try to prove non-termination</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">prover</span><span class="o">.</span><span class="n">prove_non_termination</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">result</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Non-termination proven!&quot;</span><span class="p">)</span>
+    <span class="n">recurrence_set</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">recurrence_set</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recurrence set: </span><span class="si">{</span><span class="n">recurrence_set</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Could not prove non-termination&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="comprehensive-analysis">
+<h2>Comprehensive Analysis<a class="headerlink" href="#comprehensive-analysis" title="Permalink to this heading">¶</a></h2>
+<p>The termination API provides a high-level function for comprehensive analysis:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.engines.ef.termination</span><span class="w"> </span><span class="kn">import</span> <span class="n">analyze_termination</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">analyze_termination</span><span class="p">(</span>
+    <span class="n">sts</span><span class="p">,</span>
+    <span class="n">ranking_templates</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;bv_linear_ranking&#39;</span><span class="p">,</span> <span class="s1">&#39;bv_lexicographic_ranking&#39;</span><span class="p">],</span>
+    <span class="n">recurrence_templates</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;bv_linear_recurrence&#39;</span><span class="p">],</span>
+    <span class="n">timeout</span><span class="o">=</span><span class="mi">120</span>
+<span class="p">)</span>
+
+<span class="k">if</span> <span class="n">results</span><span class="p">[</span><span class="s1">&#39;termination_proven&#39;</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Termination proven!&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Template used: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;ranking_template_used&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ranking function: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;ranking_function&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">elif</span> <span class="n">results</span><span class="p">[</span><span class="s1">&#39;non_termination_proven&#39;</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Non-termination proven!&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Template used: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;recurrence_template_used&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recurrence set: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;recurrence_set&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Could not determine termination status&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">results</span><span class="p">[</span><span class="s1">&#39;errors&#39;</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Errors: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;errors&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="configuration-options">
+<h2>Configuration Options<a class="headerlink" href="#configuration-options" title="Permalink to this heading">¶</a></h2>
+<p><strong>Solver Options:</strong>
+- <code class="docutils literal notranslate"><span class="pre">solver</span></code>: Backend SMT solver (‘z3api’, ‘cvc5’, etc.)</p>
+<p><strong>Validation Options:</strong>
+- <code class="docutils literal notranslate"><span class="pre">validate_ranking_function</span></code>: Validate synthesized ranking functions
+- <code class="docutils literal notranslate"><span class="pre">validate_recurrence_set</span></code>: Validate synthesized recurrence sets</p>
+<p><strong>Template Options:</strong>
+- <code class="docutils literal notranslate"><span class="pre">num_components</span></code>: Number of components for lexicographic ranking functions
+- <code class="docutils literal notranslate"><span class="pre">num_branches</span></code>: Number of branches for conditional ranking functions</p>
+<p><strong>Debugging Options:</strong>
+- <code class="docutils literal notranslate"><span class="pre">print_vc</span></code>: Print verification conditions for debugging</p>
+</section>
+<section id="bit-vector-support">
+<h2>Bit-Vector Support<a class="headerlink" href="#bit-vector-support" title="Permalink to this heading">¶</a></h2>
+<p>The termination prover is optimized for bit-vector programs:</p>
+<ul class="simple">
+<li><p>Supports signed and unsigned bit-vector arithmetic</p></li>
+<li><p>Handles bit-vector overflow and underflow</p></li>
+<li><p>Uses bit-vector specific ranking function templates</p></li>
+<li><p>Supports bit-vector recurrence set templates</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2>Limitations<a class="headerlink" href="#limitations" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Currently optimized for single-loop programs</p></li>
+<li><p>May require manual template selection for complex programs</p></li>
+<li><p>Performance depends on the chosen template and solver</p></li>
+</ul>
+</section>
+<section id="related-work">
+<h2>Related Work<a class="headerlink" href="#related-work" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Bradley, A. R., Manna, Z., &amp; Sipma, H. B. (2005). Termination of polynomial programs. VMCAI 2005.</p></li>
+<li><p>Cook, B., Podelski, A., &amp; Rybalchenko, A. (2006). Termination proofs for systems code. PLDI 2006.</p></li>
+<li><p>Heizmann, M., et al. (2013). Software model checking for people who love automata. CAV 2013.</p></li>
+<li><p>Larraz, D., et al. (2014). Proving non-termination using Max-SMT. CAV 2014.</p></li>
+</ul>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Termination Verification</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#ranking-functions">Ranking Functions</a></li>
+<li><a class="reference internal" href="#supported-ranking-function-templates">Supported Ranking Function Templates</a></li>
+<li><a class="reference internal" href="#recurrence-sets">Recurrence Sets</a></li>
+<li><a class="reference internal" href="#supported-recurrence-set-templates">Supported Recurrence Set Templates</a></li>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#proving-non-termination">Proving Non-Termination</a></li>
+<li><a class="reference internal" href="#comprehensive-analysis">Comprehensive Analysis</a></li>
+<li><a class="reference internal" href="#configuration-options">Configuration Options</a></li>
+<li><a class="reference internal" href="#bit-vector-support">Bit-Vector Support</a></li>
+<li><a class="reference internal" href="#limitations">Limitations</a></li>
+<li><a class="reference internal" href="#related-work">Related Work</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="danger.html"
+                          title="previous chapter">Danger Invariants</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/termination.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="danger.html" title="Danger Invariants"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Termination Verification</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>
