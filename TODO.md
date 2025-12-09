@@ -10,10 +10,6 @@ Here are a few topics for further exploration:
 
 ## 0. Bugs?
 
-kind  and kind+aux_inv seems to be buggy
-
-- For `data/BV/LoopInvGen/chc/2016.SyGuS-Comp/64bits_unsigned/fig1_vars.sl_64bits_unsigned.smt2`, eldarica returns "unsafe" (`./bin_solvers/bin/eldarica -log -cex`), but kind returns "safe"!!
-
 
 ## 1. Dataset
 
