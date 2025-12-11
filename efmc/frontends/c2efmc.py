@@ -331,7 +331,7 @@ class CToEFMCConverter:
             if op == "/":
                 return z3.IntDiv(lhs, rhs)
             if op == "%":
-                return z3.Mod(lhs, rhs)
+                return lhs % rhs
             if op == "==":
                 return lhs == rhs
             if op == "!=":
@@ -380,25 +380,49 @@ class CToEFMCConverter:
     def _collect_assertions_with_guards(
         self, stmts: List[c_ast.Node], env: Dict[str, z3.ExprRef]
     ) -> List[z3.ExprRef]:
-        """Collect guarded assertions from a straight-line statement list."""
+        """Collect guarded assertions, including those nested in conditionals."""
+
         collected: List[z3.ExprRef] = []
-        paths: List[Tuple[z3.ExprRef, Dict[str, z3.ExprRef]]] = [
-            (z3.BoolVal(True), env)
-        ]
 
-        for stmt in stmts or []:
-            new_paths: List[Tuple[z3.ExprRef, Dict[str, z3.ExprRef]]] = []
-            for guard, cur_env in paths:
-                if isinstance(stmt, c_ast.FuncCall) and self._is_assert_call(stmt):
-                    expr = self._as_bool(
-                        self._c_expr_to_z3(stmt.args.exprs[0], cur_env)
-                    )
-                    collected.append(z3.Implies(guard, expr))
-                    new_paths.append((guard, cur_env))
-                else:
-                    new_paths.extend(self._process_statement(stmt, guard, cur_env))
-            paths = new_paths
+        def walk(
+            stmt_list: List[c_ast.Node], guard: z3.ExprRef, cur_env: Dict[str, z3.ExprRef]
+        ) -> List[Tuple[z3.ExprRef, Dict[str, z3.ExprRef]]]:
+            paths: List[Tuple[z3.ExprRef, Dict[str, z3.ExprRef]]] = [(guard, cur_env)]
 
+            for stmt in stmt_list or []:
+                new_paths: List[Tuple[z3.ExprRef, Dict[str, z3.ExprRef]]] = []
+                for g, env_at_stmt in paths:
+                    if isinstance(stmt, c_ast.FuncCall) and self._is_assert_call(stmt):
+                        expr = self._as_bool(
+                            self._c_expr_to_z3(stmt.args.exprs[0], env_at_stmt)
+                        )
+                        collected.append(z3.Implies(g, expr))
+                        new_paths.append((g, env_at_stmt))
+                        continue
+
+                    if isinstance(stmt, c_ast.If):
+                        cond = self._as_bool(self._c_expr_to_z3(stmt.cond, env_at_stmt))
+                        then_paths = walk(
+                            self._body_items(stmt.iftrue),
+                            z3.And(g, cond),
+                            deepcopy(env_at_stmt),
+                        )
+                        else_paths = walk(
+                            self._body_items(stmt.iffalse),
+                            z3.And(g, z3.Not(cond)),
+                            deepcopy(env_at_stmt),
+                        )
+                        new_paths.extend(then_paths)
+                        new_paths.extend(else_paths)
+                        continue
+
+                    new_paths.extend(self._process_statement(stmt, g, env_at_stmt))
+
+                paths = new_paths
+
+            return paths
+
+        walk(stmts, z3.BoolVal(True), env)
         return collected
 
     def _as_bool(self, expr: z3.ExprRef) -> z3.ExprRef:
