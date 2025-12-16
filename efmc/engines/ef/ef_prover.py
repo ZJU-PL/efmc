@@ -309,6 +309,11 @@ class EFProver:
             invariant = big_and([t.build_invariant(model) for t in self.induction])
             #invariant = self.ct.build_invariant(model)
             return VerificationResult(True, invariant)
-        else:
+        elif check_res == z3.unsat:
+            print("unsat")
+            # unsat means no invariant exists with the current template
+            # This could mean the property is unsafe or the template is too weak
+            return VerificationResult(False, None, is_unknown=True)
+        else:  # z3.unknown
             print("unknown")
             return VerificationResult(False, None, is_unknown=True)

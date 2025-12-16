@@ -61,7 +61,10 @@ class CToEFMCConverter:
 
         init = self._build_init_condition(pre_stmts)
         trans = self._build_transition(loop_node)
-        post = self._build_post_condition(post_stmts)
+
+        # Safety after the loop should only be enforced once the loop exits.
+        loop_guard = self._as_bool(self._c_expr_to_z3(loop_node.cond, self.variable_mapping))
+        post = self._build_post_condition(post_stmts, exit_guard=z3.Not(loop_guard))
 
         ts = TransitionSystem(
             variables=[self.variable_mapping[v] for v in variables],
@@ -204,10 +207,16 @@ class CToEFMCConverter:
             return z3.BoolVal(False)
         return transitions[0] if len(transitions) == 1 else z3.Or(transitions)
 
-    def _build_post_condition(self, stmts: List[c_ast.Node]) -> z3.ExprRef:
-        """Translate post-loop assertions into a safety property."""
+    def _build_post_condition(
+        self, stmts: List[c_ast.Node], exit_guard: z3.ExprRef = z3.BoolVal(True)
+    ) -> z3.ExprRef:
+        """Translate post-loop assertions into a safety property.
+
+        The guard captures the loop-exit condition so assertions are only
+        required to hold after leaving the loop.
+        """
         assertions = self._collect_assertions_with_guards(
-            stmts, deepcopy(self.variable_mapping)
+            stmts, deepcopy(self.variable_mapping), initial_guard=exit_guard
         )
         return z3.And(assertions) if assertions else z3.BoolVal(True)
 
@@ -378,7 +387,10 @@ class CToEFMCConverter:
     # Assertions and helpers                                            #
     # ------------------------------------------------------------------ #
     def _collect_assertions_with_guards(
-        self, stmts: List[c_ast.Node], env: Dict[str, z3.ExprRef]
+        self,
+        stmts: List[c_ast.Node],
+        env: Dict[str, z3.ExprRef],
+        initial_guard: z3.ExprRef = z3.BoolVal(True),
     ) -> List[z3.ExprRef]:
         """Collect guarded assertions, including those nested in conditionals."""
 
@@ -422,7 +434,7 @@ class CToEFMCConverter:
 
             return paths
 
-        walk(stmts, z3.BoolVal(True), env)
+        walk(stmts, initial_guard, env)
         return collected
 
     def _as_bool(self, expr: z3.ExprRef) -> z3.ExprRef:
@@ -443,14 +455,7 @@ class CToEFMCConverter:
         return bool(name in ("__VERIFIER_assert", "assert") and call.args and call.args.exprs)
 
 
-def c_to_efmc(
-    filename: str,
-    function: Optional[str] = None,
-    use_cpp: bool = False,
-    cpp_args: Optional[List[str]] = None,
-) -> TransitionSystem:
+def c_to_efmc(filename: str) -> TransitionSystem:
     """Convenience wrapper mirroring :func:`boogie_to_efmc`."""
     converter = CToEFMCConverter()
-    return converter.convert_file_to_transition_system(
-        filename, function=function, use_cpp=use_cpp, cpp_args=cpp_args
-    )
+    return converter.convert_file_to_transition_system(filename)

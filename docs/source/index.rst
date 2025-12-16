@@ -8,6 +8,7 @@ Welcome to EFMC's documentation
    
    verification
    boogie_frontend
+   c_frontend
    absint
    ltl
    abduction

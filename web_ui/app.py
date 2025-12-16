@@ -14,7 +14,7 @@ app.config['DEFAULT_TIMEOUT'] = 60  # Default timeout in seconds
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {'smt2', 'sl', 'chc', 'sygus'}
+ALLOWED_EXTENSIONS = {'smt2', 'sl', 'chc', 'sygus', 'bpl', 'c'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

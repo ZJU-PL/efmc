@@ -58,9 +58,9 @@
                     </div>
                     <div class="tab-pane fade" id="upload" role="tabpanel" aria-labelledby="upload-tab">
                         <div class="mb-3">
-                            <label for="fileUpload" class="form-label">Upload SMT file</label>
-                            <input class="form-control" type="file" id="fileUpload" accept=".smt2,.sl,.chc,.sygus">
-                            <div class="form-text">Supported file types: .smt2, .sl, .chc, .sygus</div>
+                            <label for="fileUpload" class="form-label">Upload file</label>
+                            <input class="form-control" type="file" id="fileUpload" accept=".smt2,.sl,.chc,.sygus,.bpl,.c">
+                            <div class="form-text">Supported file types: .smt2, .sl, .chc, .sygus (CHC/SyGuS), .bpl (Boogie), .c (C)</div>
                         </div>
                     </div>
                     <div class="tab-pane fade" id="examples" role="tabpanel" aria-labelledby="examples-tab">
@@ -129,6 +129,8 @@
                                     <option value="">Auto-detect</option>
                                     <option value="chc">CHC</option>
                                     <option value="sygus">SyGuS</option>
+                                    <option value="boogie">Boogie</option>
+                                    <option value="c">C</option>
                                 </select>
                             </div>
                         </div>
@@ -170,12 +172,30 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize CodeMirror
         const codeEditor = CodeMirror(document.getElementById('codeEditor'), {
-            mode: 'javascript',
+            mode: 'scheme', // SMT-LIB format uses scheme-like syntax
             theme: 'monokai',
             lineNumbers: true,
             matchBrackets: true,
             indentUnit: 4,
             value: ';; Enter your SMT code here\n(set-logic HORN)\n\n(declare-fun inv ((_ BitVec 32) (_ BitVec 32)) Bool)\n\n(assert (forall ((x (_ BitVec 32)) (y (_ BitVec 32)))\n       (=> (and (= x (_ bv1 32)) (= y (_ bv1 32))) (inv x y))))\n(assert (forall ((x (_ BitVec 32)) (y (_ BitVec 32)) (x! (_ BitVec 32)) (y! (_ BitVec 32)))\n       (=> (and (inv x y) (and (= x! (bvadd x y)) (= y! (bvadd x y)))) (inv x! y!))))\n(assert (forall ((x (_ BitVec 32)) (y (_ BitVec 32)))\n       (=> (inv x y) (bvuge y (_ bv1 32)))))\n\n(check-sat)\n'
+        });
+        
+        // Update CodeMirror mode based on selected language
+        function updateEditorMode(lang) {
+            let mode = 'scheme'; // Default to scheme mode for SMT-LIB syntax
+            if (lang === 'c') {
+                mode = 'clike';
+            } else if (lang === 'boogie') {
+                mode = 'clike'; // Boogie syntax is similar to C
+            } else if (lang === 'chc' || lang === 'sygus' || lang === '') {
+                mode = 'scheme'; // SMT-LIB format uses scheme-like syntax
+            }
+            codeEditor.setOption('mode', mode);
+        }
+        
+        // Listen for language changes
+        document.getElementById('langSelect').addEventListener('change', function() {
+            updateEditorMode(this.value);
         });
 
         // Load examples

@@ -1,6 +1,5 @@
 """Command-line interface for EFMC.
-This module provides the main CLI interface for running different verification engines
-on transition systems specified in various formats.
+This module provides the main CLI interface for running different verification engines on transition systems specified in various formats.
 """
 
 import argparse
@@ -15,7 +14,7 @@ import logging
 from typing import List
 import psutil
 
-from efmc.frontends import parse_sygus, parse_chc, parse_boogie
+from efmc.frontends import parse_sygus, parse_chc, parse_boogie, parse_c
 from efmc.sts import TransitionSystem
 from efmc.efmc_config import g_verifier_args
 
@@ -218,6 +217,17 @@ class EFMCRunner:
         # Parse Boogie file and get transition system directly
         sts = parse_boogie(filename, to_real_type=False)
         self.logger.info("Boogie file parsing completed")
+
+        if sts.has_bv and g_verifier_args.signedness in ["signed", "unsigned"]:
+            sts.set_signedness(g_verifier_args.signedness)
+
+        self.run_verifier(sts)
+
+    def verify_c(self, filename: str) -> None:
+        """Verify C file"""
+        self.logger.info(f"Parsing C file: {filename}")
+        sts = parse_c(filename, to_real_type=False)
+        self.logger.info("C file parsing completed")
 
         if sts.has_bv and g_verifier_args.signedness in ["signed", "unsigned"]:
             sts.set_signedness(g_verifier_args.signedness)
@@ -492,6 +502,8 @@ def main():
         runner.verify_sygus(g_verifier_args.file)
     elif g_verifier_args.lang == "boogie":
         runner.verify_boogie(g_verifier_args.file)
+    elif g_verifier_args.lang == "c":
+        runner.verify_c(g_verifier_args.file)
     else:  # the default value is "auto"
         file_extension = os.path.splitext(g_verifier_args.file)[1].lower()
         if file_extension == '.smt2':
@@ -500,6 +512,8 @@ def main():
             runner.verify_sygus(g_verifier_args.file)
         elif file_extension == '.bpl':
             runner.verify_boogie(g_verifier_args.file)
+        elif file_extension == '.c':
+            runner.verify_c(g_verifier_args.file)
         else:
             logging.error(f"Unsupported file extension: {file_extension}")
             logging.info("Supported extensions: .smt2 (CHC), .sy/sl (SyGuS), .bpl (Boogie)")

@@ -95,8 +95,13 @@ The parsers (and the transition system) are limited and not robust:
   - In some benchmarks, the primed variables could be ended with `'`
 - There is no support for arrays (e.g., ALIA)
 
-To extend the applicability, we need more frontends:
-- Frontend for C programs (for more software verification benchmarks)
+EFMC currently supports multiple frontends:
+- **CHC Frontend**: For Constrained Horn Clause format (.smt2)
+- **SyGuS Frontend**: For Syntax-Guided Synthesis format (.sy, .sl)
+- **Boogie Frontend**: For Boogie intermediate verification language (.bpl)
+- **C Frontend**: For C programs (.c)
+
+Future frontends:
 - Frontend for btor2 (for hardware model checking benchmarks)
 
 ### Other Verification Engines

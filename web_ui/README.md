@@ -5,11 +5,12 @@ A web-based user interface for interacting with EFMC (SMT-based Software Model C
 ## Features
 
 - Modern, responsive web interface
-- Code editor with syntax highlighting
-- File upload capability
+- Code editor with syntax highlighting for multiple languages (SMT-LIB, C, Boogie)
+- File upload capability supporting multiple formats (.smt2, .sl, .chc, .sygus, .bpl, .c)
 - Example browser
 - Real-time verification results
 - Support for multiple verification engines
+- Support for multiple input formats: CHC, SyGuS, Boogie, and C
 - Configurable timeout settings
 - Multiple template options for constraint-based verification
 - Customizable SMT solver selection for EFSMT

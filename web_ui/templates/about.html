@@ -15,6 +15,15 @@
             <div class="card-body">
                 <p>EFMC is a toolkit for verifying program properties using SMT-based verification engines. It implements multiple approaches, such as template-based verification, property-directed reachability (PDR), Houdini, and k-induction. Each engine offers distinct advantages for different types of programs and properties.</p>
                 
+                <h5 class="mt-4">Supported Input Formats</h5>
+                <p>EFMC supports multiple input formats:</p>
+                <ul>
+                    <li><strong>CHC (Constrained Horn Clauses)</strong>: SMT-LIB format (.smt2) for expressing verification conditions as Horn clauses</li>
+                    <li><strong>SyGuS (Syntax-Guided Synthesis)</strong>: Format (.sy, .sl) for syntax-guided program synthesis</li>
+                    <li><strong>Boogie</strong>: Microsoft Boogie intermediate verification language (.bpl)</li>
+                    <li><strong>C</strong>: C programs (.c) with loop-centric verification</li>
+                </ul>
+                
                 <h5 class="mt-4">Verification Engines</h5>
                 <div class="row">
                     <div class="col-md-6">
@@ -107,7 +116,7 @@
             <div class="card-body">
                 <p>This web interface provides a convenient way to interact with EFMC and EFSMT tools through your browser. It allows you to:</p>
                 <ul>
-                    <li>Write or upload SMT code</li>
+                    <li>Write or upload code in multiple formats (CHC, SyGuS, Boogie, C)</li>
                     <li>Choose different verification engines and options</li>
                     <li>Run verification tasks and view results in real-time</li>
                     <li>Explore example problems</li>

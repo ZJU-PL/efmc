@@ -17,9 +17,13 @@ You can try the following command (in a virtual environemnt)
 pip install -e .
 ~~~~
 
-Then, the `efmc` is a command-line tool, which supports programs specified in either CHC (Constrained Horn
-Clauses) or SyGuS (Syntax-Guided Synthesis) format with pre- and
-post-conditions.
+Then, the `efmc` is a command-line tool, which supports programs specified in multiple formats:
+- CHC (Constrained Horn Clauses) format (.smt2)
+- SyGuS (Syntax-Guided Synthesis) format (.sy, .sl)
+- Boogie intermediate verification language (.bpl)
+- C programs (.c)
+
+All formats support pre- and post-conditions for verification.
 
 ~~~~
 efmc -h
