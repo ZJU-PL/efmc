@@ -36,7 +36,7 @@ def test_simple_while_translation():
 
         _assert_equiv(ts.init, x == 0)
         _assert_equiv(ts.trans, z3.And(x < 3, xp == x + 1))
-        _assert_equiv(ts.post, x == 3)
+        _assert_equiv(ts.post, z3.Implies(z3.Not(x < 3), x == 3))
     finally:
         os.unlink(path)
 
@@ -58,7 +58,7 @@ def test_for_loop_normalization():
 
         _assert_equiv(ts.init, i == 0)
         _assert_equiv(ts.trans, z3.And(i < 2, ip == i + 1))
-        _assert_equiv(ts.post, i == 2)
+        _assert_equiv(ts.post, z3.Implies(z3.Not(i < 2), i == 2))
     finally:
         os.unlink(path)
 
@@ -135,9 +135,10 @@ def test_post_assertions_are_guarded():
         x = ts.variables[0]
         post = ts.post
 
+        exit_guard = z3.Not(x < 3)
         guarded = z3.And(
-            z3.Implies(x > 1, x == 3),
-            z3.Implies(z3.Not(x > 1), x == 1),
+            z3.Implies(z3.And(exit_guard, x > 1), x == 3),
+            z3.Implies(z3.And(exit_guard, z3.Not(x > 1)), x == 1),
         )
         _assert_equiv(post, guarded)
     finally:
