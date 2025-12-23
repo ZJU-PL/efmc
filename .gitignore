@@ -1,6 +1,8 @@
 coverage.xml
 coverage_report
 .coverage
+lextab.py
+yacctab.py
 .vscode
 *.time 
 *.out

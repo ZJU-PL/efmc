@@ -170,5 +170,6 @@ def main():
 
 
 if __name__ == "__main__":
+    # NOTE: this demo uses local llm be default, you can change it to remote llm by setting the llm_provider to 'remote'
     import sys
     main()
