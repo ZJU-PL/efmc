@@ -46,6 +46,10 @@ class EFProver:
         self.no_underflow = kwargs.get("no_underflow", False)
         self.pysmt_solver = kwargs.get("pysmt_solver", "z3")
         self.num_disjunctions = kwargs.get("num_disjunctions",2)
+        # CEGIS-specific parameters
+        self.cegis_solver_timeout = kwargs.get("cegis_solver_timeout", 10)
+        self.cegis_dump_dir = kwargs.get("cegis_dump_dir", None)
+        self.cegis_dump_threshold = kwargs.get("cegis_dump_threshold", 5)
         # split the input into list if not empty str
         if self.prop_strengthening_templates != "":
             if self.prop_strengthening:
@@ -201,7 +205,10 @@ class EFProver:
         qf_vc = self.generate_quantifier_free_vc()
         print("EFSMT starting!!!")
         
-        ef_solver = EFSMTSolver(logic=self.logic, solver=self.solver, pysmt_solver=self.pysmt_solver)
+        ef_solver = EFSMTSolver(logic=self.logic, solver=self.solver, pysmt_solver=self.pysmt_solver,
+                                solver_timeout=self.cegis_solver_timeout,
+                                dump_dir=self.cegis_dump_dir,
+                                dump_threshold=self.cegis_dump_threshold)
         exists_vars = extract_all(self.ct.template_vars)
         ef_solver.init(exist_vars=exists_vars, forall_vars=self.sts.all_variables, phi=qf_vc)
         
@@ -297,6 +304,7 @@ class EFProver:
             print(vc)
         
         s.add(vc)
+        # print(s)
         print("EFSMT starting (via z3py API)!!!")
         
         start = time.time()

@@ -127,7 +127,10 @@ class EFMCRunner:
             no_underflow=g_verifier_args.prevent_over_under_flows > 0 if sts.has_bv else False,
             pysmt_solver=g_verifier_args.pysmt_solver,
             strengthen_templates=g_verifier_args.strengthen_templates,
-            num_disjunctions=g_verifier_args.num_disjunctions
+            num_disjunctions=g_verifier_args.num_disjunctions,
+            cegis_solver_timeout=getattr(g_verifier_args, 'cegis_solver_timeout', 10),
+            cegis_dump_dir=getattr(g_verifier_args, 'cegis_dump_dir', None),
+            cegis_dump_threshold=getattr(g_verifier_args, 'cegis_dump_threshold', 5)
         )
 
         # Set template and solver
@@ -413,6 +416,15 @@ def parse_arguments():
                               help='Dump constraints in QBF format')
     output_group.add_argument('--dump-cnt-dir', dest='dump_cnt_dir', default="/tmp", type=str,
                               help="The dir for storing the dumped constraints")
+    
+    # CEGIS-specific options (for FP logic)
+    cegis_group = parser.add_argument_group('CEGIS solver options (for FP logic)')
+    cegis_group.add_argument('--cegis-solver-timeout', type=int, default=10,
+                             help='Timeout per solver call in seconds for CEGIS (default: 10)')
+    cegis_group.add_argument('--cegis-dump-dir', type=str, default=None,
+                             help='Directory to dump challenging QF_FP queries (default: None, no dumping)')
+    cegis_group.add_argument('--cegis-dump-threshold', type=int, default=5,
+                             help='Dump queries that timeout or exceed this many iterations (default: 5)')
 
     # K-induction options
     kind_group = parser.add_argument_group('K-induction options')

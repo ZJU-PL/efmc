@@ -58,6 +58,11 @@ class EFSMTSolver:
         # NOTE: it seems that only z3 is installed automatically when we install pysmt
         # For other SMT solvers, we need to use the pysmt-install command to install
         self.pysmt_solver = kwargs.get("pysmt_solver", "z3")
+        
+        # CEGIS-specific parameters
+        self.solver_timeout = kwargs.get("solver_timeout", 10)  # Timeout per solver call in seconds
+        self.dump_dir = kwargs.get("dump_dir", None)  # Directory to dump challenging queries
+        self.dump_threshold = kwargs.get("dump_threshold", 5)  # Dump queries after this many iterations
 
     def get_model(self):
         return "get_model is not implemented"
@@ -233,7 +238,10 @@ class EFSMTSolver:
         # Use FP-specific CEGIS solver for FP logic
         if self.logic == "FP":
             z3_res = simple_cegis_efsmt_fp(self.logic, self.exists_vars, self.forall_vars, self.phi,
-                                           maxloops=None, profiling=False, timeout=None)
+                                           maxloops=None, profiling=False, timeout=None,
+                                           solver_timeout=self.solver_timeout,
+                                           dump_dir=self.dump_dir,
+                                           dump_threshold=self.dump_threshold)
         else:
             z3_res = simple_cegis_efsmt(self.logic, self.exists_vars, self.forall_vars, self.phi,
                                         pysmt_solver=self.pysmt_solver)
