@@ -23,20 +23,21 @@ class HoudiniProver:
         self.sts = system
         self.logger = logging.getLogger(__name__)
 
-    def houdini(self, lemmas: List[z3.ExprRef], timeout: Optional[int] = None) -> Optional[Dict[int, z3.ExprRef]]:
+    def houdini(self, lemmas: List[z3.ExprRef],
+                timeout: Optional[int] = None) -> Optional[Dict[int, z3.ExprRef]]:
         """Find the maximal inductive subset for the given lemmas"""
         annotated: List[z3.ExprRef] = []
         annotated_primes: List[z3.ExprRef] = []
         indexed: Dict[int, z3.ExprRef] = {}
-        
+
         start_time = time.time()
-        self.logger.info(f"Starting Houdini with {len(lemmas)} lemmas" + 
-                        (f" (timeout: {timeout}s)" if timeout else ""))
+        timeout_msg = f" (timeout: {timeout}s)" if timeout else ""
+        self.logger.info("Starting Houdini with %d lemmas%s", len(lemmas), timeout_msg)
 
         # Create primed versions and selector variables
-        for i in range(len(lemmas)):
-            lemma = lemmas[i]
-            primed = z3.substitute(lemma, list(zip(self.sts.variables, self.sts.prime_variables)))
+        for i, lemma in enumerate(lemmas):
+            primed = z3.substitute(
+                lemma, list(zip(self.sts.variables, self.sts.prime_variables)))
             annotated.append(z3.Or(lemma, get_selector_var(i)))
             annotated_primes.append(z3.Or(primed, get_selector_var(i)))
             indexed[i] = lemma
@@ -51,9 +52,9 @@ class HoudiniProver:
 
         while prover.check() != z3.unsat:
             if timeout and (time.time() - start_time > timeout):
-                self.logger.warning(f"Houdini timed out after {iteration} iterations")
+                self.logger.warning("Houdini timed out after %d iterations", iteration)
                 return None
-                
+
             iteration += 1
             m = prover.model()
             removed = 0
@@ -64,18 +65,21 @@ class HoudiniProver:
                     del indexed[i]
                     removed += 1
 
-            self.logger.info(f"Iteration {iteration}: Removed {removed}, {len(indexed)}/{initial_count} remaining")
+            self.logger.info("Iteration %d: Removed %d, %d/%d remaining",
+                            iteration, removed, len(indexed), initial_count)
 
         elapsed = time.time() - start_time
-        self.logger.info(f"Houdini completed in {elapsed:.2f}s with {len(indexed)}/{initial_count} lemmas")
+        self.logger.info("Houdini completed in %.2fs with %d/%d lemmas",
+                         elapsed, len(indexed), initial_count)
         return indexed
 
     def solve(self, timeout: Optional[int] = None) -> VerificationResult:
         """Main solving procedure"""
         start_time = time.time()
-        
+
         # Check if post-condition is already inductive
-        post_primed = z3.substitute(self.sts.post, list(zip(self.sts.variables, self.sts.prime_variables)))
+        post_primed = z3.substitute(
+            self.sts.post, list(zip(self.sts.variables, self.sts.prime_variables)))
         if check_invariant(self.sts, self.sts.post, post_primed):
             self.logger.info("Post-condition is already inductive")
             return VerificationResult(True, self.sts.post)
@@ -85,7 +89,8 @@ class HoudiniProver:
         result = self.houdini(lemmas, timeout)
 
         if result is None or (timeout and (time.time() - start_time > timeout)):
-            self.logger.warning(f"Solver timed out after {time.time() - start_time:.2f}s")
+            elapsed = time.time() - start_time
+            self.logger.warning("Solver timed out after %.2fs", elapsed)
             return VerificationResult(False, None, is_unknown=True, timed_out=True)
 
         if result:
@@ -104,13 +109,13 @@ class HoudiniProver:
         existing_invariants = None
         if hasattr(self.sts, 'invariants') and self.sts.invariants:
             existing_invariants = self.sts.invariants
-        
+
         # Use the centralized lemma generation function
         lemmas = generate_basic_lemmas(
-            self.sts.variables, 
-            self.sts.post, 
+            self.sts.variables,
+            self.sts.post,
             existing_invariants
         )
-        
-        self.logger.info(f"Generated {len(lemmas)} candidate lemmas")
+
+        self.logger.info("Generated %d candidate lemmas", len(lemmas))
         return lemmas

@@ -8,7 +8,7 @@ keeping them separate from the generic LLM interface.
 import json
 import re
 import logging
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple
 import z3
 
 from efmc.sts import TransitionSystem
@@ -20,12 +20,12 @@ def extract_bit_width_from_sts(sts: TransitionSystem) -> int:
     """Extract bit width from TransitionSystem variables."""
     if not sts.variables:
         return 32  # Default fallback
-    
+
     # Find the first bit-vector variable and extract its width
     for var in sts.variables:
         if z3.is_bv_sort(var.sort()):
             return var.sort().size()
-    
+
     # If no bit-vector variables found, return default
     return 32
 
@@ -33,11 +33,11 @@ def extract_bit_width_from_sts(sts: TransitionSystem) -> int:
 class InvariantPromptManager:
     """
     Manages invariant-specific prompts and response parsing for LLM4Inv.
-    
+
     This class handles all the domain-specific logic for generating
     invariant synthesis prompts and parsing LLM responses.
     """
-    
+
     def __init__(self, sts: TransitionSystem, bit_width: Optional[int] = None):
         self.sts = sts
         self.bit_width = bit_width or extract_bit_width_from_sts(sts)
@@ -51,24 +51,27 @@ class InvariantPromptManager:
     ) -> str:
         """
         Generate a prompt for invariant synthesis.
-        
+
         Args:
             program_code: The program code to analyze
             failed_candidates: Previously failed candidates to avoid
             max_candidates: Maximum number of candidates to generate
-            
+
         Returns:
             The formatted prompt string
         """
         failed_candidates = failed_candidates or []
-        
+
         failed_candidates_section = (
-            'The following candidates failed previously and should be avoided or strengthened:\n' + 
+            'The following candidates failed previously and should be avoided or strengthened:\n' +
             '\n'.join('- ' + c for c in failed_candidates)
             if failed_candidates else ''
         )
-        
-        prompt = f"""You are an expert in program verification. Propose up to {max_candidates} concrete inductive invariant candidates for the following program. Do NOT use holes or placeholders. Use only variables: {', '.join(self.variables)}.
+
+        vars_str = ', '.join(self.variables)
+        prompt = f"""You are an expert in program verification. Propose up to {max_candidates} \
+concrete inductive invariant candidates for the following program. Do NOT use holes or \
+placeholders. Use only variables: {vars_str}.
 
 Program:
 ```
@@ -94,7 +97,7 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
 ```
 """
         return prompt
-    
+
     def parse_invariant_response(self, response: str) -> List[Tuple[str, z3.ExprRef]]:
         """
         Parse LLM response to extract invariant candidates.
@@ -111,18 +114,18 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
             if not json_match:
                 json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if not json_match:
-                logger.warning(f"No JSON found in response: {response[:100]}...")
+                logger.warning("No JSON found in response: %s...", response[:100])
                 return []
-            
+
             json_str = json_match.group(1) if json_match.group(1) else json_match.group(0)
-            logger.info(f"Extracted JSON: {json_str}")
-            
+            logger.info("Extracted JSON: %s", json_str)
+
             parsed = json.loads(json_str)
             candidate_strs = parsed.get("candidates", [])
-            logger.info(f"Parsed candidates: {candidate_strs}")
-        except Exception as e:
-            logger.error(f"Failed to parse invariant candidates: {e}")
-            logger.error(f"Response was: {response}")
+            logger.info("Parsed candidates: %s", candidate_strs)
+        except (json.JSONDecodeError, KeyError, AttributeError) as e:
+            logger.error("Failed to parse invariant candidates: %s", e)
+            logger.error("Response was: %s", response)
             return []
 
         pairs = []
@@ -130,7 +133,7 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
             expr = self._parse_candidate_to_z3(s)
             if expr is not None:
                 pairs.append((s, expr))
-        
+
         return pairs
     
     def _parse_candidate_to_z3(self, s: str) -> Optional[z3.ExprRef]:
@@ -138,31 +141,36 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
         try:
             s = s.strip()
             var_map = {str(var): var for var in self.sts.variables}
-            
+
             # Try Z3 Python API evaluation
+            # Note: eval is necessary here to parse Z3 Python expressions from LLM output
             try:
                 safe_globals = {'z3': z3, '__builtins__': {}, **var_map}
-                expr = eval(s, safe_globals)
+                expr = eval(s, safe_globals)  # pylint: disable=eval-used
                 if isinstance(expr, z3.ExprRef):
                     return expr
-            except:
+            except (NameError, SyntaxError, TypeError, AttributeError):
                 pass
-            
+
             # Try SMT-LIB parsing
             try:
-                if s.startswith('(') or s.startswith('=') or s.startswith('#x') or s.isdigit() or '#' in s:
-                    decls = [f"(declare-fun {str(var)} () (_ BitVec {var.sort().size()}))" 
-                            if z3.is_bv_sort(var.sort()) else f"(declare-fun {str(var)} () Int)"
-                            for var in self.sts.variables]
+                if (s.startswith('(') or s.startswith('=') or s.startswith('#x') or
+                        s.isdigit() or '#' in s):
+                    decls = [
+                        f"(declare-fun {str(var)} () (_ BitVec {var.sort().size()}))"
+                        if z3.is_bv_sort(var.sort())
+                        else f"(declare-fun {str(var)} () Int)"
+                        for var in self.sts.variables
+                    ]
                     smt = "\n".join(decls) + f"\n(assert {s})\n"
                     expr = z3.parse_smt2_string(smt)
                     if hasattr(expr, '__len__') and len(expr) > 0:
                         return expr[0]
-            except:
+            except (z3.Z3Exception, AttributeError, IndexError):
                 pass
-            
+
             return None
-        except:
+        except Exception:
             return None
     
     def create_prompt_generator(
@@ -173,28 +181,28 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
     ):
         """
         Create a prompt generator function for use with the generic LLM interface.
-        
+
         Args:
             program_code: The program code to analyze
             failed_candidates: Previously failed candidates to avoid
             max_candidates: Maximum number of candidates to generate
-            
+
         Returns:
             A function that generates the prompt when called
         """
         def prompt_generator():
             return self.generate_invariant_prompt(program_code, failed_candidates, max_candidates)
-        
+
         return prompt_generator
-    
+
     def create_response_parser(self):
         """
         Create a response parser function for use with the generic LLM interface.
-        
+
         Returns:
             A function that parses LLM responses into candidate pairs
         """
         def response_parser(response: str):
             return self.parse_invariant_response(response)
-        
+
         return response_parser

@@ -9,11 +9,11 @@ analogue appropriate for numeric systems, suitable as a starting point.
 """
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List
 import z3
 
-from .base_prover import BaseKSafetyProver
 from efmc.utils.verification_utils import VerificationResult
+from .base_prover import BaseKSafetyProver
 
 logger = logging.getLogger(__name__)
 
@@ -85,5 +85,3 @@ class DifferentialPrivacyProver(BaseKSafetyProver):
 
         self.set_relational_property(z3.Implies(antecedent, consequent))
         return self.solve()
-
-

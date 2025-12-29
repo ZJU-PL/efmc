@@ -6,7 +6,6 @@ import logging
 from typing import List
 import z3
 from pysmt.shortcuts import And, Not, Bool, get_model, Solver, BV
-from pysmt.typing import BVType
 from pysmt.logics import QF_BV
 
 from efmc.smttools.pysmt_solver import PySMTSolver, to_pysmt_vars
@@ -25,52 +24,55 @@ class SamplingEFSMTSolver:
         self.sample_size = kwargs.get("sample_size", 10)
         self.max_samples = kwargs.get("max_samples", 100)
 
-    def solve(self, evars: List[z3.ExprRef], uvars: List[z3.ExprRef], z3fml: z3.ExprRef, 
-              maxloops=None):
-        """Solves exists x. forall y. phi(x, y) using sampling-based CEGIS over QF_BV"""
+    def solve(
+        self, evars: List[z3.ExprRef], uvars: List[z3.ExprRef],
+        z3fml: z3.ExprRef, maxloops=None
+    ):
+        """Solves exists x. forall y. phi(x, y) using sampling-based CEGIS
+        over QF_BV."""
         start_time = time.time()
-        
+
         # Convert to PySMT format
         _, phi = PySMTSolver.convert(z3fml)
         y_vars = to_pysmt_vars(uvars)
         x_vars = to_pysmt_vars(evars)
-        
+
         # Initialize sample set
         y_samples = self._generate_initial_samples(y_vars, self.sample_size)
-        
+
         loops = 0
         result = "unknown"
-        
+
         while maxloops is None or loops < maxloops:
             if self.timeout and time.time() - start_time > self.timeout:
                 if self.verbose:
-                    print(f"Timeout reached after {time.time() - start_time:.2f} seconds")
+                    elapsed = time.time() - start_time
+                    print(f"Timeout reached after {elapsed:.2f} seconds")
                 break
-                
+
             loops += 1
             if self.verbose:
                 print(f"CEGIS iteration {loops} with {len(y_samples)} samples")
-            
+
             # Synthesize x for all sampled y
             candidate_x = self._synthesize_for_samples(x_vars, phi, y_samples)
             if candidate_x is None:
                 result = "unsat"
                 break
-            
+
             # Verify candidate
             counterexample = self._verify_candidate(y_vars, phi, candidate_x)
             if counterexample is None:
                 result = "sat"
                 break
-            else:
-                y_samples.append(counterexample)
-                if len(y_samples) >= self.max_samples:
-                    if self.verbose:
-                        print(f"Reached maximum sample size ({self.max_samples})")
-                    break
-        
+            y_samples.append(counterexample)
+            if len(y_samples) >= self.max_samples:
+                if self.verbose:
+                    print(f"Reached maximum sample size ({self.max_samples})")
+                break
+
         return result
-    
+
     def _generate_initial_samples(self, y_vars, sample_size):
         """Generate initial samples for y variables"""
         samples = []
@@ -78,41 +80,46 @@ class SamplingEFSMTSolver:
             sample = {}
             for var in y_vars:
                 var_type = var.symbol_type()
-                if isinstance(var_type, BVType):
+                # Check if it's a BVType (need to import from pysmt.typing)
+                if hasattr(var_type, 'width'):
                     width = var_type.width
-                    sample[var] = BV(0, width)  # Start with 0, could be randomized
+                    # Start with 0, could be randomized
+                    sample[var] = BV(0, width)
                 else:
                     sample[var] = Bool(False)
             samples.append(sample)
         return samples
-    
+
     def _synthesize_for_samples(self, x_vars, phi, y_samples):
         """Synthesize x that satisfies phi(x, y) for all sampled y"""
         constraints = []
         for sample in y_samples:
             phi_substituted = phi.substitute(sample).simplify()
             constraints.append(phi_substituted)
-        
+
         with Solver(logic=QF_BV, name=self.esolver_name) as solver:
             solver.add_assertion(And(constraints))
             if solver.solve():
                 return {var: solver.get_value(var) for var in x_vars}
             return None
-    
+
     def _verify_candidate(self, y_vars, phi, candidate_x):
         """Verify if candidate_x works for all y, return counterexample if not"""
         phi_substituted = phi.substitute(candidate_x).simplify()
-        counterexample = get_model(Not(phi_substituted), logic=QF_BV, solver_name=self.fsolver_name)
-        
+        counterexample = get_model(
+            Not(phi_substituted), logic=QF_BV, solver_name=self.fsolver_name
+        )
+
         if counterexample is None:
             return None
-        else:
-            return {var: counterexample[var] for var in y_vars}
+        return {var: counterexample[var] for var in y_vars}
 
 
-def sampling_efsmt(evars: List[z3.ExprRef], uvars: List[z3.ExprRef], z3fml: z3.ExprRef, 
-                   maxloops=None, esolver_name="z3", fsolver_name="z3", 
-                   verbose=False, timeout=None, sample_size=10, max_samples=100):
+def sampling_efsmt(
+    evars: List[z3.ExprRef], uvars: List[z3.ExprRef], z3fml: z3.ExprRef,
+    maxloops=None, esolver_name="z3", fsolver_name="z3",
+    verbose=False, timeout=None, sample_size=10, max_samples=100
+):
     """Convenience function for sampling-based CEGIS over QF_BV"""
     solver = SamplingEFSMTSolver(
         esolver_name=esolver_name,

@@ -1,13 +1,15 @@
+"""
+Custom exception hierarchy for SMT-related errors.
+"""
+
+
 class SMTError(Exception):
-    """
-    Top level Exception object for custom exception hierarchy
-    """
-    pass
+    """Top level Exception object for custom exception hierarchy."""
 
 
 class SmtlibError(SMTError):
-    pass
+    """Exception for SMTLIB-related errors."""
 
 
 class SolverError(SmtlibError):
-    pass
+    """Exception for solver-related errors."""

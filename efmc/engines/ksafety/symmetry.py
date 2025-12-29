@@ -10,8 +10,8 @@ import logging
 from typing import Dict, List
 import z3
 
-from .base_prover import BaseKSafetyProver
 from efmc.utils.verification_utils import VerificationResult
+from .base_prover import BaseKSafetyProver
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,8 @@ class SymmetryProver(BaseKSafetyProver):
         output_perm: Dict[str, str]
     ) -> VerificationResult:
         """
-        Check that applying input permutation on trace 1 yields output permutation equivalence on trace 2.
+        Check that applying input permutation on trace 1 yields output
+        permutation equivalence on trace 2.
 
         Args:
             input_perm: mapping from input var name to its permuted name
@@ -51,8 +52,8 @@ class SymmetryProver(BaseKSafetyProver):
                 perm_name = input_perm[name]
                 try:
                     j = next(idx for idx, v in enumerate(self.sts.variables) if str(v) == perm_name)
-                except StopIteration:
-                    raise ValueError(f"Permutation target '{perm_name}' not found among variables")
+                except StopIteration as exc:
+                    raise ValueError(f"Permutation target '{perm_name}' not found among variables") from exc
                 input_eq_terms.append(trace_vars[0][i] == trace_vars[1][j])
 
         # For outputs, require v_0 equals perm(v)_1
@@ -63,13 +64,11 @@ class SymmetryProver(BaseKSafetyProver):
                 perm_name = output_perm[name]
                 try:
                     j = next(idx for idx, v in enumerate(self.sts.variables) if str(v) == perm_name)
-                except StopIteration:
-                    raise ValueError(f"Permutation target '{perm_name}' not found among variables")
+                except StopIteration as exc:
+                    raise ValueError(f"Permutation target '{perm_name}' not found among variables") from exc
                 output_eq_terms.append(trace_vars[0][i] == trace_vars[1][j])
 
         antecedent = z3.And(*input_eq_terms) if input_eq_terms else z3.BoolVal(True)
         consequent = z3.And(*output_eq_terms) if output_eq_terms else z3.BoolVal(True)
         self.set_relational_property(z3.Implies(antecedent, consequent))
         return self.solve()
-
-

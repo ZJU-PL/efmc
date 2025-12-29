@@ -8,8 +8,8 @@ which ensure that for the same inputs, the system always produces the same outpu
 import logging
 import z3
 
-from .base_prover import BaseKSafetyProver
 from efmc.utils.verification_utils import VerificationResult
+from .base_prover import BaseKSafetyProver
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class DeterminismProver(BaseKSafetyProver):
             VerificationResult indicating the verification outcome
         """
         self.logger.info("Verifying determinism property")
-        
+
         # Create the determinism property
         # For determinism: if inputs are the same, then outputs should be the same
         trace_vars = self.create_trace_variables()
@@ -73,6 +73,6 @@ class DeterminismProver(BaseKSafetyProver):
         output_equality = z3.And(*output_eq_terms) if output_eq_terms else z3.BoolVal(True)
 
         determinism_property = z3.Implies(input_equality, output_equality)
-        
+
         self.set_relational_property(determinism_property)
-        return self.solve() 
+        return self.solve()

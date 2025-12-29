@@ -26,22 +26,20 @@ def get_qmodel(x_univl, formula, maxiters=None, solver_name=None, verbose=False)
             amodel = asolver.solve()
             if not amodel:
                 return None
-            else:
-                cand = {v: asolver.get_value(v) for v in x_exist}
-                subform = formula.substitute(cand).simplify()
-                if verbose:
-                    print('c qsolve cand{0}: {1}'.format(iters, cand))
+            cand = {v: asolver.get_value(v) for v in x_exist}
+            subform = formula.substitute(cand).simplify()
+            if verbose:
+                print(f'c qsolve cand{iters}: {cand}')
 
-                cmodel = get_model(Not(subform), solver_name=solver_name)
-                if cmodel is None:
-                    return cand
-                else:
-                    coex = {v: cmodel[v] for v in x_univl}
-                    subform = formula.substitute(coex).simplify()
-                    if verbose:
-                        print('c qsolve coex{0}: {1}'.format(iters, coex))
+            cmodel = get_model(Not(subform), solver_name=solver_name)
+            if cmodel is None:
+                return cand
+            coex = {v: cmodel[v] for v in x_univl}
+            subform = formula.substitute(coex).simplify()
+            if verbose:
+                print(f'c qsolve coex{iters}: {coex}')
 
-                    asolver.add_assertion(subform)
+            asolver.add_assertion(subform)
 
         raise SolverReturnedUnknownResultError
 
@@ -53,7 +51,7 @@ class Mistral:
         Mistral solver class.
     """
 
-    def __init__(self, simplify, solver, qsolve, verbose, fname):
+    def __init__(self, simplify, solver, qsolve, verbose, fname):  # pylint: disable=too-many-arguments
         """
             Constructor.
         """
@@ -70,10 +68,10 @@ class Mistral:
         self.qsolve = qsolve
 
         if self.verb > 2:
-            print('c formula: \'{0}\''.format(self.formula))
+            print(f'c formula: \'{self.formula}\'')
 
         if self.verb > 1:
-            print('c vars ({0}):'.format(len(self.fvars)), list(self.fvars))
+            print(f'c vars ({len(self.fvars)}):', list(self.fvars))
 
     def solve(self):
         """
@@ -88,34 +86,35 @@ class Mistral:
         mus = self.compute_mus(frozenset([]), self.fvars, 0)
 
         model = self.get_model_forall(mus)
-        return ['{0}={1}'.format(v, model[v]) for v in self.fvars - mus]
+        return [f'{v}={model[v]}' for v in self.fvars - mus]
 
-    def compute_mus(self, X, fvars, lb):
+    def compute_mus(self, x_set, fvars, lb):  # pylint: disable=invalid-name
         """
             Algorithm implements find_mus() procedure from Fig. 1
             of the dillig-cav12 paper.
+            x_set: variables to include (named X in the paper)
         """
 
         if not fvars or len(fvars) <= lb:
             return frozenset()
 
         best = set()
-        x = frozenset([next(iter(fvars))])  # should choose x in a more clever way
+        x_var = frozenset([next(iter(fvars))])  # should choose x in a more clever way
 
         if self.verb > 1:
-            print('c state:', 'X = {0} + {1},'.format(list(X), list(x)), 'lb =', lb)
+            print(f'c state: X = {list(x_set)} + {list(x_var)}, lb = {lb}')
 
-        if self.get_model_forall(X.union(x)):
-            Y = self.compute_mus(X.union(x), fvars - x, lb - 1)
+        if self.get_model_forall(x_set.union(x_var)):
+            y_set = self.compute_mus(x_set.union(x_var), fvars - x_var, lb - 1)
 
-            cost_curr = len(Y) + 1
+            cost_curr = len(y_set) + 1
             if cost_curr > lb:
-                best = Y.union(x)
+                best = y_set.union(x_var)
                 lb = cost_curr
 
-        Y = self.compute_mus(X, fvars - x, lb)
-        if len(Y) > lb:
-            best = Y
+        y_set = self.compute_mus(x_set, fvars - x_var, lb)
+        if len(y_set) > lb:
+            best = y_set
 
         return best
 
@@ -130,6 +129,5 @@ class Mistral:
         elif self.qsolve == 'z3qe':
             formula = qelim(ForAll(x_univl, self.formula))
             return get_model(formula, solver_name=self.sname)
-        else:
-            return get_qmodel(x_univl, self.formula, solver_name=self.sname,
-                              verbose=True if self.verb > 2 else False)
+        return get_qmodel(x_univl, self.formula, solver_name=self.sname,
+                          verbose=self.verb > 2)

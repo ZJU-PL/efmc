@@ -20,11 +20,11 @@ Example:
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union, Iterable
+from typing import Dict, List, Optional, Union
 import z3
 
-from .base_prover import BaseKSafetyProver
 from efmc.utils.verification_utils import VerificationResult
+from .base_prover import BaseKSafetyProver
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +35,22 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Var:
     """A reference to a state variable name on a given trace."""
+
     name: str
     trace: int
 
 
 @dataclass(frozen=True)
 class IntConst:
+    """Integer constant."""
+
     value: int
 
 
 @dataclass(frozen=True)
 class RealConst:
+    """Real constant."""
+
     value: float
 
 
@@ -54,6 +59,8 @@ Term = Union[Var, IntConst, RealConst]
 
 @dataclass(frozen=True)
 class Atom:
+    """Atomic formula with comparison operator."""
+
     op: str  # '==','!=','<=','<','>=','>'
     left: Term
     right: Term
@@ -61,42 +68,58 @@ class Atom:
 
 @dataclass(frozen=True)
 class Not:
+    """Negation."""
+
     phi: "HProp"
 
 
 @dataclass(frozen=True)
 class And:
+    """Conjunction."""
+
     conjuncts: List["HProp"]
 
 
 @dataclass(frozen=True)
 class Or:
+    """Disjunction."""
+
     disjuncts: List["HProp"]
 
 
 @dataclass(frozen=True)
 class Implies:
+    """Implication."""
+
     left: "HProp"
     right: "HProp"
 
 
 @dataclass(frozen=True)
 class X:
+    """Next temporal operator."""
+
     phi: "HProp"
 
 
 @dataclass(frozen=True)
 class G:
+    """Globally temporal operator."""
+
     phi: "HProp"
 
 
 @dataclass(frozen=True)
 class F:
+    """Eventually temporal operator."""
+
     phi: "HProp"
 
 
 @dataclass(frozen=True)
 class U:
+    """Until temporal operator."""
+
     left: "HProp"
     right: "HProp"
 
@@ -158,14 +181,25 @@ def _encode(sts, step_vars, cache, phi: HProp, step: int, bound: int) -> z3.Expr
         next_step = min(step + 1, bound)
         return _encode(sts, step_vars, cache, phi.phi, next_step, bound)
     if isinstance(phi, G):
-        return z3.And(*[_encode(sts, step_vars, cache, phi.phi, t, bound) for t in range(step, bound + 1)])
+        return z3.And(*[
+            _encode(sts, step_vars, cache, phi.phi, t, bound)
+            for t in range(step, bound + 1)
+        ])
     if isinstance(phi, F):
-        return z3.Or(*[_encode(sts, step_vars, cache, phi.phi, t, bound) for t in range(step, bound + 1)])
+        return z3.Or(*[
+            _encode(sts, step_vars, cache, phi.phi, t, bound)
+            for t in range(step, bound + 1)
+        ])
     if isinstance(phi, U):
         ors = []
         for j in range(step, bound + 1):
-            left_ands = [ _encode(sts, step_vars, cache, phi.left, i, bound) for i in range(step, j) ]
-            ors.append(z3.And(*(left_ands + [ _encode(sts, step_vars, cache, phi.right, j, bound) ])))
+            left_ands = [
+                _encode(sts, step_vars, cache, phi.left, i, bound)
+                for i in range(step, j)
+            ]
+            ors.append(z3.And(*(left_ands + [
+                _encode(sts, step_vars, cache, phi.right, j, bound)
+            ])))
         return z3.Or(*ors) if ors else z3.BoolVal(False)
     raise NotImplementedError(f"Unsupported formula type: {type(phi)}")
 
@@ -185,25 +219,36 @@ class HyperLTLProver(BaseKSafetyProver):
         self.formula = formula
 
     def _build_unrolled_antecedent(self, bound: int):
+        """Build unrolled antecedent for bounded model checking."""
         # Create per-trace per-step variables using Base helper
         step_vars = self._make_step_variables(bound)
         conditions = []
         for trace_idx in range(self.k):
             # init at step 0
-            init_subst = [(self.sts.variables[i], step_vars[trace_idx][0][i]) for i in range(len(self.sts.variables))]
+            init_subst = [
+                (self.sts.variables[i], step_vars[trace_idx][0][i])
+                for i, _ in enumerate(self.sts.variables)
+            ]
             conditions.append(z3.substitute(self.sts.init, init_subst))
             # invariants 0..bound
             if getattr(self.sts, "invariants", None):
                 for step in range(bound + 1):
-                    inv_subst = [(self.sts.variables[i], step_vars[trace_idx][step][i]) for i in range(len(self.sts.variables))]
+                    inv_subst = [
+                        (self.sts.variables[i], step_vars[trace_idx][step][i])
+                        for i, _ in enumerate(self.sts.variables)
+                    ]
                     for inv in self.sts.invariants:
                         conditions.append(z3.substitute(inv, inv_subst))
             # transitions 0..bound-1
             for step in range(bound):
                 trans_subst = []
-                for i in range(len(self.sts.variables)):
-                    trans_subst.append((self.sts.variables[i], step_vars[trace_idx][step][i]))
-                    trans_subst.append((self.sts.prime_variables[i], step_vars[trace_idx][step + 1][i]))
+                for i, _ in enumerate(self.sts.variables):
+                    trans_subst.append(
+                        (self.sts.variables[i], step_vars[trace_idx][step][i])
+                    )
+                    trans_subst.append(
+                        (self.sts.prime_variables[i], step_vars[trace_idx][step + 1][i])
+                    )
                 conditions.append(z3.substitute(self.sts.trans, trans_subst))
         antecedent = z3.And(*conditions) if conditions else z3.BoolVal(True)
         return antecedent, step_vars
@@ -211,7 +256,7 @@ class HyperLTLProver(BaseKSafetyProver):
     def bounded_model_checking(self, bound: int) -> VerificationResult:
         if self.formula is None:
             raise ValueError("HyperLTL formula must be set before solving")
-        self.logger.info(f"Performing HyperLTL BMC with bound {bound}")
+        self.logger.info("Performing HyperLTL BMC with bound %s", bound)
         antecedent, step_vars = self._build_unrolled_antecedent(bound)
         cache: Dict[str, int] = {}
         prop = _encode(self.sts, step_vars, cache, self.formula, step=0, bound=bound)
@@ -222,9 +267,6 @@ class HyperLTLProver(BaseKSafetyProver):
         res = solver.check()
         if res == z3.sat:
             return VerificationResult(False, None, solver.model(), is_unsafe=True)
-        elif res == z3.unsat:
+        if res == z3.unsat:
             return VerificationResult(True, None)
-        else:
-            return VerificationResult(False, None, None, is_unknown=True, timed_out=True)
-
-
+        return VerificationResult(False, None, None, is_unknown=True, timed_out=True)

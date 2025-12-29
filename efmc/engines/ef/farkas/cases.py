@@ -26,7 +26,7 @@ def create_transition_system(variables, prime_vars, init, trans, post):
 def create_test_cases():
     """Create test cases for Farkas prover."""
     test_cases = []
-    
+
     # Simple Counter Program
     x, x_prime = z3.Int('x'), z3.Int('x_prime')
     sts1 = create_transition_system(
@@ -36,7 +36,7 @@ def create_test_cases():
         x >= 0
     )
     test_cases.append(("Simple Counter Program", sts1))
-    
+
     # Two-Variable Counter
     x, y = z3.Int('x'), z3.Int('y')
     x_prime, y_prime = z3.Int('x_prime'), z3.Int('y_prime')
@@ -47,7 +47,7 @@ def create_test_cases():
         x <= y
     )
     test_cases.append(("Two-Variable Counter", sts2))
-    
+
     # Difference Bounds
     x, y = z3.Int('x'), z3.Int('y')
     x_prime, y_prime = z3.Int('x_prime'), z3.Int('y_prime')
@@ -58,7 +58,7 @@ def create_test_cases():
         x - y <= 5
     )
     test_cases.append(("Difference Bounds", sts3))
-    
+
     # Multi-Path Loop
     x, x_prime = z3.Int('x'), z3.Int('x_prime')
     sts4 = create_transition_system(
@@ -71,7 +71,7 @@ def create_test_cases():
         x >= 0
     )
     test_cases.append(("Multi-Path Loop", sts4))
-    
+
     # Array Bounds
     i, n = z3.Int('i'), z3.Int('n')
     i_prime, n_prime = z3.Int('i_prime'), z3.Int('n_prime')
@@ -82,7 +82,7 @@ def create_test_cases():
         n >= i
     )
     test_cases.append(("Array Bounds", sts5))
-    
+
     # Multiple Invariants
     x, y = z3.Int('x'), z3.Int('y')
     x_prime, y_prime = z3.Int('x_prime'), z3.Int('y_prime')
@@ -93,7 +93,7 @@ def create_test_cases():
         y == 2 * x
     )
     test_cases.append(("Multiple Invariants", sts6))
-    
+
     return test_cases
 
 
@@ -102,28 +102,28 @@ def run_farkas_prover_test(name, sts):
     print(f"{'='*60}")
     print(f"Testing: {name}")
     print(f"{'='*60}")
-    
+
     var_names = [str(v) for v in sts.variables]
     print(f"Variables: {var_names}")
     print(f"Init: {sts.init}")
     print(f"Trans: {sts.trans}")
     print(f"Post: {sts.post}")
-    
+
     prover = FarkasProver(sts, num_templates=3, verbose=False, validate_invariant=True)
     result = prover.solve(timeout=30)
-    
+
     print(f"\nResult: {result}")
     print(f"Is Safe: {result.is_safe}")
     print(f"Is Unknown: {result.is_unknown}")
-    
+
     if result.invariant:
         print(f"Invariant: {result.invariant}")
     else:
         print("No invariant found")
-    
+
     stats = prover.get_statistics()
     print(f"Statistics: {stats}")
-    
+
     return result
 
 
@@ -131,35 +131,35 @@ def demo_cases():
     """Run all test cases and summarize results."""
     print("Farkas-based Invariant Inference Test Cases")
     print("=" * 60)
-    
+
     test_cases = create_test_cases()
     results = {}
-    
+
     for name, sts in test_cases:
         print()
         result = run_farkas_prover_test(name, sts)
-        
+
         if result.is_safe:
             status = "SAFE"
         elif result.is_unknown:
             status = "UNKNOWN"
         else:
             status = "ERROR"
-        
+
         results[name] = status
-    
+
     # Summary
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
-    
+
     for name, status in results.items():
         print(f"{name:<30} : {status}")
-    
+
     safe_count = sum(1 for s in results.values() if s == "SAFE")
     unknown_count = sum(1 for s in results.values() if s == "UNKNOWN")
     error_count = sum(1 for s in results.values() if s == "ERROR")
-    
+
     print(f"\nTotal tests: {len(results)}")
     print(f"Safe: {safe_count}, Unknown: {unknown_count}, Errors: {error_count}")
 

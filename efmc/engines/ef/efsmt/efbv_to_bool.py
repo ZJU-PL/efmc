@@ -10,7 +10,8 @@ Some references of QDIMACS
   http://www.qbflib.org/qdimacs.html
   http://beyondnp.org/pages/solvers/qbf-solvers/
 
-Later, we may refer to the code of Q3B (or directly use it), which translates general quantified bit-vector formulas to BDDs.
+Later, we may refer to the code of Q3B (or directly use it), which translates
+general quantified bit-vector formulas to BDDs.
 """
 
 import logging
@@ -26,8 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class EFBV2BoolAux:
-    """
-    """
+    """Auxiliary class for translating EFBV to Boolean formulas."""
 
     def __init__(self):
         self.universal_bools = []
@@ -36,9 +36,10 @@ class EFBV2BoolAux:
 
     def flattening_qf_fml(self, fml: z3.ExprRef):
         """
-        The flattening_af_fml function takes a bit-vector formula and translates it to a Boolean formula.
+        The flattening_af_fml function takes a bit-vector formula and
+        translates it to a Boolean formula.
         """
-        bv2bool, bool2id, header, bool_clauses = translate_smt2formula_to_numeric_clauses(fml)
+        _, bool2id, _, bool_clauses = translate_smt2formula_to_numeric_clauses(fml)
         return bool2id, bool_clauses
 
     def flattening(self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef], universal_vars: List[z3.ExprRef]):
@@ -51,10 +52,12 @@ class EFBV2BoolAux:
         # for cls in clauses:
         #    self.bool_clauses.append([int(lit) for lit in cls.split(" ")])
 
-        bv2bool, bool2id, header, self.bool_clauses = translate_smt2formula_to_numeric_clauses(fml)
+        bv2bool, bool2id, _, self.bool_clauses = (
+            translate_smt2formula_to_numeric_clauses(fml)
+        )
 
-        logger.debug("  from bv to bools: {}".format(bv2bool))
-        logger.debug("  from bool to sat id: {}".format(bool2id))
+        logger.debug("  from bv to bools: %s", bv2bool)
+        logger.debug("  from bool to sat id: %s", bool2id)
 
         for bv_var in existential_vars:
             for bool_var_name in bv2bool[str(bv_var)]:
@@ -66,20 +69,22 @@ class EFBV2BoolAux:
             for bool_var_name in bv2bool[str(bv_var)]:
                 self.universal_bools.append(bool2id[bool_var_name])
 
-        logger.debug("existential vars: {}".format(self.existential_bools))
-        logger.debug("universal vars:   {}".format(self.universal_bools))
-        logger.debug("boolean clauses:  {}".format(self.bool_clauses))
+        logger.debug("existential vars: %s", self.existential_bools)
+        logger.debug("universal vars:   %s", self.universal_bools)
+        logger.debug("boolean clauses:  %s", self.bool_clauses)
 
     def to_qbf_z3expr(self) -> z3.ExprRef:
-        """ Translate to an EFSMT(BF) formula to a QBF formula
+        """Translate to an EFSMT(BF) formula to a QBF formula
         FIXME:
-         After bit-blasting and CNF transformation, we may have many auxiliary Boolean variables.
-         If operating over the Boolean level, it seems that we need to solve the problem below:
+         After bit-blasting and CNF transformation, we may have many auxiliary
+         Boolean variables. If operating over the Boolean level, it seems that
+         we need to solve the problem below:
              Exists BX ForAll BY Exists BZ . BF(BX, BY, BZ)
                  where BZ is the set of auxiliary variables)
          Instead of the following problem
              Exists X ForAll Y . F(X, Y)
-                 where X and Y are the existential and universal quantified bit-vectors, resp.)
+                 where X and Y are the existential and universal quantified
+                 bit-vectors, resp.)
         """
         prefix = "q"
         int2var = {}
@@ -116,7 +121,7 @@ class EFBV2BoolAux:
         # print("U vars: \n{}".format(universal_vars))
         # print("fml:    \n{}".format(fml))
 
-        # { NOET a trick for eliminating a subset of aux variables that are
+        # { NOTE a trick for eliminating a subset of aux variables that are
         #     equivalent with existential or universal variables
         # FIXME: I forgot what algorithms the following code follow
         """
@@ -148,23 +153,27 @@ class EFBV2BoolAux:
         # TODO: remove universal vars that do not appear in simplified_fml?
         if len(aux_bool_vars) >= 1:
             # cnt = z3.ForAll(universal_vars, z3.Exists(aux_bool_vars, simplified_fml))
-            cnt = z3.Exists(existential_vars,
-                            z3.ForAll(universal_vars, z3.Exists(aux_bool_vars, simplified_fml)))
+            cnt = z3.Exists(
+                existential_vars,
+                z3.ForAll(universal_vars, z3.Exists(aux_bool_vars, simplified_fml))
+            )
         else:
             cnt = z3.ForAll(universal_vars, simplified_fml)
         print("Finishing generating QBF CNT...")
         return cnt
 
     def to_qbf_qdimacs(self) -> str:
-        """ Translate to an EFSMT(BF) formula to a QBF formula
+        """Translate to an EFSMT(BF) formula to a QBF formula
         FIXME:
-         After bit-blasting and CNF transformation, we may have many auxiliary Boolean variables.
-         If operating over the Boolean level, it seems that we need to solve the problem below:
+         After bit-blasting and CNF transformation, we may have many auxiliary
+         Boolean variables. If operating over the Boolean level, it seems that
+         we need to solve the problem below:
              Exists BX ForAll BY Exists BZ . BF(BX, BY, BZ)
                  where BZ is the set of auxiliary variables)
          Instead of the following problem
              Exists X ForAll Y . F(X, Y)
-                 where X and Y are the existential and universal quantified bit-vectors, resp.)
+                 where X and Y are the existential and universal quantified
+                 bit-vectors, resp.)
         """
         aux_bool_vars = []
         prefix = "q"
@@ -176,7 +185,7 @@ class EFBV2BoolAux:
                 numeric_var = abs(numeric_lit)
                 if numeric_var not in int2var:
                     # create new Boolean vars
-                    z3_var = z3.Bool("{0}{1}".format(prefix, numeric_var))
+                    z3_var = z3.Bool(f"{prefix}{numeric_var}")
                     int2var[numeric_var] = z3_var
                     if (numeric_var not in self.universal_bools) and \
                             (numeric_var not in self.existential_bools):
@@ -184,16 +193,20 @@ class EFBV2BoolAux:
                         if numeric_var not in aux_bool_vars:
                             aux_bool_vars.append(numeric_var)
 
-        logger.debug("aux vars: {}".format(aux_bool_vars))
-        num_vars = len(self.existential_bools) + len(self.universal_bools) + len(aux_bool_vars)
+        logger.debug("aux vars: %s", aux_bool_vars)
+        num_vars = (
+            len(self.existential_bools) + len(self.universal_bools) + len(aux_bool_vars)
+        )
         num_clauses = len(self.bool_clauses)
-        fml_str = ["c QBF from EFSMT(BV)",
-                   "p cnf {0} {1}".format(str(num_vars), str(num_clauses)),
-                   # FIXME: should we keep the next line or not?
-                   #  i.e, Exits X . Forall Y. Exists Z . P(X, Y, Z)
-                   # "e {} 0".format(" ".join([str(v) for v in self.existential_bools])),
-                   "a {} 0".format(" ".join([str(v) for v in self.universal_bools])),
-                   "e {} 0".format(" ".join([str(v) for v in aux_bool_vars]))]
+        fml_str = [
+            "c QBF from EFSMT(BV)",
+            f"p cnf {num_vars} {num_clauses}",
+            # FIXME: should we keep the next line or not?
+            #  i.e, Exits X . Forall Y. Exists Z . P(X, Y, Z)
+            # "e {} 0".format(" ".join([str(v) for v in self.existential_bools])),
+            f"a {' '.join([str(v) for v in self.universal_bools])} 0",
+            f"e {' '.join([str(v) for v in aux_bool_vars])} 0"
+        ]
 
         for cls in self.bool_clauses:
             cls_str = [str(lit) for lit in cls]
@@ -235,12 +248,19 @@ class EFBVFormulaTranslator:
         translator.flattening(fml, existential_vars, universal_vars)
         return translator.to_qbf_z3expr()
 
-    def to_qdimacs_str(self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef], universal_vars: List[z3.ExprRef]):
+    def to_qdimacs_str(
+        self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef]
+    ):
+        """Translate formula to QDIMACS string format."""
         translator = EFBV2BoolAux()
         translator.flattening(fml, existential_vars, universal_vars)
         return translator.to_qbf_qdimacs()
 
-    def to_z3_sat(self, fml: z3.BoolRef, existential_vars: List[z3.ExprRef], universal_vars: List[z3.ExprRef]):
+    def to_z3_sat(
+        self, fml: z3.BoolRef, existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef]
+    ):
         """Translate an EFSMT(BV) formula to a SAT formula
         :return: a quantifier-free Boolean formula (in z3)
         """
@@ -252,15 +272,17 @@ class EFBVFormulaTranslator:
             sat_formula = z3.Then("simplify", self.qe_tactic)(qbf_fml).as_expr()
             # Finally, convert the SAT formula to CNF form
             return z3.Then("simplify", "tseitin-cnf")(sat_formula).as_expr()
-        else:
-            qbv_fml = z3.ForAll(universal_vars, fml)
-            # First, use word-level QE to build a quantifier-free bit-vec formula
-            qfbv_fml = z3.Then("simplify", self.qe_tactic)(qbv_fml).as_expr()
-            # second, convert the bit-vec formula to CNF
-            # return z3.Then("simplify", "bit-blast", "simplify", "tseitin-cnf")(qfbv_fml).as_expr()
-            return z3.Then("simplify", "bit-blast")(qfbv_fml).as_expr()
+        qbv_fml = z3.ForAll(universal_vars, fml)
+        # First, use word-level QE to build a quantifier-free bit-vec formula
+        qfbv_fml = z3.Then("simplify", self.qe_tactic)(qbv_fml).as_expr()
+        # second, convert the bit-vec formula to CNF
+        # return z3.Then("simplify", "bit-blast", "simplify", "tseitin-cnf")(qfbv_fml).as_expr()
+        return z3.Then("simplify", "bit-blast")(qfbv_fml).as_expr()
 
-    def to_dimacs_str(self, fml: z3.BoolRef, existential_vars: List[z3.ExprRef], universal_vars: List[z3.ExprRef]):
+    def to_dimacs_str(
+        self, fml: z3.BoolRef, existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef]
+    ):
         """Translate an EFSMT(BV) formula to a SAT formula
         1. First, perform quantifier elimination (currently, at bit-vector level)
         2. Second, perform bit-blasting
@@ -272,9 +294,10 @@ class EFBVFormulaTranslator:
         num_vars = len(bool2id)
         num_clauses = len(bool_clauses)
 
-        fml_str = ["c SAT from EFSMT(BV)",
-                   "p cnf {0} {1}".format(str(num_vars), str(num_clauses)),
-                   ]
+        fml_str = [
+            "c SAT from EFSMT(BV)",
+            f"p cnf {num_vars} {num_clauses}",
+        ]
 
         for cls in bool_clauses:
             cls_str = [str(lit) for lit in cls]
@@ -294,5 +317,5 @@ def demo_efbv2bool():
 
 
 if __name__ == '__main__':
-    res = demo_efbv2bool()
-    print(res)
+    RES = demo_efbv2bool()
+    print(RES)

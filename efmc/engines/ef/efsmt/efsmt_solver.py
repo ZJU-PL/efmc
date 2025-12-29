@@ -7,7 +7,8 @@ Approaches:
 - 2. Bit-blasting: Translation to QBF, BDD, or SAT, and solving with QBF solvers, BDD solvers, or SAT solvers
 - 3. CEGIS: CEGIS-based iterative approach (using a SMT oracle for deciding quantifier-free formulas)
 
-FIXME: if we call a binary solver, it would be hard to obtain a z3 model (for building the invariant)
+FIXME: if we call a binary solver, it would be hard to obtain a z3 model
+(for building the invariant)
 
 Solver options:
 - "z3": Use Z3 SMT solver (call the binary solver)
@@ -55,19 +56,25 @@ class EFSMTSolver:
 
         self.initialized = False
         # the pysmt library allows for using different SMT solvers
-        # NOTE: it seems that only z3 is installed automatically when we install pysmt
-        # For other SMT solvers, we need to use the pysmt-install command to install
+        # NOTE: it seems that only z3 is installed automatically when we
+        # install pysmt. For other SMT solvers, we need to use the
+        # pysmt-install command to install
         self.pysmt_solver = kwargs.get("pysmt_solver", "z3")
-        
+
         # CEGIS-specific parameters
-        self.solver_timeout = kwargs.get("solver_timeout", 10)  # Timeout per solver call in seconds
-        self.dump_dir = kwargs.get("dump_dir", None)  # Directory to dump challenging queries
-        self.dump_threshold = kwargs.get("dump_threshold", 5)  # Dump queries after this many iterations
+        # Timeout per solver call in seconds
+        self.solver_timeout = kwargs.get("solver_timeout", 10)
+        # Directory to dump challenging queries
+        self.dump_dir = kwargs.get("dump_dir", None)
+        # Dump queries after this many iterations
+        self.dump_threshold = kwargs.get("dump_threshold", 5)
 
     def get_model(self):
+        """Get model from solver (not implemented)."""
         return "get_model is not implemented"
-    
+
     def set_tactic(self, name: str):
+        """Set solver tactic (not implemented)."""
         raise NotImplementedError
 
     def init(self, exist_vars, forall_vars, phi: z3.ExprRef):
@@ -78,9 +85,8 @@ class EFSMTSolver:
         self.initialized = True
 
     def dump_ef_smt_file(self, smt2_file_name: str):
-        """Dump the constraint from the ef engine
-        """
-        fml_str = "(set-logic {})\n".format(self.logic)
+        """Dump the constraint from the ef engine."""
+        fml_str = f"(set-logic {self.logic})\n"
 
         dump_strategy = 1
         if dump_strategy == 1:
@@ -90,7 +96,7 @@ class EFSMTSolver:
                 name = str(v)
                 if name not in exits_vars_names:
                     exits_vars_names.add(name)
-                    fml_str += "(declare-const {0} {1})\n".format(v.sexpr(), v.sort().sexpr())
+                    fml_str += f"(declare-const {v.sexpr()} {v.sort().sexpr()})\n"
 
             quant_vars = "("
             for v in self.forall_vars:
@@ -102,12 +108,12 @@ class EFSMTSolver:
             s.add(self.phi)
             # self.phi is in the form of
             #  and (Init, Trans, Post)
-            assert (z3.is_app(self.phi))
+            assert z3.is_app(self.phi)
             for fml in self.phi.children():
-                quant_fml_body += "  {}\n".format(fml.sexpr())
+                quant_fml_body += f"  {fml.sexpr()}\n"
             quant_fml_body += ")"
 
-            fml_body = "(assert (forall {0} {1}))\n".format(quant_vars, quant_fml_body)
+            fml_body = f"(assert (forall {quant_vars} {quant_fml_body}))\n"
             fml_str += fml_body
             fml_str += "(check-sat)\n"
         else:
@@ -117,37 +123,38 @@ class EFSMTSolver:
             sol.add(z3.ForAll(self.forall_vars, self.phi))
             fml_str += sol.to_smt2()
 
-        tmp = open(smt2_file_name, "w")
-        tmp.write(fml_str)
-        tmp.close()
+        with open(smt2_file_name, "w", encoding='utf-8') as tmp:
+            tmp.write(fml_str)
 
     def dump_qbf_file(self, qdimacs_file_name: str):
         """Dump to QBF formula"""
-        assert self.logic == "BV" or self.logic == "UFBV"
+        assert self.logic in ("BV", "UFBV")
         fml_manager = EFBVFormulaTranslator()
-        qdimacs_str = fml_manager.to_qdimacs_str(self.phi, existential_vars=self.exists_vars,
-                                                 universal_vars=self.forall_vars)
-        tmp = open(qdimacs_file_name, "w")
-        tmp.write(qdimacs_str)
-        tmp.close()
+        qdimacs_str = fml_manager.to_qdimacs_str(
+            self.phi, existential_vars=self.exists_vars,
+            universal_vars=self.forall_vars
+        )
+        with open(qdimacs_file_name, "w", encoding='utf-8') as tmp:
+            tmp.write(qdimacs_str)
 
     def dump_cnf_file(self, dimacs_file_name: str):
         """Dump to CNF formula"""
-        assert self.logic == "BV" or self.logic == "UFBV"
+        assert self.logic in ("BV", "UFBV")
         fml_manager = EFBVFormulaTranslator()
         # FIXME: to_cnf_str() is not implemented
-        cnf_str = fml_manager.to_cnf_str(self.phi, existential_vars=self.exists_vars,
-                                         universal_vars=self.forall_vars)
-        tmp = open(dimacs_file_name, "w")
-        tmp.write(cnf_str)
-        tmp.close()
+        cnf_str = fml_manager.to_cnf_str(
+            self.phi, existential_vars=self.exists_vars,
+            universal_vars=self.forall_vars
+        )
+        with open(dimacs_file_name, "w", encoding='utf-8') as tmp:
+            tmp.write(cnf_str)
 
     def solve(self):
         """
         Solve EFSMT(BV) formulas via different strategies
         """
         assert self.initialized
-        print("EFSMT solver: {}".format(self.solver))
+        print(f"EFSMT solver: {self.solver}")
         # 1. Quantifier instantiation approach
         if self.solver == "z3api":
             # Use z3's Python API to solve the problem
@@ -166,28 +173,29 @@ class EFSMTSolver:
             return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "bitwuzla")
 
         # 2. Bit-blasting approach
-        elif self.solver == "z3qbf":
+        if self.solver == "z3qbf":
             return self.solve_with_z3_qbf()
-        elif self.solver == "caqe":
+        if self.solver == "caqe":
             return self.solve_with_third_party_qbf("caqe")
         # TODO: q3b (BDD-based), z3-based QE+SAT
-        elif self.solver == "q3b":
-            return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "q3b")
-        elif self.solver == "z3sat":
+        if self.solver == "q3b":
+            return solve_with_bin_smt(
+                self.logic, self.exists_vars, self.forall_vars, self.phi, "q3b"
+            )
+        if self.solver == "z3sat":
             return self.solve_with_z3_sat()
         # third-party SAT solves (using pySAT)
-        elif self.solver in ['cd', 'cd15', 'gc3', 'gc4', 'g3',
-                             'g4', 'lgl', 'mcb', 'mpl', 'mg3',
-                             'mc', 'm22', 'mgh']:
+        if self.solver in ['cd', 'cd15', 'gc3', 'gc4', 'g3',
+                           'g4', 'lgl', 'mcb', 'mpl', 'mg3',
+                           'mc', 'm22', 'mgh']:
             return self.solve_with_third_party_sat(solver_name=self.solver)
 
         # 3. Simple cegis-based approach
-        elif self.solver == "cegis":
+        if self.solver == "cegis":
             print("solving via cegis_solver")
             return self.solve_with_simple_cegis()
 
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     def solve_with_z3_api(self) -> str:
         """
@@ -223,33 +231,37 @@ class EFSMTSolver:
         # Return result as string
         if result == z3.sat:
             return "sat"
-        elif result == z3.unsat:
+        if result == z3.unsat:
             return "unsat"
-        else:
-            return "unknown"
+        return "unknown"
 
     def solve_with_simple_cegis(self) -> str:
-        """Solve with a CEGIS-style algorithm, which consists of a "forall solver" and an "exists solver"
-        This can be slow (perhaps not a good idea for NRA) Maybe good for LRA or BV?
-        NOTE: Currently, we use pySMT for the implementation
+        """Solve with a CEGIS-style algorithm, which consists of a "forall solver"
+        and an "exists solver". This can be slow (perhaps not a good idea for NRA)
+        Maybe good for LRA or BV? NOTE: Currently, we use pySMT for the
+        implementation.
         """
         print("Simple, sequential, CEGIS-style EFSMT!")
-        
+
         # Use FP-specific CEGIS solver for FP logic
         if self.logic == "FP":
-            z3_res = simple_cegis_efsmt_fp(self.logic, self.exists_vars, self.forall_vars, self.phi,
-                                           maxloops=None, profiling=False, timeout=None,
-                                           solver_timeout=self.solver_timeout,
-                                           dump_dir=self.dump_dir,
-                                           dump_threshold=self.dump_threshold)
-        else:
-            z3_res = simple_cegis_efsmt(self.logic, self.exists_vars, self.forall_vars, self.phi,
-                                        pysmt_solver=self.pysmt_solver)
+            z3_res = simple_cegis_efsmt_fp(
+                self.logic, self.exists_vars, self.forall_vars, self.phi,
+                maxloops=None, timeout=None,
+                solver_timeout=self.solver_timeout,
+                dump_dir=self.dump_dir,
+                dump_threshold=self.dump_threshold
+            )
+            return z3_res[0]  # Return just the result string
+        z3_res = simple_cegis_efsmt(
+            self.logic, self.exists_vars, self.forall_vars, self.phi,
+            pysmt_solver=self.pysmt_solver
+        )
         return z3_res
 
     def solve_with_z3_qbf(self) -> str:
         """Translate to QBF"""
-        assert self.logic == "BV" or self.logic == "UFBV"
+        assert self.logic in ("BV", "UFBV")
         fml_manager = EFBVFormulaTranslator()
         sol = z3.Solver()
         vc = fml_manager.to_z3_qbf(self.phi, self.exists_vars, self.forall_vars)
@@ -257,14 +269,13 @@ class EFSMTSolver:
         res = sol.check()
         if res == z3.sat:
             return "sat"
-        elif res == z3.unsat:
+        if res == z3.unsat:
             return "unsat"
-        else:
-            return "unknown"
+        return "unknown"
 
     def solve_with_z3_sat(self):
         """Quantifier elimination + SAT solving"""
-        assert self.logic == "BV" or self.logic == "UFBV"
+        assert self.logic in ("BV", "UFBV")
         print("Quantifier elimination + SAT solving")
         fml_manager = EFBVFormulaTranslator()
         sol = z3.Solver()
@@ -274,17 +285,18 @@ class EFSMTSolver:
         res = sol.check()
         if res == z3.sat:
             return "sat"
-        elif res == z3.unsat:
+        if res == z3.unsat:
             return "unsat"
-        else:
-            return "unknown"
+        return "unknown"
 
     def solve_with_third_party_qbf(self, solver_name: str) -> str:
         """Translate EFSMT(BV) to QBF, and call a third-party QBF solver"""
-        assert self.logic == "BV" or self.logic == "UFBV"
+        assert self.logic in ("BV", "UFBV")
         fml_manager = EFBVFormulaTranslator()
-        qdimacs = fml_manager.to_qdimacs_str(self.phi, existential_vars=self.exists_vars,
-                                             universal_vars=self.forall_vars)
+        qdimacs = fml_manager.to_qdimacs_str(
+            self.phi, existential_vars=self.exists_vars,
+            universal_vars=self.forall_vars
+        )
         return solve_with_bin_qbf(qdimacs, solver_name)
 
     def solve_with_third_party_sat(self, solver_name: str) -> str:
@@ -294,21 +306,24 @@ class EFSMTSolver:
         cd(cadical103), cd15(cadical153),
         gc3(gluecard3), gc4(glucard4), g3(glucose3), g4(glucose4),
         lgl(lingeling), mcb(maplechrono), mcm(maplecm), mpl(maplesat)
-        mg3(mergesat3), mc(minicard), m22(minisat22, mgh(minsatgh)
+        mg3(mergesat3), mc(minicard),         m22(minisat22, mgh(minsatgh)
         sat_solvers_in_pysat = ['cd', 'cd15', 'gc3', 'gc4', 'g3',
                         'g4', 'lgl', 'mcb', 'mpl', 'mg3',
                         'mc', 'm22', 'mgh']
         """
-        assert self.logic == "BV" or self.logic == "UFBV"
+        assert self.logic in ("BV", "UFBV")
         print("Quantifier elimination + SAT solving")
         fml_manager = EFBVFormulaTranslator()
-        vc = fml_manager.to_dimacs_str(self.phi, self.exists_vars, self.forall_vars)
+        vc = fml_manager.to_dimacs_str(
+            self.phi, self.exists_vars, self.forall_vars
+        )
         res = solve_with_sat_solver(vc, solver_name=solver_name)
         return res
 
 
 def demo_efsmt():
-    import time
+    """Demo function for EFSMT solver."""
+    import time  # noqa: E402
     x, y, z = z3.BitVecs("x y z", 16)
     # x, y, z = z3.Reals("x y z")
     fmla = z3.Implies(z3.And(y > 0, y < 10), y - 2 * x < 7)

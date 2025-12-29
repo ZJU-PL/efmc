@@ -47,7 +47,7 @@ __all__ = ["DangerInvariantProver"]
 logger = logging.getLogger(__name__)
 
 
-class DangerInvariantProver:
+class DangerInvariantProver:  # pylint: disable=too-few-public-methods
     """
     Validate danger invariants and ranking functions for a `TransitionSystem`.
 
@@ -81,7 +81,7 @@ class DangerInvariantProver:
     # public API
     # --------------------------------------------------------------------- #
 
-    def verify(
+    def verify(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         inv: z3.ExprRef,
         rank: z3.ExprRef,

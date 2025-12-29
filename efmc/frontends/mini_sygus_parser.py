@@ -1,8 +1,9 @@
 """
 Parser for SyGuS files based on a simple S-expression parser
 
-NOTE: I only this file for inputs in the style of the SyGuS invariant track. It could be used for SyGuS(PBE)
-To keep this file independent, I do not important other files in this project.
+NOTE: I only this file for inputs in the style of the SyGuS invariant track.
+It could be used for SyGuS(PBE). To keep this file independent,
+I do not important other files in this project.
 
 This parser handles:
 - S-expression parsing
@@ -11,7 +12,7 @@ This parser handles:
 - Support for multiple data types (Int, Real, Array, BitVec)
 """
 import z3
-from typing import Union, List, Tuple, Set, Dict, Optional
+from typing import Union, List
 
 # Type definitions
 Symbol = str
@@ -86,14 +87,14 @@ def atom(token: str) -> Atom:
 
 
 def get_start(cmd) -> str:
-    assert (cmd[0] == "synth-fun")
+    assert cmd[0] == "synth-fun"
     return cmd[4][0]
 
 
 def get_nonterminals(cmd):
     nonterms = set()
     type_dict = {}
-    assert (cmd[0] == "synth-fun")
+    assert cmd[0] == "synth-fun"
     for elem in cmd[4]:
         nt = elem[0]
         typ = elem[1]
@@ -230,7 +231,7 @@ class SyGusInVParser:
             self.post_fun_body = self.to_sexpr(slist[4])
         else:
             # print("Function name not recognized!:", func_name)
-            raise AssertionError("Function name not recognized!: {}".format(func_name))
+            raise AssertionError(f"Function name not recognized!: {func_name}")
 
     def get_transition_system(self):
         """
@@ -262,9 +263,9 @@ class SyGusInVParser:
                 else:
                     final_type = var_type
 
-            init_constraints.append("(declare-const {} {})".format(var_name, final_type))
-            trans_constraints.append("(declare-const {} {})".format(var_name, final_type))
-            post_constraints.append("(declare-const {} {})".format(var_name, final_type))
+            init_constraints.append(f"(declare-const {var_name} {final_type})")
+            trans_constraints.append(f"(declare-const {var_name} {final_type})")
+            post_constraints.append(f"(declare-const {var_name} {final_type})")
 
         init_constraints.append("(assert {})".format(self.pre_fun_body))
         trans_constraints.append("(assert {})".format(self.trans_fun_body))
@@ -317,38 +318,16 @@ def demo_parser():
         "(set-logic LIA)",
         " (synth-inv inv_fun ((x Int) (y Int)))\n",
         "(define-fun pre_fun ((x Int) (y Int)) Bool (and (= x 1) (= y 1))) ",
-        "(define-fun trans_fun ((x Int) (y Int) (x! Int) (y! Int)) Bool (and (= x! (+ x y)) (= y! (+ x y))))",
+        "(define-fun trans_fun ((x Int) (y Int) (x! Int) (y! Int)) "
+        "Bool (and (= x! (+ x y)) (= y! (+ x y))))",
         "(define-fun post_fun ((x Int) (y Int)) Bool (>= y 1))",
         "(inv-constraint inv_fun pre_fun trans_fun post_fun)",
         "(check-synth)"
         "; xxx"]
 
-    alia = """(set-logic ALIA)
-(synth-inv inv_fun ((x (Array Int Int)) (y Int) (n Int)))
-(define-fun pre_fun ((x (Array Int Int)) (y Int) (n Int)) Bool
-    (and (>= n 0) (and (= n (select x 0)) (= y 0))))
-(define-fun trans_fun ((x (Array Int Int)) (y Int) (n Int) (x! (Array Int Int)) (y! Int) (n! Int)) Bool
-    (and (> (select x 0) 0) (and (= n! n) (and (= y! (+ y 1)) (= x! (store x 0 (- (select x 0) 1)))))))
-(define-fun post_fun ((x (Array Int Int)) (y Int) (n Int)) Bool
-    (or (> (select x 0) 0) (= n (+ (select x 0) y))))
-(inv-constraint inv_fun pre_fun trans_fun post_fun)
-(check-synth)
-        """
-
-    str_inv = """
-    (synth-inv inv_fun ((x (Array Int Int)) (y Int) (n Int)))
-    (define-fun pre_fun ((x (Array Int Int)) (y Int) (n Int)) Bool
-        (and (>= n 0) (and (= n (select x 0)) (= y 0))))
-    (define-fun trans_fun ((x (Array Int Int)) (y Int) (n Int) (x! (Array Int Int)) (y! Int) (n! Int)) Bool
-        (and (> (select x 0) 0) (and (= n! n) (and (= y! (+ y 1)) (= x! (store x 0 (- (select x 0) 1)))))))
-    (define-fun post_fun ((x (Array Int Int)) (y Int) (n Int)) Bool
-        (or (> (select x 0) 0) (= n (+ (select x 0) y))))
-    (inv-constraint inv_fun pre_fun trans_fun post_fun)
-    (check-synth)
-            """
     # ss = SyGusInVParser("\n".join(tt_arr), to_real=False)
     ss = SyGusInVParser(tt, to_real=False)
-    all_vars, init, trans, post = ss.get_transition_system()
+    _, init, trans, post = ss.get_transition_system()
     print(init, "\n", trans, "\n", post)
     # print(input_to_list(tttt))
 

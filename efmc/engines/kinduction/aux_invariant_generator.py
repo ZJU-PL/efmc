@@ -25,13 +25,13 @@ class InvariantGenerator:
         ef_prover = EFProver(self.sts)
         ef_prover.ignore_post_cond = True  # Ignore post condition for aux invariant
         ef_prover.validate_invariant = False  # Skip validation for efficiency
-        
+
         # Set appropriate template based on variable types
         if self.sts.has_bv:
             ef_prover.set_template("bv_interval")
         else:
             ef_prover.set_template("interval")
-        
+
         if ef_prover.solve():
             inv = getattr(ef_prover, 'inductive_invaraint', None)
             if inv and not z3.is_true(z3.simplify(inv)):
@@ -50,13 +50,13 @@ class InvariantGenerator:
         aux_sts.init = self.sts.init
         aux_sts.trans = self.sts.trans
         aux_sts.post = z3.BoolVal(True)  # Ignore original post condition
-        
+
         houdini = HoudiniProver(aux_sts)
-        
+
         # Generate candidate lemmas using templates
         templates = generate_templates(self.sts.variables, {'bounds', 'ordering'})
         result = houdini.houdini(templates, timeout)
-        
+
         if result and len(result) > 0:
             inv = z3.And(*result.values())
             if not z3.is_true(z3.simplify(inv)):
@@ -76,9 +76,7 @@ class InvariantGenerator:
         """
         if method == "ef":
             return self.generate_via_ef()
-        elif method == "houdini":
+        if method == "houdini":
             return self.generate_via_houdini(timeout)
-        else:
-            raise ValueError(f"Unknown method: {method}. Use 'ef' or 'houdini'")
-
+        raise ValueError(f"Unknown method: {method}. Use 'ef' or 'houdini'")
 

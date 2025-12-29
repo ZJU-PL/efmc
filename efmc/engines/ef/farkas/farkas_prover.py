@@ -35,7 +35,7 @@ import contextlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Sequence, Dict, Any
+from typing import Optional, Dict, Any
 
 import z3
 
@@ -62,6 +62,7 @@ def _timer() -> Any:  # returns elapsed seconds as float
 # ---------------------------------------------------------------------------#
 @dataclass
 class FarkasProverConfig:
+    """Configuration for FarkasProver."""
     num_templates: int = 3
     solver: str = "z3"                 # placeholder for future external support
     validate_invariant: bool = True

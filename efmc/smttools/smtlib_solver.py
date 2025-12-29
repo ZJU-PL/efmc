@@ -1,4 +1,22 @@
 # coding: utf-8
+"""
+SMTLIB solver interface.
+
+Partially modified from https://github.com/trailofbits/manticore
+TODO: allow the user to select different modes
+1. Use the same process to first accept the whole formula, and then accept
+   multiple (check-sat-assuming) commands?
+2. Every time, create a new process the solve each individual instance
+   (including formulas and check-sat-assuming)
+
+TODO: we need to consider three "incremental mode"
+1. Every time build new assertions
+   - build new solver process + new assertions?
+   - reuse the solver process, but use `reset` command? (it seems that
+     `reset` can affect the tactic)
+2. Use push/pop
+3. Use assumption literal
+"""
 import fcntl  # seems that Windows does not have this lib.
 import logging
 import shlex
@@ -9,23 +27,12 @@ import os
 
 from efmc.smttools.smt_exceptions import SolverError
 
-"""
-Partially modified from https://github.com/trailofbits/manticore
-TODO: allow the user to select different modes 
-1. Use the same process to first accept the whole formula, and then accept multiple (check-sat-assuming) commands?
-2. Every time, create a new process the solve each individual instance (including formulas and check-sat-assuming)
-
-TODO: we need to consider three "incremental mode"
-1. Every time build new assertions
-   - build new solver process + new assertions?
-   - reuse the solver process, but use `reset` command? (it seems that `reset` can affect the tactic)
-2. Use push/pop
-3. Use assumption literal
-"""
 logger = logging.getLogger(__name__)
 
 
 class SmtlibProc:
+    """Single SMTLIB interactive process."""
+
     def __init__(self, solver_command: str, debug=False):
         """Single smtlib interactive process
         :param solver_command: the shell command to execute
@@ -40,11 +47,12 @@ class SmtlibProc:
         """Spawns POpen solver process"""
         if self._proc is not None:
             return
+        # bufsize=0: if we set input to unbuffered, we get syntax errors
+        # in large formulas
         self._proc = Popen(
             shlex.split(self._command),
             stdin=PIPE,
             stdout=PIPE,
-            # bufsize=0,  # if we set input to unbuffered, we get syntax errors in large formulas
             universal_newlines=True,
             close_fds=True,
         )
@@ -87,11 +95,14 @@ class SmtlibProc:
             self._proc.stdin.flush()  # type: ignore
         except (BrokenPipeError, IOError) as e:
             logger.critical(
-                f"Solver encountered an error trying to send commands: {e}.\n"
-                f"\tOutput: {self._proc.stdout}\n\n"
-                f"\tStderr: {self._proc.stderr}"
+                "Solver encountered an error trying to send commands: %s.\n"
+                "\tOutput: %s\n\n"
+                "\tStderr: %s",
+                e,
+                self._proc.stdout,
+                self._proc.stderr
             )
-            raise e
+            raise
 
     def recv(self, wait=True):
         """Reads the response from the smtlib solver
@@ -121,9 +132,10 @@ class SmtlibProc:
             if buf == "":
                 continue
 
-            # this verifies if the response from the solver is complete (it has balanced brackets)
-            # TODO: the results of some special queries might not be s-expression
-            #  (e.g., it can be multiple e-expressions)
+            # this verifies if the response from the solver is complete
+            # (it has balanced brackets)
+            # TODO: the results of some special queries might not be
+            # s-expression (e.g., it can be multiple e-expressions)
             lparen, rparen = map(sum, zip(*((c == "(", c == ")") for c in buf)))
             if lparen == rparen and buf != "":
                 break
@@ -137,7 +149,7 @@ class SmtlibProc:
         self._last_buf = ""
 
         if "(error" in buf or "Fatal" in buf:
-            raise Exception(f"Solver error: {buf}")
+            raise SolverError(f"Solver error: {buf}")
 
         if self._debug:
             logger.debug("<%s", buf)
@@ -153,6 +165,7 @@ class SmtlibProc:
 
 
 class SMTLIBSolver:
+    """SMTLIB solver interface using external solver via subprocess."""
 
     def __init__(self, solver_command: str, debug=False):
         """
@@ -177,9 +190,8 @@ class SMTLIBSolver:
 
         if status in ("sat", "unsat", "unknown"):
             return status
-        else:
-            raise SolverError(status)
-            # return False
+        raise SolverError(status)
+        # return False
 
     def check_sat_assuming(self, assumptions: List[str]):
         """
@@ -196,9 +208,8 @@ class SMTLIBSolver:
 
         if status in ("sat", "unsat", "unknown"):
             return status
-        else:
-            raise SolverError(status)
-            # return False
+        raise SolverError(status)
+        # return False
 
     def check_sat_with_pushpop_scope(self, new_assertions: str):
         """
@@ -217,14 +228,14 @@ class SMTLIBSolver:
 
         if status in ("sat", "unsat", "unknown"):
             return status
-        else:
-            raise SolverError(status)
-            # return False
+        raise SolverError(status)
+        # return False
 
     def check_sat_from_scratch(self, whole_fml: str):
         """
         Check the satisfiability of the current state
-        :param whole_fml: should be a whole formula (with declaration, assertions, and check-sat)
+        :param whole_fml: should be a whole formula (with declaration,
+                         assertions, and check-sat)
         :return: whether current state is satisfiable or not.
         """
         start = time.time()
@@ -236,9 +247,8 @@ class SMTLIBSolver:
 
         if status in ("sat", "unsat", "unknown"):
             return status
-        else:
-            raise SolverError(status)
-            # return False
+        raise SolverError(status)
+        # return False
 
     def assert_assertions(self, assertions: str):
         """
@@ -267,6 +277,7 @@ class SMTLIBSolver:
 
     def get_unsat_core(self):
         """
+        Get the unsat core.
         FIXME: implement and test
         """
         cmd = "(get-unsat-core)"  # core or cores?
@@ -277,11 +288,12 @@ class SMTLIBSolver:
     def reset(self):
         """
         Auxiliary method to reset the smtlib external solver to initial defaults
-        TODO: Z3 and CVC5 supports the "reset" cmd. Maube can use it
+        TODO: Z3 and CVC5 supports the "reset" cmd. Maybe can use it
         """
         self._smtlib.stop()  # does not do anything if already stopped
         self._smtlib.start()
         self._smtlib.clear_buffers()  # need this?
 
     def stop(self):
+        """Stop the solver process."""
         self._smtlib.stop()

@@ -10,6 +10,7 @@ from efmc.tests.simple_sts import get_int_sys1, get_int_sys2, get_int_sys3, get_
 
 
 class TestAuxInvariantGenerator(TestCase):
+    """Test cases for auxiliary invariant generation."""
 
     def setUp(self):
         super().setUp()
@@ -43,17 +44,17 @@ class TestAuxInvariantGenerator(TestCase):
     def test_generate_methods(self):
         """Test generate method with different parameters."""
         generator = InvariantGenerator(self.simple_sts)
-        
+
         # Test EF method
         result_ef = generator.generate(method="ef")
         self.assertIsInstance(result_ef, z3.ExprRef)
         print(f"EF method result: {result_ef}")
-        
+
         # Test Houdini method
         result_houdini = generator.generate(method="houdini", timeout=10)
         self.assertIsInstance(result_houdini, z3.ExprRef)
         print(f"Houdini method result: {result_houdini}")
-        
+
         # Test invalid method
         with self.assertRaises(ValueError) as context:
             generator.generate(method="invalid")
@@ -64,7 +65,7 @@ class TestAuxInvariantGenerator(TestCase):
         systems = [
             # Integer system 1
             (get_int_sys1(), "int_sys1"),
-            # Integer system 2  
+            # Integer system 2
             (get_int_sys2(), "int_sys2"),
             # Integer system 3
             (get_int_sys3(), "int_sys3"),
@@ -75,24 +76,25 @@ class TestAuxInvariantGenerator(TestCase):
             # Boolean system
             (self._create_bool_system(), "bool_system"),
         ]
-        
+
         for system_data, system_name in systems:
             print(f"\nTesting {system_name}:")
             sts = TransitionSystem()
             sts.from_z3_cnts(list(system_data))
-            
+
             generator = InvariantGenerator(sts)
-            
+
             # Test EF method
             print(f"  Testing EF for {system_name}...")
             result_ef = generator.generate_via_ef()
             self.assertIsInstance(result_ef, z3.ExprRef, f"EF failed for {system_name}")
             print(f"  EF result: {result_ef}")
-            
+
             # Test Houdini method
             print(f"  Testing Houdini for {system_name}...")
             result_houdini = generator.generate_via_houdini(timeout=10)
-            self.assertIsInstance(result_houdini, z3.ExprRef, f"Houdini failed for {system_name}")
+            self.assertIsInstance(result_houdini, z3.ExprRef,
+                                  f"Houdini failed for {system_name}")
             print(f"  Houdini result: {result_houdini}")
 
     def _create_bv_system(self):
@@ -113,4 +115,4 @@ class TestAuxInvariantGenerator(TestCase):
 
 
 if __name__ == '__main__':
-    main() 
+    main()

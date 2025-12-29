@@ -8,7 +8,7 @@ TODO: this can be very slow and may not terminate （How to over-approximate qe)
 
 import logging
 import time
-from typing import List, Optional
+from typing import Optional
 
 import z3
 
@@ -19,12 +19,8 @@ from efmc.utils.verification_utils import VerificationResult
 logger = logging.getLogger(__name__)
 
 
-def fixpoint(old_inv: z3.ExprRef, inv: z3.ExprRef):
-    # Check if we've reached a fixpoint (inv implies old_inv AND old_inv implies inv)
-    return is_valid(z3.Implies(inv, old_inv)) and is_valid(z3.Implies(old_inv, inv))
-
-
 class QuantifierEliminationProver:
+    """Prover using quantifier elimination to compute inductive invariants."""
     def __init__(self, system: TransitionSystem, timeout=None, verbose=True):
         self.sts = system
         self.timeout = timeout  # Timeout in seconds
@@ -35,11 +31,11 @@ class QuantifierEliminationProver:
         """
         self.var_map = []
         self.var_map_rev = []
-        for i in range(len(self.sts.variables)):
-            self.var_map.append((self.sts.variables[i], self.sts.prime_variables[i]))
-            self.var_map_rev.append((self.sts.prime_variables[i], self.sts.variables[i]))
+        for i, var in enumerate(self.sts.variables):
+            self.var_map.append((var, self.sts.prime_variables[i]))
+            self.var_map_rev.append((self.sts.prime_variables[i], var))
 
-    def solve(self, timeout: Optional[int] = None) -> VerificationResult:
+    def solve(self, timeout: Optional[int] = None) -> VerificationResult:  # pylint: disable=unused-argument
         """
         Verify the system using quantifier elimination.
         
@@ -91,11 +87,10 @@ class QuantifierEliminationProver:
                 print(f"QE success time: {time.time() - start:.2f} seconds")
                 print(f"Invariant: {z3.simplify(inv)}")
             return VerificationResult(True, inv)
-        else:
-            if self.verbose:
-                print(">>> UNKNOWN (invariant too weak)\n")
-                print(f"QE UNKNOWN time: {time.time() - start:.2f} seconds")
-            return VerificationResult(False, None, is_unknown=True)
+        if self.verbose:
+            print(">>> UNKNOWN (invariant too weak)\n")
+            print(f"QE UNKNOWN time: {time.time() - start:.2f} seconds")
+        return VerificationResult(False, None, is_unknown=True)
 
 
 if __name__ == '__main__':

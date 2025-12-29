@@ -10,8 +10,8 @@ from typing import Dict, List, Optional
 import z3
 
 from efmc.sts import TransitionSystem
-from .base_prover import BaseKSafetyProver
 from efmc.utils.verification_utils import VerificationResult
+from .base_prover import BaseKSafetyProver
 
 logger = logging.getLogger(__name__)
 
@@ -53,42 +53,64 @@ class EquivalenceProver(BaseKSafetyProver):
                 return i
         return None
 
-    def _bmc_two_systems(self, bound: int, input_vars: List[str], output_vars: List[str], inputs_equal_all_steps: bool) -> VerificationResult:
+    def _bmc_two_systems(
+        self,
+        bound: int,
+        input_vars: List[str],
+        output_vars: List[str],
+        inputs_equal_all_steps: bool
+    ) -> VerificationResult:
         sv_a = self._make_step_variables_for(self.sts_a, 0, bound)
         sv_b = self._make_step_variables_for(self.sts_b, 1, bound)
 
         conditions = []
 
         # inits
-        init_subst_a = [(self.sts_a.variables[i], sv_a[0][i]) for i in range(len(self.sts_a.variables))]
-        init_subst_b = [(self.sts_b.variables[i], sv_b[0][i]) for i in range(len(self.sts_b.variables))]
+        init_subst_a = [
+            (self.sts_a.variables[i], sv_a[0][i])
+            for i, _ in enumerate(self.sts_a.variables)
+        ]
+        init_subst_b = [
+            (self.sts_b.variables[i], sv_b[0][i])
+            for i, _ in enumerate(self.sts_b.variables)
+        ]
         conditions.append(z3.substitute(self.sts_a.init, init_subst_a))
         conditions.append(z3.substitute(self.sts_b.init, init_subst_b))
 
         # invariants if any (for steps 0..bound)
         if getattr(self.sts_a, "invariants", None):
             for step in range(bound + 1):
-                inv_subst = [(self.sts_a.variables[i], sv_a[step][i]) for i in range(len(self.sts_a.variables))]
+                inv_subst = [
+                    (self.sts_a.variables[i], sv_a[step][i])
+                    for i, _ in enumerate(self.sts_a.variables)
+                ]
                 for inv in self.sts_a.invariants:
                     conditions.append(z3.substitute(inv, inv_subst))
         if getattr(self.sts_b, "invariants", None):
             for step in range(bound + 1):
-                inv_subst = [(self.sts_b.variables[i], sv_b[step][i]) for i in range(len(self.sts_b.variables))]
+                inv_subst = [
+                    (self.sts_b.variables[i], sv_b[step][i])
+                    for i, _ in enumerate(self.sts_b.variables)
+                ]
                 for inv in self.sts_b.invariants:
                     conditions.append(z3.substitute(inv, inv_subst))
 
         # transitions 0..bound-1
         for step in range(bound):
             trans_subst_a = []
-            for i in range(len(self.sts_a.variables)):
+            for i, _ in enumerate(self.sts_a.variables):
                 trans_subst_a.append((self.sts_a.variables[i], sv_a[step][i]))
-                trans_subst_a.append((self.sts_a.prime_variables[i], sv_a[step + 1][i]))
+                trans_subst_a.append(
+                    (self.sts_a.prime_variables[i], sv_a[step + 1][i])
+                )
             conditions.append(z3.substitute(self.sts_a.trans, trans_subst_a))
 
             trans_subst_b = []
-            for i in range(len(self.sts_b.variables)):
+            for i, _ in enumerate(self.sts_b.variables):
                 trans_subst_b.append((self.sts_b.variables[i], sv_b[step][i]))
-                trans_subst_b.append((self.sts_b.prime_variables[i], sv_b[step + 1][i]))
+                trans_subst_b.append(
+                    (self.sts_b.prime_variables[i], sv_b[step + 1][i])
+                )
             conditions.append(z3.substitute(self.sts_b.trans, trans_subst_b))
 
         antecedent = z3.And(*conditions) if conditions else z3.BoolVal(True)
@@ -123,10 +145,9 @@ class EquivalenceProver(BaseKSafetyProver):
         res = solver.check()
         if res == z3.sat:
             return VerificationResult(False, None, solver.model(), is_unsafe=True)
-        elif res == z3.unsat:
+        if res == z3.unsat:
             return VerificationResult(True, None)
-        else:
-            return VerificationResult(False, None, None, is_unknown=True, timed_out=True)
+        return VerificationResult(False, None, None, is_unknown=True, timed_out=True)
 
     def verify_functional_equivalence(
         self,
@@ -134,15 +155,15 @@ class EquivalenceProver(BaseKSafetyProver):
         output_vars: List[str],
         inputs_equal_all_steps: bool = True
     ) -> VerificationResult:
+        """Verify functional equivalence between two systems."""
         self.logger.info("Verifying functional equivalence between two systems")
         if self.verification_method == "bounded_model_checking":
             for b in range(1, self.max_bound + 1):
-                result = self._bmc_two_systems(b, input_vars, output_vars, inputs_equal_all_steps)
+                result = self._bmc_two_systems(
+                    b, input_vars, output_vars, inputs_equal_all_steps
+                )
                 if result.is_safe or result.is_unsafe:
                     return result
             return VerificationResult(False, None, None, is_unknown=True)
-        else:
-            # Only BMC supported for two-system equivalence in this version
-            return VerificationResult(False, None, None, is_unknown=True)
-
-
+        # Only BMC supported for two-system equivalence in this version
+        return VerificationResult(False, None, None, is_unknown=True)

@@ -4,7 +4,7 @@ Verifying Boolean Programs using "Predicate abstraction"
  Given a set of Boolean variables P and a transition system S,
  it finds the strongest inductive invariant expressible as the Boolean combination of P.
 """
-from typing import List, Optional       
+from typing import List, Optional
 
 import z3
 
@@ -12,7 +12,7 @@ from efmc.utils import negate, is_valid, ctx_simplify, eval_predicates
 from efmc.sts import TransitionSystem
 
 
-def strongest_consequence(fml: z3.ExprRef, predicates: List[z3.ExprRef], k=None):
+def strongest_consequence(fml: z3.ExprRef, predicates: List[z3.ExprRef]):
     """
     Compute the strongest necessary condition of fml that is the Boolean combination of preds
     Following CAV'06 paper "SMT Techniques for Fast Predicate Abstraction"
@@ -33,17 +33,20 @@ def strongest_consequence(fml: z3.ExprRef, predicates: List[z3.ExprRef], k=None)
     return z3.simplify(z3.Or(res))
 
 
-def weakest_sufficient_condition(fml: z3.ExprRef, predicates: List[z3.ExprRef]):
+def weakest_sufficient_condition(fml: z3.ExprRef, predicates: List[z3.ExprRef]) -> z3.ExprRef:
+    """Compute WSC using the duality between SNC(Strongest Necessary Condition)."""
     notfml = z3.Not(fml)
     sc = strongest_consequence(notfml, predicates)
     return z3.simplify(z3.Not(sc))
 
 
 def fixpoint(old_inv: z3.ExprRef, inv: z3.ExprRef) -> bool:
+    """Check if inv implies old_inv (fixpoint reached)."""
     return is_valid(z3.Implies(inv, old_inv))
 
 
 class PredicateAbstractionProver:
+    """Predicate abstraction prover for Boolean programs."""
     def __init__(self, system: TransitionSystem):
         self.sts = system
         self.preds = []
@@ -53,15 +56,16 @@ class PredicateAbstractionProver:
         """
         self.var_map = []
         self.var_map_rev = []
-        for i in range(len(self.sts.variables)):
-            self.var_map.append((self.sts.variables[i], self.sts.prime_variables[i]))
-            self.var_map_rev.append((self.sts.prime_variables[i], self.sts.variables[i]))
+        for i, var in enumerate(self.sts.variables):
+            self.var_map.append((var, self.sts.prime_variables[i]))
+            self.var_map_rev.append((self.sts.prime_variables[i], var))
 
     def set_predicates(self, predicates):
         """The element in the domain is the Boolean combinations of a set of predicates"""
         self.preds = predicates
 
-    def solve(self, timeout: Optional[int] = None):
+    def solve(self, timeout: Optional[int] = None):  # pylint: disable=unused-argument
+        """Solve the verification problem using predicate abstraction."""
         preds_prime = []
         for pred in self.preds:
             preds_prime.append(z3.substitute(pred, self.var_map))
@@ -84,5 +88,3 @@ class PredicateAbstractionProver:
             print(">>> SAFE\n\n")
         else:
             print(">>> MAYBE?!?!\n\n")
-
-        return

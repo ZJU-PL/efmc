@@ -9,8 +9,8 @@ import logging
 from typing import List
 import z3
 
-from .base_prover import BaseKSafetyProver
 from efmc.utils.verification_utils import VerificationResult
+from .base_prover import BaseKSafetyProver
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,9 @@ class NonInterferenceProver(BaseKSafetyProver):
         super().__init__(sts, k=2, **kwargs)
         self.logger.info("Initialized non-interference prover")
 
-    def verify_non_interference(self, high_vars: List[str], low_vars: List[str]) -> VerificationResult:
+    def verify_non_interference(
+        self, high_vars: List[str], low_vars: List[str]
+    ) -> VerificationResult:
         """
         Verify non-interference property.
         
@@ -50,7 +52,7 @@ class NonInterferenceProver(BaseKSafetyProver):
             VerificationResult indicating the verification outcome
         """
         self.logger.info("Verifying non-interference property")
-        
+
         # Create the non-interference property
         # For non-interference: if high inputs are the same, then low outputs should be the same
         trace_vars = self.create_trace_variables()
@@ -71,6 +73,6 @@ class NonInterferenceProver(BaseKSafetyProver):
         low_equality = z3.And(*low_eq_terms) if low_eq_terms else z3.BoolVal(True)
 
         non_interference_property = z3.Implies(high_equality, low_equality)
-        
+
         self.set_relational_property(non_interference_property)
-        return self.solve() 
+        return self.solve()

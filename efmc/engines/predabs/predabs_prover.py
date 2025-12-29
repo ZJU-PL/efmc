@@ -1,7 +1,8 @@
 """
 This is an "old-school" version of the predicate abstraction domain.
 
-- A set of predicates is given prior. The element in the domain is the Boolean combination of those predicates
+- A set of predicates is given prior. The element in the domain is the
+  Boolean combination of those predicates
 - Compute the strongest post operation(similar to symbolic abstraction)
 - Compute inductive invariant expressed in the element of the domain
 Currently we do not explore
@@ -40,7 +41,7 @@ def eval_preds(m: z3.ModelRef, predicates: List[z3.BoolRef]) -> List:
 
 ############################
 # predicate abstraction
-def strongest_consequence(fml: z3.ExprRef, predicates: List, k=None) -> z3.ExprRef:
+def strongest_consequence(fml: z3.ExprRef, predicates: List) -> z3.ExprRef:
     """
     Compute the strongest necessary condition of fml that is the Boolean combination of preds
     Following CAV'06 paper "SMT Techniques for Fast Predicate Abstraction"
@@ -69,7 +70,7 @@ def weakest_sufficient_condition(fml: z3.ExprRef, predicates: List[z3.ExprRef]) 
 def stronget_consequence_simple(phi: z3.ExprRef, predicates: List[z3.ExprRef]) -> z3.ExprRef:
     """Is this correct?"""
     res = z3.And(False)
-    neg_preds = map(lambda xx: z3.Not(xx), predicates)
+    neg_preds = [z3.Not(xx) for xx in predicates]
 
     for ps in combinations(chain(predicates, neg_preds), len(list(predicates))):  # for py3?
         if is_sat(z3.And(phi, *ps)):
@@ -78,7 +79,8 @@ def stronget_consequence_simple(phi: z3.ExprRef, predicates: List[z3.ExprRef]) -
     return z3.simplify(res)
 
 
-class PredicateAbstractionProver(object):
+class PredicateAbstractionProver:
+    """Predicate abstraction prover for transition systems."""
     def __init__(self, system: TransitionSystem):
         self.sts = system
         self.preds = []
@@ -89,15 +91,15 @@ class PredicateAbstractionProver(object):
         """
         self.var_map = []
         self.var_map_rev = []
-        for i in range(len(self.sts.variables)):
-            self.var_map.append((self.sts.variables[i], self.sts.prime_variables[i]))
-            self.var_map_rev.append((self.sts.prime_variables[i], self.sts.variables[i]))
+        for i, var in enumerate(self.sts.variables):
+            self.var_map.append((var, self.sts.prime_variables[i]))
+            self.var_map_rev.append((self.sts.prime_variables[i], var))
 
     def set_predicates(self, predicates: List[z3.ExprRef]):
         """The element in the domain is the Boolean combinations of a set of predicates"""
         self.preds = predicates
 
-    def solve(self, timeout: Optional[int] = None) -> VerificationResult:
+    def solve(self, timeout: Optional[int] = None) -> VerificationResult:  # pylint: disable=unused-argument
         """External interface for verifying"""
         preds_prime = []
         for pred in self.preds:
@@ -111,8 +113,9 @@ class PredicateAbstractionProver(object):
             i = i + 1
             # onestep = strongest_consequence_simple(And(inv, trans), preds_prime) # another imple
             # Transfer function: Given abstract state Abs(X) and transition formula P(X, X'),
-            # compute the new state Abs(X') that is expressive in the predicate abstraction domain.
-            # To preserve precision, we use the following function to compute the most precise transfer function
+            # compute the new state Abs(X') that is expressive in the predicate abstraction
+            # domain. To preserve precision, we use the following function to compute the
+            # most precise transfer function
             onestep = strongest_consequence(z3.And(inv, self.sts.trans), preds_prime)
             onestep = z3.substitute(onestep, self.var_map_rev)
             old_inv = inv  # Is this correct?
@@ -124,7 +127,6 @@ class PredicateAbstractionProver(object):
             print(z3.simplify(inv))
             print(">>> SAFE\n\n")
             return VerificationResult(True, inv)
-        else:
-            # need refinement
-            print(">>> MAYBE?!?!\n\n")
-            return VerificationResult(False, None, None, is_unknown=True)
+        # need refinement
+        print(">>> MAYBE?!?!\n\n")
+        return VerificationResult(False, None, None, is_unknown=True)

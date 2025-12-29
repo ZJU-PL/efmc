@@ -65,9 +65,9 @@ class CHCParser:
         # TODO: remove "inv"? (Besides, ground_quantifier may change the var order...)
         #  Also, ground_quantifier can be slow
         # from z3.z3util import get_vars
-        init, vars_init = ground_quantifier(self.fmls[0])
+        init, _ = ground_quantifier(self.fmls[0])
         trans, vars_trans = ground_quantifier(self.fmls[1])
-        post, vars_post = ground_quantifier(self.fmls[2])
+        post, _ = ground_quantifier(self.fmls[2])
 
         pure_init = init.children()[0]
         pure_trans = z3.And(trans.children()[0].children()[1:])
@@ -125,11 +125,11 @@ def test_parse2():
 
 
 def test_parse3(filename):
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         res = f.read()
         ss = CHCParser(res, to_real=False)
-        all_vars, init, trans, post = ss.get_transition_system()
-        print(all_vars)
+        vars_trans, init, trans, post = ss.get_transition_system()
+        print(vars_trans)
         # ss.solve_with_pdr()
 
 

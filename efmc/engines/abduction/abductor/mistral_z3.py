@@ -11,7 +11,10 @@ from efmc.utils.z3_expr_utils import get_variables
 
 
 class MSASolver:
+    """Minimal Satisfying Assignment solver using Z3."""
+
     def __init__(self, verbose=1):
+        """Initialize the MSA solver."""
 
         self.formula = None
         # self.formula = simplify(self.formula)
@@ -19,20 +22,22 @@ class MSASolver:
         self.verb = verbose
 
     def init_from_file(self, filename: str) -> None:
+        """Initialize solver from an SMT2 file."""
         self.formula = z3.And(z3.parse_smt2_file(filename))
         # self.formula = simplify(self.formula)
         self.fvars = frozenset(get_variables(self.formula))
 
         if self.verb > 2:
-            print('c formula: \'{0}\''.format(self.formula))
+            print(f'c formula: \'{self.formula}\'')
 
     def init_from_formula(self, formula: z3.BoolRef) -> None:
+        """Initialize solver from a Z3 formula."""
         self.formula = formula
         # self.formula = simplify(self.formula)
         self.fvars = frozenset(get_variables(self.formula))
 
         if self.verb > 2:
-            print('c formula: \'{0}\''.format(self.formula))
+            print(f'c formula: \'{self.formula}\'')
 
     def validate_small_model(self, model: z3.ModelRef) -> bool:
         """Check whether a small model is a 'sufficient condition'"""
@@ -65,32 +70,32 @@ class MSASolver:
         return model
         # return ['{0}={1}'.format(v, model[v]) for v in frozenset(self.fvars) - mus]
 
-    def compute_mus(self, X: FrozenSet, fvars: FrozenSet, lb: int):
+    def compute_mus(self, x_set: FrozenSet, fvars: FrozenSet, lb: int):  # pylint: disable=invalid-name
         """
         Algorithm implements find_mus() procedure from Fig. 1
         of the dillig-cav12 paper.
+        x_set: variables to include (named X in the paper)
         """
-
         if not fvars or len(fvars) <= lb:
             return frozenset()
 
         best = set()
-        x = frozenset([next(iter(fvars))])  # should choose x in a more clever way
+        x_var = frozenset([next(iter(fvars))])  # should choose x in a more clever way
 
         if self.verb > 1:
-            print('c state:', 'X = {0} + {1},'.format(list(X), list(x)), 'lb =', lb)
+            print(f'c state: X = {list(x_set)} + {list(x_var)}, lb = {lb}')
 
-        if self.get_model_forall(X.union(x)):
-            Y = self.compute_mus(X.union(x), fvars - x, lb - 1)
+        if self.get_model_forall(x_set.union(x_var)):
+            y_set = self.compute_mus(x_set.union(x_var), fvars - x_var, lb - 1)
 
-            cost_curr = len(Y) + 1
+            cost_curr = len(y_set) + 1
             if cost_curr > lb:
-                best = Y.union(x)
+                best = y_set.union(x_var)
                 lb = cost_curr
 
-        Y = self.compute_mus(X, frozenset(fvars) - x, lb)
-        if len(Y) > lb:
-            best = Y
+        y_set = self.compute_mus(x_set, frozenset(fvars) - x_var, lb)
+        if len(y_set) > lb:
+            best = y_set
 
         return best
 

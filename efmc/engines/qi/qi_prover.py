@@ -8,19 +8,18 @@ import time
 import tempfile
 import subprocess
 import os
-import uuid
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 import z3
 
 from efmc.sts import TransitionSystem
 from efmc.utils.verification_utils import VerificationResult
-from efmc.efmc_config import config
 
 logger = logging.getLogger(__name__)
 
 
 class QuantifierInstantiationProver:
+    """Quantifier Instantiation based prover for verification."""
     def __init__(self, system: TransitionSystem, **kwargs):
         self.sts = system
         self.timeout = kwargs.get('timeout', None)
@@ -34,14 +33,13 @@ class QuantifierInstantiationProver:
         """Get appropriate SMT logic based on variable types."""
         if self.sts.has_int:
             return "UFLIA"
-        elif self.sts.has_real:
+        if self.sts.has_real:
             return "AUFLIRA"
-        elif self.sts.has_bv:
+        if self.sts.has_bv:
             return "UFBV"
-        elif self.sts.has_fp:
+        if self.sts.has_fp:
             return "UFFP"
-        else:
-            raise NotImplementedError("Unsupported variable types")
+        raise NotImplementedError("Unsupported variable types")
 
     def _create_inv_function(self) -> z3.FuncDeclRef:
         """Create invariant function with appropriate signature."""
@@ -60,7 +58,7 @@ class QuantifierInstantiationProver:
     def _configure_z3_solver(self) -> z3.Solver:
         """Configure Z3 solver with QI strategy."""
         s = z3.SolverFor(self._get_logic())
-        
+
         if self.qi_strategy == 'mbqi':
             s.set('auto_config', False)
             s.set('smt.ematching', False)
@@ -85,7 +83,7 @@ class QuantifierInstantiationProver:
             # Initiation: init(X) => inv(X)
             z3.ForAll(self.sts.variables, z3.Implies(self.sts.init, inv(*self.sts.variables))),
             # Consecution: inv(X) ∧ trans(X,X') => inv(X')
-            z3.ForAll(self.sts.all_variables, 
+            z3.ForAll(self.sts.all_variables,
                      z3.Implies(z3.And(inv(*self.sts.variables), self.sts.trans),
                                inv(*self.sts.prime_variables))),
             # Safety: inv(X) => post(X)
@@ -96,15 +94,15 @@ class QuantifierInstantiationProver:
         """Generate SMT-LIB2 format string."""
         logic = self._get_logic()
         smt2_content = f"(set-logic {logic})\n"
-        
+
         # Declare variables
         for var in self.sts.all_variables:
             smt2_content += f"(declare-const {var.sexpr()} {var.sort().sexpr()})\n"
-        
+
         # Add verification conditions
-        for i, vc in enumerate(verification_conditions):
+        for vc in verification_conditions:
             smt2_content += f"(assert {vc.sexpr()})\n"
-        
+
         smt2_content += "(check-sat)\n"
         return smt2_content
 
@@ -121,113 +119,110 @@ class QuantifierInstantiationProver:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.smt2', delete=False) as f:
             f.write(smt2_content)
             temp_file = f.name
-        
+
         try:
             # Call external solver
             result = subprocess.run(
                 solver_cmd + [temp_file],
                 capture_output=True,
                 text=True,
-                timeout=self.timeout if self.timeout else 60
+                timeout=self.timeout if self.timeout else 60,
+                check=False
             )
-            
+
             if result.returncode == 0:
                 return result.stdout.strip()
-            else:
-                logger.warning(f"External solver failed: {result.stderr}")
-                return "unknown"
-                
+            logger.warning("External solver failed: %s", result.stderr)
+            return "unknown"
+
         except subprocess.TimeoutExpired:
             logger.warning("External solver timed out")
             return "unknown"
-        except Exception as e:
-            logger.error(f"Error calling external solver: {e}")
+        except (OSError, ValueError) as e:
+            logger.error("Error calling external solver: %s", e)
             return "unknown"
         finally:
             # Clean up temporary file
             try:
                 os.unlink(temp_file)
-            except:
+            except OSError:
                 pass
 
     def solve(self, timeout: Optional[int] = None) -> VerificationResult:
         """Solve verification problem using quantifier instantiation."""
         if timeout:
             self.timeout = timeout
-            
-        logger.info(f"Starting QI verification with strategy: {self.qi_strategy}")
+
+        logger.info("Starting QI verification with strategy: %s", self.qi_strategy)
         start_time = time.time()
-        
+
         try:
             # Create invariant function
             inv = self._create_inv_function()
-            
+
             # Build verification conditions
             vcs = self._build_verification_conditions(inv)
-            
+
             if self.solver_name == 'z3api':
                 # Use Z3 API
                 s = self._configure_z3_solver()
                 for vc in vcs:
                     s.add(vc)
-                
+
                 result = s.check()
-                elapsed_time = time.time() - start_time
-                
+                _ = time.time() - start_time  # elapsed_time for potential future use
+
                 if result == z3.sat:
                     logger.info("Property violation found (unsafe)")
                     return VerificationResult(False, None, is_unsafe=True)
-                elif result == z3.unsat:
+                if result == z3.unsat:
                     logger.info("Property proven safe")
                     # Extract invariant from the model
                     model = s.model()
                     if model:
                         self.invariant = model.eval(inv(*self.sts.variables))
                     return VerificationResult(True, self.invariant)
-                else:
-                    logger.info("Solver returned unknown")
-                    return VerificationResult(False, None, is_unknown=True)
-                    
-            else:
-                # Use external solver
-                smt2_content = self._generate_smtlib2(vcs)
-                
-                if self.dump_file:
-                    with open(self.dump_file, 'w') as f:
-                        f.write(smt2_content)
-                
-                result = self._call_external_solver(smt2_content)
-                elapsed_time = time.time() - start_time
-                
-                if result == "sat":
-                    logger.info("Property violation found (unsafe)")
-                    return VerificationResult(False, None, is_unsafe=True)
-                elif result == "unsat":
-                    logger.info("Property proven safe")
-                    return VerificationResult(True, None)  # External solver doesn't provide model
-                else:
-                    logger.info("Solver returned unknown")
-                    return VerificationResult(False, None, is_unknown=True)
-                    
-        except Exception as e:
-            logger.error(f"QI verification failed: {e}")
+                logger.info("Solver returned unknown")
+                return VerificationResult(False, None, is_unknown=True)
+
+            # Use external solver
+            smt2_content = self._generate_smtlib2(vcs)
+
+            if self.dump_file:
+                with open(self.dump_file, 'w', encoding='utf-8') as f:
+                    f.write(smt2_content)
+
+            result = self._call_external_solver(smt2_content)
+            _ = time.time() - start_time  # elapsed_time for potential future use
+
+            if result == "sat":
+                logger.info("Property violation found (unsafe)")
+                return VerificationResult(False, None, is_unsafe=True)
+            if result == "unsat":
+                logger.info("Property proven safe")
+                return VerificationResult(True, None)  # External solver doesn't provide model
+            logger.info("Solver returned unknown")
+            return VerificationResult(False, None, is_unknown=True)
+
+        except (z3.Z3Exception, ValueError, NotImplementedError) as e:
+            logger.error("QI verification failed: %s", e)
             return VerificationResult(False, None, is_unknown=True)
 
     def try_multiple_strategies(self) -> VerificationResult:
         """Try multiple QI strategies if current one fails."""
         strategies = ['mbqi', 'ematching', 'combined']
-        
+
         for strategy in strategies:
             if strategy == self.qi_strategy:
                 continue
-                
-            logger.info(f"Trying QI strategy: {strategy}")
+
+            logger.info("Trying QI strategy: %s", strategy)
             self.qi_strategy = strategy
-            
+
             result = self.solve()
             if result.is_safe or result.is_unsafe:
                 return result
-        
+
         return VerificationResult(False, None, is_unknown=True)
 
     def set_strategy(self, strategy: str) -> None:

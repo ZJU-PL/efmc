@@ -1,9 +1,13 @@
+"""LLM Tool base classes for implementing LLM-based tools."""
 from abc import ABC, abstractmethod
 from typing import Dict
 from efmc.llmtools.logger import Logger
+from efmc.llmtools.llm_utils import LLM
 
 
 class LLMToolInput(ABC):
+    """Abstract base class for LLM tool input."""
+
     def __init__(self):
         pass
 
@@ -16,11 +20,15 @@ class LLMToolInput(ABC):
 
 
 class LLMToolOutput(ABC):
+    """Abstract base class for LLM tool output."""
+
     def __init__(self):
         pass
 
 
 class LLMTool(ABC):
+    """Abstract base class for LLM-based tools."""
+
     def __init__(
         self,
         model_name: str,
@@ -29,10 +37,19 @@ class LLMTool(ABC):
         max_query_num: int,
         logger: Logger,
     ) -> None:
+        """
+        Initialize LLM Tool.
+
+        Args:
+            model_name: Name of the LLM model to use
+            temperature: Temperature for model inference
+            language: Programming language for the tool
+            max_query_num: Maximum number of queries per invocation
+            logger: Logger instance for logging
+        """
         self.language = language
         self.model_name = model_name
         self.temperature = temperature
-        self.language = language
         self.max_query_num = max_query_num
         self.logger = logger
 
@@ -43,14 +60,23 @@ class LLMTool(ABC):
         self.output_token_cost = 0
         self.total_query_num = 0
 
-    def invoke(self, input: LLMToolInput) -> LLMToolOutput:
+    def invoke(self, tool_input: LLMToolInput) -> LLMToolOutput:
+        """
+        Invoke the LLM tool with given input.
+
+        Args:
+            tool_input: Input to the LLM tool
+
+        Returns:
+            Output from the LLM tool
+        """
         class_name = type(self).__name__
         self.logger.print_console(f"The LLM Tool {class_name} is invoked.")
-        if input in self.cache:
+        if tool_input in self.cache:
             self.logger.print_log("Cache hit.")
-            return self.cache[input]
+            return self.cache[tool_input]
 
-        prompt = self._get_prompt(input)
+        prompt = self._get_prompt(tool_input)
         self.logger.print_log("Prompt:", "\n", prompt)
 
         single_query_num = 0
@@ -65,22 +91,24 @@ class LLMTool(ABC):
             self.logger.print_log("Response:", "\n", response)
             self.input_token_cost += input_token_cost
             self.output_token_cost += output_token_cost
-            output = self._parse_response(response, input)
+            output = self._parse_response(response, tool_input)
 
             if output is not None:
                 break
 
         self.total_query_num += single_query_num
         if output is not None:
-            self.cache[input] = output
+            self.cache[tool_input] = output
         return output
 
     @abstractmethod
-    def _get_prompt(self, input: LLMToolInput) -> str:
+    def _get_prompt(self, tool_input: LLMToolInput) -> str:
+        """Generate prompt from input."""
         pass
 
     @abstractmethod
     def _parse_response(
-        self, response: str, input: LLMToolInput = None
+        self, response: str, tool_input: LLMToolInput = None
     ) -> LLMToolOutput:
+        """Parse response from LLM into output."""
         pass

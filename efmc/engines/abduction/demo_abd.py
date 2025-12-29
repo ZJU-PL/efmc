@@ -68,7 +68,9 @@ class VerificationTester:
             trans=z3.And(np == n + 1, mp == n),
             post=m <= n / 2
         )
-        test_cases.append(("Dependent Variables", system, False, "m tracking n-1, violating m <= n/2"))
+        test_cases.append(
+            ("Dependent Variables", system, False, "m tracking n-1, violating m <= n/2")
+        )
 
         return test_cases
 
@@ -83,13 +85,13 @@ class VerificationTester:
         # Abduction
         start_time = time.time()
         abduction_prover = AbductionProver(system)
-        
+
         try:
             abd_result = abduction_prover.solve()
             abd_safe = abd_result.is_safe
             invariant = str(abd_result.invariant) if abd_result.invariant else "None"
         except Exception as e:
-            logger.error(f"Abduction error for {name}: {e}")
+            logger.error("Abduction error for %s: %s", name, e)
             abd_safe = False
             invariant = "Error"
 
@@ -100,7 +102,7 @@ class VerificationTester:
         """Run all test cases and report results."""
         test_cases = self.create_test_cases()
         results = []
-        
+
         print("Verification Test Results")
         print("=" * 60)
         
@@ -110,20 +112,23 @@ class VerificationTester:
             # Verify abduction result matches expectation
             success = abd_result == expected_safe
             if not success:
-                logger.error(f"Test {name} failed: expected {expected_safe}, got {abd_result}")
-            
+                logger.error("Test %s failed: expected %s, got %s", name, expected_safe, abd_result)
+
             results.append((name, kind_result, abd_result, success, exec_time, invariant))
-            
+
             # Print result
-            kind_status = "unknown" if kind_result is None else ("safe" if kind_result else "unsafe")
+            if kind_result is None:
+                kind_status = "unknown"
+            else:
+                kind_status = "safe" if kind_result else "unsafe"
             abd_status = "safe" if abd_result else "unsafe"
             status_mark = "✓" if success else "✗"
-            
+
             print(f"\n{status_mark} {name}")
             print(f"  Description: {description}")
             print(f"  K-induction: {kind_status}")
             print(f"  Abduction: {abd_status} ({exec_time:.2f}s)")
-            if invariant != "None" and invariant != "Error":
+            if invariant not in ("None", "Error"):
                 print(f"  Invariant: {invariant}")
 
         # Summary
@@ -131,7 +136,7 @@ class VerificationTester:
         successful = sum(1 for _, _, _, success, _, _ in results)
         total_time = sum(exec_time for _, _, _, _, exec_time, _ in results)
         unknown_kind = sum(1 for _, kind_result, _, _, _, _ in results if kind_result is None)
-        
+
         print(f"\n{'=' * 60}")
         print(f"Summary: {successful}/{total_tests} tests passed")
         print(f"Accuracy: {successful/total_tests:.1%}")
@@ -143,12 +148,12 @@ class VerificationTester:
 def main():
     """Run verification tests."""
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-    
+
     try:
         tester = VerificationTester()
         tester.run_tests()
     except Exception as e:
-        logger.error(f"Test execution failed: {e}")
+        logger.error("Test execution failed: %s", e)
         raise
 
 

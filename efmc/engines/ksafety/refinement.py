@@ -8,11 +8,10 @@ as equality under matched inputs.
 
 import logging
 from typing import List
-import z3
 
 from efmc.sts import TransitionSystem
-from .equivalence import EquivalenceProver
 from efmc.utils.verification_utils import VerificationResult
+from .equivalence import EquivalenceProver
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,10 @@ class RefinementProver(EquivalenceProver):
         super().__init__(spec, impl, **kwargs)
         self.logger.info("Initialized refinement prover (spec -> impl)")
 
-    def verify_refinement(self, input_vars: List[str], output_vars: List[str]) -> VerificationResult:
-        return self.verify_functional_equivalence(input_vars, output_vars, inputs_equal_all_steps=True)
-
-
+    def verify_refinement(
+        self, input_vars: List[str], output_vars: List[str]
+    ) -> VerificationResult:
+        """Verify refinement property between spec and impl."""
+        return self.verify_functional_equivalence(
+            input_vars, output_vars, inputs_equal_all_steps=True
+        )

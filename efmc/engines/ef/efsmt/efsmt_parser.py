@@ -1,17 +1,17 @@
 """
 Parser for EFSMT (Exists-Forall SMT) formulas in SMT-LIB2 format
 We assume that the formula is of the form 
-    forall Y. Phi(X, Y), where X is the set of existentially quantified variables, and Y is the set of universally quantified variables.
+    forall Y. Phi(X, Y), where X is the set of existentially quantified
+    variables, and Y is the set of universally quantified variables.
 """
 
-from typing import Tuple, List, Union, Optional
+from typing import Tuple, List
 import z3
 from efmc.utils.z3_expr_utils import get_variables
 
 
 class ParserError(Exception):
     """Custom exception for parsing errors"""
-    pass
 
 
 class EFSMTParser:
@@ -30,10 +30,14 @@ class EFSMTParser:
             ValueError: If logic is not supported
         """
         if logic not in self.supported_logics:
-            raise ValueError(f"Unsupported logic: {logic}. Supported: {self.supported_logics}")
+            raise ValueError(
+                f"Unsupported logic: {logic}. Supported: {self.supported_logics}"
+            )
         self.logic = logic
 
-    def parse_smt2_string(self, inputs: str) -> Tuple[List[z3.ExprRef], List[z3.ExprRef], z3.ExprRef]:
+    def parse_smt2_string(
+        self, inputs: str
+    ) -> Tuple[List[z3.ExprRef], List[z3.ExprRef], z3.ExprRef]:
         """Parse EFSMT formula from string
 
         Args:
@@ -51,9 +55,11 @@ class EFSMTParser:
                 fml = z3.And(fml_vec)
             return self._ground_quantifier(fml)
         except z3.Z3Exception as e:
-            raise ParserError(f"Failed to parse SMT2 string: {str(e)}")
+            raise ParserError(f"Failed to parse SMT2 string: {str(e)}") from e
 
-    def parse_smt2_file(self, filename: str) -> Tuple[List[z3.ExprRef], List[z3.ExprRef], z3.ExprRef]:
+    def parse_smt2_file(
+        self, filename: str
+    ) -> Tuple[List[z3.ExprRef], List[z3.ExprRef], z3.ExprRef]:
         """Parse EFSMT formula from file
 
         Args:
@@ -72,11 +78,13 @@ class EFSMTParser:
                 fml = z3.And(fml_vec)
             return self._ground_quantifier(fml)
         except z3.Z3Exception as e:
-            raise ParserError(f"Failed to parse {filename}: {str(e)}")
-        except FileNotFoundError:
-            raise FileNotFoundError(f"File not found: {filename}")
+            raise ParserError(f"Failed to parse {filename}: {str(e)}") from e
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(f"File not found: {filename}") from exc
 
-    def _ground_quantifier(self, qexpr: z3.ExprRef) -> Tuple[List[z3.ExprRef], List[z3.ExprRef], z3.ExprRef]:
+    def _ground_quantifier(
+        self, qexpr: z3.ExprRef
+    ) -> Tuple[List[z3.ExprRef], List[z3.ExprRef], z3.ExprRef]:
         """Ground a quantified formula by extracting exists/forall variables
         FIXME: this function canbe very slow?
 
@@ -104,10 +112,11 @@ class EFSMTParser:
             exists_vars = [x for x in get_variables(body) if x not in forall_vars]
             return exists_vars, forall_vars, body
         except Exception as e:
-            raise ParserError(f"Failed to ground quantifier: {str(e)}")
+            raise ParserError(f"Failed to ground quantifier: {str(e)}") from e
 
 
 def test_parse_multiple_formulas():
+    """Test parsing multiple formulas from SMT2 string."""
     smt2_input = """
 (declare-fun x1 () (_ BitVec 8))
 (declare-fun x2 () (_ BitVec 8))

@@ -3,12 +3,13 @@
 This prover uses Z3's Boolean reasoning capabilities to implement BDD-like
 symbolic model checking for Boolean programs.
 
-TBD: Use pysmt to access BDDs, which allows us to implement the "real" BDD-based model checking and could be faster and more memory efficient.
+TBD: Use pysmt to access BDDs, which allows us to implement the "real"
+BDD-based model checking and could be faster and more memory efficient.
 """
 
 import logging
 import time
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import z3
 
@@ -18,7 +19,7 @@ from efmc.utils.verification_utils import VerificationResult
 logger = logging.getLogger(__name__)
 
 
-class BDDProver:
+class BDDProver:  # pylint: disable=too-many-instance-attributes
     """
     BDD-based symbolic model checker for Boolean programs.
     
@@ -27,7 +28,10 @@ class BDDProver:
     reachability analysis to verify safety properties.
     """
 
-    def __init__(self, system: TransitionSystem, use_forward: bool = True, max_iterations: int = 1000):
+    def __init__(
+        self, system: TransitionSystem, use_forward: bool = True,
+        max_iterations: int = 1000
+    ):
         """
         Initialize the BDD prover with a transition system.
         
@@ -43,7 +47,10 @@ class BDDProver:
 
         # Check if the system is suitable for BDD-based verification
         if not self.sts.has_bool and not self.sts.has_bv:
-            logger.warning("BDD-based verification works best with Boolean or bit-vector variables")
+            logger.warning(
+                "BDD-based verification works best with Boolean or "
+                "bit-vector variables"
+            )
 
         # Create solver for fixed-point computations
         self.solver = z3.Solver()
@@ -72,7 +79,7 @@ class BDDProver:
         Returns:
             A new formula with prime variables replaced by current variables
         """
-        substitutions = [(p, self.prime_to_current[p]) for p in self.prime_to_current]
+        substitutions = list(self.prime_to_current.items())
         return z3.substitute(formula, substitutions)
 
     def _substitute_current_with_prime(self, formula: z3.ExprRef) -> z3.ExprRef:
@@ -85,7 +92,7 @@ class BDDProver:
         Returns:
             A new formula with current variables replaced by prime variables
         """
-        substitutions = [(c, self.current_to_prime[c]) for c in self.current_to_prime]
+        substitutions = list(self.current_to_prime.items())
         return z3.substitute(formula, substitutions)
 
     def _image(self, states_formula: z3.ExprRef) -> z3.ExprRef:
@@ -101,8 +108,7 @@ class BDDProver:
         # For bit-vector systems, we need a special approach
         if self.sts.has_bv:
             return self._image_bv(states_formula)
-        else:
-            return self._image_bool(states_formula)
+        return self._image_bool(states_formula)
 
     def _image_bool(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
@@ -235,8 +241,7 @@ class BDDProver:
         # For bit-vector systems, we need a special approach
         if self.sts.has_bv:
             return self._pre_image_bv(states_formula)
-        else:
-            return self._pre_image_bool(states_formula)
+        return self._pre_image_bool(states_formula)
 
     def _pre_image_bool(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
@@ -386,7 +391,10 @@ class BDDProver:
             True if formula1 is equivalent to formula2, False otherwise
         """
         # formula1 = formula2 iff (formula1 ⊆ formula2) and (formula2 ⊆ formula1)
-        return self._is_contained(formula1, formula2) and self._is_contained(formula2, formula1)
+        contained_1_in_2 = self._is_contained(formula1, formula2)
+        # We intentionally swap arguments to check formula2 ⊆ formula1
+        contained_2_in_1 = self._is_contained(formula2, formula1)  # pylint: disable=arguments-out-of-order
+        return contained_1_in_2 and contained_2_in_1
 
     def _is_sat(self, formula: z3.ExprRef) -> bool:
         """
@@ -426,21 +434,21 @@ class BDDProver:
         # Fixed-point computation
         while True:
             step += 1
-            logger.info(f"Forward analysis step {step}")
+            logger.info("Forward analysis step %s", step)
 
             # Compute successor states
             new_frontier_formula = self._image(frontier_formula)
 
             # Check if new states violate the property
             if self._is_sat(z3.And(new_frontier_formula, self.not_post_formula)):
-                logger.info(f"Property violation found at step {step}")
+                logger.info("Property violation found at step %s", step)
                 return False, None
 
             # Check if we've reached a fixed point
             # We need to check if new_frontier_formula is contained in reached_formula
             if self._is_contained(new_frontier_formula, reached_formula):
                 # No new states, we've reached a fixed point
-                logger.info(f"Fixed point reached after {step} steps")
+                logger.info("Fixed point reached after %s steps", step)
                 # The invariant is the set of reached states
                 return True, reached_formula
 
@@ -450,9 +458,12 @@ class BDDProver:
 
             # Limit the number of iterations to avoid infinite loops
             if step > self.max_iterations:
-                logger.warning(f"Reached maximum number of iterations ({self.max_iterations}), stopping")
-                # For safety, we assume the system is safe if we've reached the maximum number of iterations
-                # and haven't found a property violation
+                logger.warning(
+                    "Reached maximum number of iterations (%s), stopping",
+                    self.max_iterations
+                )
+                # For safety, we assume the system is safe if we've reached the
+                # maximum number of iterations and haven't found a property violation
                 return True, reached_formula
 
     def backward_analysis(self) -> Tuple[bool, Optional[z3.ExprRef]]:
@@ -479,21 +490,21 @@ class BDDProver:
         # Fixed-point computation
         while True:
             step += 1
-            logger.info(f"Backward analysis step {step}")
+            logger.info("Backward analysis step %s", step)
 
             # Compute predecessor states
             new_frontier_formula = self._pre_image(frontier_formula)
 
             # Check if new bad states intersect with initial states
             if self._is_sat(z3.And(new_frontier_formula, self.init_formula)):
-                logger.info(f"Property violation found at step {step}")
+                logger.info("Property violation found at step %s", step)
                 return False, None
 
             # Check if we've reached a fixed point
             # We need to check if new_frontier_formula is contained in bad_formula
             if self._is_contained(new_frontier_formula, bad_formula):
                 # No new states, we've reached a fixed point
-                logger.info(f"Fixed point reached after {step} steps")
+                logger.info("Fixed point reached after %s steps", step)
                 # The invariant is the negation of the bad states
                 return True, z3.Not(bad_formula)
 
@@ -503,9 +514,12 @@ class BDDProver:
 
             # Limit the number of iterations to avoid infinite loops
             if step > self.max_iterations:
-                logger.warning(f"Reached maximum number of iterations ({self.max_iterations}), stopping")
-                # For safety, we assume the system is safe if we've reached the maximum number of iterations
-                # and haven't found a property violation
+                logger.warning(
+                    "Reached maximum number of iterations (%s), stopping",
+                    self.max_iterations
+                )
+                # For safety, we assume the system is safe if we've reached the
+                # maximum number of iterations and haven't found a property violation
                 return True, z3.Not(bad_formula)
 
     def solve(self) -> VerificationResult:
@@ -532,11 +546,10 @@ class BDDProver:
                 print("Safe")
                 print(f"Invariant: {invariant}")
                 return VerificationResult(True, invariant)
-            else:
-                print("Unsafe")
-                return VerificationResult(False, None, is_unsafe=True)
+            print("Unsafe")
+            return VerificationResult(False, None, is_unsafe=True)
 
-        except Exception as e:
+        except (RuntimeError, ValueError, z3.Z3Exception) as e:
             print(f"BDD verification failed: {e}")
             print(f"BDD verification time: {time.time() - start:.2f} seconds")
             print("Unknown")

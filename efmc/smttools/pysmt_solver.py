@@ -68,26 +68,30 @@ def to_pysmt_vars(z3vars: [z3.ExprRef]):
 
 
 class PySMTSolver(z3.Solver):
+    """PySMT-based solver wrapper for Z3."""
 
     def __init__(self, debug=False):
-        super(PySMTSolver, self).__init__()
+        super().__init__()
 
     @staticmethod
     def convert(zf: z3.ExprRef):
         """
-        FIXME: if we do not call "pysmt_vars = ...", z3 will report naming warning..
+        Convert Z3 formula to PySMT formula.
+        FIXME: if we do not call "pysmt_vars = ...", z3 will report
+        naming warning..
         """
         zvs = get_variables(zf)
-        # pysmt_vars = [Symbol(v.decl().name(), INT if v.is_int() else REAL) for v in zvs]
+        # pysmt_vars = [Symbol(v.decl().name(), INT if v.is_int() else REAL)
+        #               for v in zvs]
         pysmt_vars = to_pysmt_vars(zvs)
         z3s = Solver(name='z3')
         pysmt_fml = z3s.converter.back(zf)
         return pysmt_vars, pysmt_fml
 
     def check_with_pysmt(self):
-        """TODO: build a Z3 model?"""
+        """Check satisfiability using PySMT solver. TODO: build a Z3 model?"""
         z3fml = z3.And(self.assertions())
-        pysmt_vars, pysmt_fml = PySMTSolver.convert(z3fml)
+        _, pysmt_fml = PySMTSolver.convert(z3fml)
         # print(pysmt_vars)
         f_logic = get_logic(pysmt_fml)
         try:
@@ -106,7 +110,7 @@ class PySMTSolver(z3.Solver):
         Use multiple solvers (in parallel?)
         """
         z3fml = z3.And(self.assertions())
-        pysmt_vars, pysmt_fml = PySMTSolver.convert(z3fml)
+        _, pysmt_fml = PySMTSolver.convert(z3fml)
         f_logic = get_logic(pysmt_fml)
 
         with Portfolio([("msat", {"random_seed": 1}),
@@ -139,14 +143,17 @@ class PySMTSolver(z3.Solver):
                 print(partial_model)
                 solver.add_assertion(Not(And(partial_model)))
                 iteration += 1
-                if iteration >= bound: break
+                if iteration >= bound:
+                    break
 
-    def binary_interpolant(self, fml_a: z3.BoolRef, fml_b: z3.BoolRef, solver_name="z3", logic=None):
-        """ Binary interpolant"""
+    def binary_interpolant(self, fml_a: z3.BoolRef, fml_b: z3.BoolRef,
+                          solver_name="z3", logic=None):
+        """Binary interpolant"""
         _, pysmt_fml_a = PySMTSolver.convert(fml_a)
         _, pysmt_fml_b = PySMTSolver.convert(fml_b)
 
-        itp = binary_interpolant(pysmt_fml_a, pysmt_fml_b, solver_name=solver_name, logic=logic)
+        itp = binary_interpolant(pysmt_fml_a, pysmt_fml_b,
+                                solver_name=solver_name, logic=logic)
         return Solver(name='z3').converter.convert(itp)
 
     def sequence_interpolant(self, formulas: List[z3.ExprRef]):
@@ -162,22 +169,29 @@ class PySMTSolver(z3.Solver):
             z3_seq_itp.append(Solver(name='z3').converter.convert(cnt))
         return z3_seq_itp
     
-    # should allow the users to choose the solver for existential and universal quantifiers
-    def efsmt(self, evars: List[z3.ExprRef], uvars: List[z3.ExprRef], z3fml: z3.ExprRef, logic=QF_BV, maxloops=None,
-              esolver_name="z3", fsolver_name="z3", verbose=False, timeout=None):
+    # should allow the users to choose the solver for existential and
+    # universal quantifiers
+    def efsmt(self, evars: List[z3.ExprRef], uvars: List[z3.ExprRef],
+              z3fml: z3.ExprRef, logic=QF_BV, maxloops=None,
+              esolver_name="z3", fsolver_name="z3", verbose=False,
+              timeout=None):
         """Solves exists x. forall y. phi(x, y)
-        
+
         Args:
             evars: Existentially quantified variables
             uvars: Universally quantified variables
             z3fml: Z3 formula representing the constraint
             logic: The logic to use (default: QF_BV)
-            maxloops: Maximum number of iterations (default: None, meaning no limit)
-            esolver_name: Name of the solver to use for existential solving (default: "z3")
-            fsolver_name: Name of the solver to use for universal solving (default: "z3")
+            maxloops: Maximum number of iterations (default: None,
+                     meaning no limit)
+            esolver_name: Name of the solver to use for existential solving
+                         (default: "z3")
+            fsolver_name: Name of the solver to use for universal solving
+                         (default: "z3")
             verbose: Whether to print debugging information (default: False)
-            timeout: Maximum execution time in seconds (default: None, meaning no timeout)
-            
+            timeout: Maximum execution time in seconds (default: None,
+                    meaning no timeout)
+
         Returns:
             "sat", "unsat", or "unknown"
         """
@@ -186,8 +200,8 @@ class PySMTSolver(z3.Solver):
         _, phi = PySMTSolver.convert(z3fml)
         y = to_pysmt_vars(uvars)  # universally quantified
         y = set(y)
-        # x = phi.get_free_variables() - y 
-        x = set(to_pysmt_vars(evars))  # should we use the previous line or this one
+        # x = phi.get_free_variables() - y
+        x = set(to_pysmt_vars(evars))  # should we use previous line or this
 
         with Solver(logic=logic, name=esolver_name) as esolver:
             esolver.add_assertion(Bool(True))
@@ -197,33 +211,35 @@ class PySMTSolver(z3.Solver):
                 # Check timeout
                 if timeout is not None and time.time() - start_time > timeout:
                     if verbose:
-                        print(f"Timeout reached after {time.time() - start_time:.2f} seconds")
+                        elapsed = time.time() - start_time
+                        print(f"Timeout reached after {elapsed:.2f} seconds")
                     break
-                    
+
                 loops += 1
                 eres = esolver.solve()
                 if not eres:
                     result = "unsat"
                     break
-                else:
-                    tau = {v: esolver.get_value(v) for v in x}
-                    sub_phi = phi.substitute(tau).simplify()
-                    if verbose: print("%d: Tau = %s" % (loops, tau))
+                tau = {v: esolver.get_value(v) for v in x}
+                sub_phi = phi.substitute(tau).simplify()
+                if verbose:
+                    print("%d: Tau = %s" % (loops, tau))
 
-                    fmodel = get_model(Not(sub_phi),
-                                       logic=logic, solver_name=fsolver_name)
-                    if fmodel is None:
-                        result = "sat"
-                        break
-                    else:
-                        sigma = {v: fmodel[v] for v in y}
-                        sub_phi = phi.substitute(sigma).simplify()
-                        if verbose: print("%d: Sigma = %s" % (loops, sigma))
-                        esolver.add_assertion(sub_phi)
+                fmodel = get_model(Not(sub_phi),
+                                   logic=logic, solver_name=fsolver_name)
+                if fmodel is None:
+                    result = "sat"
+                    break
+                sigma = {v: fmodel[v] for v in y}
+                sub_phi = phi.substitute(sigma).simplify()
+                if verbose:
+                    print("%d: Sigma = %s" % (loops, sigma))
+                esolver.add_assertion(sub_phi)
             return result
 
 
 def test():
+    """Test function for PySMTSolver."""
     x, y, z = z3.Ints("x y z")
     fml = z3.And(x > 10, y < 19, z == 3.0)
     sol = PySMTSolver()

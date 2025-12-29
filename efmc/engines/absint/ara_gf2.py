@@ -7,7 +7,7 @@ translated from https://github.com/meamy/feynman/blob/master/src/Feynman/Algebra
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import Tuple
 
 import numpy as np      # 0/1 matrices, XOR → addition modulo-2
 
@@ -21,9 +21,9 @@ def row_reduce(mat: np.ndarray) -> np.ndarray:
     Gauss–Jordan elimination over GF(2), 返回行最简（RREF）矩阵。
     mat 只能包含 0/1，shape = (m, n)；该函数就地修改并返回引用。
     """
-    m, n = mat.shape
+    m, num_cols = mat.shape
     r = 0                                         # 当前 pivot 行
-    for c in range(n - 1):                        # 最后一列是常数项，也可参与
+    for c in range(num_cols - 1):                 # 最后一列是常数项，也可参与
         # 1) 选 pivot
         pivot = None
         for i in range(r, m):
@@ -64,7 +64,7 @@ def project_cols(mat: np.ndarray, rng: Tuple[int, int]) -> np.ndarray:
     其余行保留，并把对应列删除。
     """
     j, i = rng
-    if not (0 <= i <= j <= mat.shape[1] - 1):
+    if not 0 <= i <= j <= mat.shape[1] - 1:
         raise ValueError("invalid range")
 
     keep_mask = (mat[:, i:j].sum(axis=1) == 0)    # 那段全 0 才留
@@ -91,10 +91,12 @@ class AffineRelation:
 
     @property
     def m(self) -> int:                 # 约束行数
+        """Number of constraint rows."""
         return self.mat.shape[0]
 
     @property
     def n(self) -> int:                 # 变量个数
+        """Number of variables."""
         return self.mat.shape[1] - 1
 
     # ------------------------- 可读输出 -------------------------
@@ -133,6 +135,7 @@ class AffineRelation:
     # ------------------------- Canonicalize / SAT 检查 -------------------------
 
     def canonicalize(self) -> "AffineRelation":
+        """Canonicalize the relation by row reduction."""
         mat = row_reduce(self.mat.copy())
 
         # 若出现 [0 … 0 | 1] 说明约束组 UNSAT → ⊥
@@ -144,36 +147,36 @@ class AffineRelation:
     # ------------------------- 小工具 -------------------------
 
     def add_vars(self, k: int) -> "AffineRelation":
-        "在末尾再引入 k 个自由变量；添上恒等行"
+        """在末尾再引入 k 个自由变量；添上恒等行"""
         m, n1 = self.mat.shape               # n1 = n+1
-        n = n1 - 1
-        new_n = n + k
+        num_vars = n1 - 1
+        new_n = num_vars + k
         new_mat = np.zeros((m + k, new_n + 1), dtype=np.uint8)
 
         # 复制旧列
-        new_mat[:m, :n] = self.mat[:, :n]
+        new_mat[:m, :num_vars] = self.mat[:, :num_vars]
         new_mat[:m, -1] = self.mat[:, -1]
 
         # 加上 k 行单位
         for i in range(k):
-            new_mat[m + i, n + i] = 1
+            new_mat[m + i, num_vars + i] = 1
 
         return AffineRelation(new_mat)
 
     def negate_post(self, j: int) -> "AffineRelation":
-        "x'j ← x'j + 1"
+        """x'j ← x'j + 1"""
         mat = self.mat.copy()
         mat[j, -1] ^= 1
         return AffineRelation(mat)
 
     def add_post(self, j: int, k: int) -> "AffineRelation":
-        "x'j ← x'j + x'k"
+        """x'j ← x'j + x'k"""
         mat = self.mat.copy()
         mat[j] ^= mat[k]
         return AffineRelation(mat)
 
     def clear_post(self, j: int) -> "AffineRelation":
-        "x'j ← 0"
+        """x'j ← 0"""
         mat = self.mat.copy()
         mat[j, :] = 0
         return AffineRelation(mat)
@@ -181,6 +184,7 @@ class AffineRelation:
     # ------------------------- 交 (meet) / 并 (join) -------------------------
 
     def meet(self, other: "AffineRelation") -> "AffineRelation":
+        """Compute the meet (intersection) of two relations."""
         if self.m == 0:
             return other
         if other.m == 0:
@@ -223,11 +227,11 @@ class AffineRelation:
         if self.n != other.n:
             raise ValueError("compose: variable sets not equal")
 
-        n = self.n
-        if n % 2:
+        num_vars = self.n
+        if num_vars % 2:
             raise ValueError("compose: expect even number of vars (X',X)")
 
-        v = n // 2
+        v = num_vars // 2
 
         # ---------- 生成 ar2 的行 :  [ c | 0^v | A_x ]
         c2     = other.mat[:, -1:]              # (m2,1)
@@ -264,9 +268,11 @@ class AffineRelation:
     # ------------------------- 方便的等价 / 拷贝 -------------------------
 
     def copy(self) -> "AffineRelation":
+        """Create a copy of this relation."""
         return AffineRelation(self.mat.copy())
 
     def __eq__(self, other: object) -> bool:
+        """Check equality of two relations."""
         if not isinstance(other, AffineRelation):
             return False
         return np.array_equal(self.canonicalize().mat,
@@ -278,8 +284,8 @@ class AffineRelation:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    n = 4
-    r1 = AffineRelation.eye(n)                # x' = x
+    N = 4
+    r1 = AffineRelation.eye(N)                # x' = x
     r2 = r1.negate_post(0)                    # flip 第 0 位
     r3 = r2.add_post(1, 0)                    # x'1 += x'0
 
@@ -292,11 +298,11 @@ if __name__ == "__main__":
     print("\njoin(r2, r3):\n", r2.join(r3), sep="")
 
     # composition   (这里把变量看成两半 [X'|X] → 需偶数)
-    n2 = 2
-    inc      = AffineRelation.eye(n2)             # 恒等
+    N2 = 2
+    inc      = AffineRelation.eye(N2)             # 恒等
     inc      = inc.add_post(0, 1)                 # x'0 += x1
-    swap     = AffineRelation.eye(n2)
-    swap.mat[[0, 1], :n2] = swap.mat[[1, 0], :n2] # 交换 x0 x1
+    swap     = AffineRelation.eye(N2)
+    swap.mat[[0, 1], :N2] = swap.mat[[1, 0], :N2] # 交换 x0 x1
 
     composed = inc.compose(swap)
     print("\ncompose(inc, swap):\n", composed, sep="")

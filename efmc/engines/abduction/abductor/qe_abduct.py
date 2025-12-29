@@ -9,7 +9,7 @@ import z3
 from efmc.utils import get_variables, is_sat, is_entail
 
 
-def qe_abduce(pre_cond: z3.BoolRef, post_cond: z3.BoolRef) -> Optional[z3.ExprRef]:
+def qe_abduce(pre_cond: z3.BoolRef, post_cond: z3.BoolRef) -> Optional[z3.ExprRef]:  # pylint: disable=too-many-return-statements,too-many-branches
     """
     Performs abduction using quantifier elimination.
 

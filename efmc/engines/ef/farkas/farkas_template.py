@@ -85,11 +85,13 @@ class FarkasTemplate(Template):
     # .template_cnt_trans.  We use simple @property for type-safety.
     @property
     def template_cnt_init_and_post(self) -> z3.BoolRef:
+        """Return constraints for init and post conditions."""
         assert self._cnt_init_post is not None
         return self._cnt_init_post
 
     @property
     def template_cnt_trans(self) -> z3.BoolRef:
+        """Return constraints for transition relation."""
         assert self._cnt_trans is not None
         return self._cnt_trans
 
@@ -135,25 +137,25 @@ class FarkasTemplate(Template):
             ∀x. premise(x) ⇒ conclusion(x)
 
         under the assumption that all atoms are linear (QF_LRA / QF_LIA).
-        
+
         If conclusion is a conjunction, prove each conjunct separately:
             premise ⇒ (a ∧ b) ≡ (premise ⇒ a) ∧ (premise ⇒ b)
         """
         # Split conclusion into conjuncts
         conclusion_conjuncts = _flatten_conj(conclusion)
-        
+
         all_constraints: List[z3.BoolRef] = []
-        
+
         # Prove premise ⇒ each conjunct separately
         for conj in conclusion_conjuncts:
             fl = FarkasLemma()
-            
+
             # Collect atomic linear constraints of premise ∧ ¬conj
             # which must be UNSAT for the implication to hold
             premise_atoms = _flatten_conj(premise)
             for a in premise_atoms:
                 fl.add_constraint(a)
-            
+
             # Add the negation of this conjunct
             # Handle the negation properly based on the form of conj
             if z3.is_le(conj):  # ¬(lhs ≤ rhs) ⇒ lhs > rhs
@@ -170,14 +172,14 @@ class FarkasTemplate(Template):
             else:
                 # For other forms, try to add the negation directly
                 fl.add_constraint(z3.Not(conj))
-            
+
             # variables possibly from both current and primed worlds
             universe = list({*self.sts.variables, *self.sts.prime_variables})
             constraints = fl.apply_farkas_lemma_symbolic(universe)
             logger.debug("Farkas produced %d constraints for one conjunct.", len(constraints))
-            
+
             all_constraints.extend(constraints)
-        
+
         return z3.And(all_constraints) if all_constraints else z3.BoolVal(True)
 
     # ----------------------------- assemble the three VCs -------------------
@@ -216,13 +218,13 @@ class FarkasTemplate(Template):
             const_val = model.evaluate(coeffs[0], model_completion=True)
             # Convert to a concrete Z3 value
             if z3.is_rational_value(const_val):
-                aff = z3.RealVal(z3.Q(const_val.numerator_as_long(), 
-                                       const_val.denominator_as_long()))
+                aff = z3.RealVal(z3.Q(const_val.numerator_as_long(),
+                                      const_val.denominator_as_long()))
             elif z3.is_int_value(const_val):
                 aff = z3.RealVal(const_val.as_long())
             else:
                 aff = const_val
-            
+
             for i, v in enumerate(vars_):
                 coef_val = model.evaluate(coeffs[i + 1], model_completion=True)
                 if z3.is_rational_value(coef_val):
@@ -236,4 +238,3 @@ class FarkasTemplate(Template):
             conjuncts.append(aff >= 0)
 
         return z3.And(conjuncts) if conjuncts else z3.BoolVal(True)
-        

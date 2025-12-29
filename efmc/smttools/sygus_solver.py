@@ -16,8 +16,7 @@ import os
 import re
 import subprocess
 import tempfile
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Union, Any
+from typing import List, Dict, Optional
 
 import z3
 from efmc.utils.uf_utils import modify, replace_func_with_template
@@ -27,84 +26,70 @@ from efmc.efmc_config import config
 def get_sort_sexpr(sort: z3.SortRef) -> str:
     """
     Get the SyGuS-compatible S-expression for a Z3 sort.
-    
+
     :param sort: Z3 sort
     :return: SyGuS-compatible S-expression for the sort
     """
     if sort == z3.IntSort():
         return "Int"
-    elif sort == z3.BoolSort():
+    if sort == z3.BoolSort():
         return "Bool"
-    elif sort == z3.RealSort():
+    if sort == z3.RealSort():
         return "Real"
-    elif sort == z3.StringSort():
+    if sort == z3.StringSort():
         return "String"
-    elif z3.is_bv_sort(sort):
+    if z3.is_bv_sort(sort):
         return f"(_ BitVec {sort.size()})"
-    else:
-        # Use the default Z3 sexpr for other sorts
-        return sort.sexpr()
+    # Use the default Z3 sexpr for other sorts
+    return sort.sexpr()
 
 
-def build_sygus_cnt(funcs: List[z3.FuncDeclRef], cnts: List[z3.BoolRef], variables: List[z3.ExprRef], logic="ALL"):
+def build_sygus_cnt(funcs: List[z3.FuncDeclRef], cnts: List[z3.BoolRef],
+                    variables: List[z3.ExprRef], logic="ALL"):
     """
     Translate specification (written with z3 expr) to SyGuS format
-    
+
     :param funcs: a list of function to be synthesized
     :param cnts: a list of constraints
     :param variables: a list of variables
     :param logic: SMT logic to use (default: "ALL")
     :return: SyGuS problem as a string
     """
-    cmds = ["(set-logic {})".format(logic)]
+    cmds = [f"(set-logic {logic})"]
 
     # target functions
     for func in funcs:
-        target = "(synth-fun {} (".format(func.name())
+        target = f"(synth-fun {func.name()} ("
         for ii in range(func.arity()):
-            target += "({} {}) ".format(str(variables[ii]), get_sort_sexpr(func.domain(ii)))
-        target += ") {})".format(get_sort_sexpr(func.range()))  # return value
+            target += f"({variables[ii]} {get_sort_sexpr(func.domain(ii))}) "
+        target += f") {get_sort_sexpr(func.range())})"  # return value
         cmds.append(target)
     # variables
     for var in variables:
-        cmds.append("(declare-var {} {})".format(var, get_sort_sexpr(var.sort())))
+        cmds.append(f"(declare-var {var} {get_sort_sexpr(var.sort())})")
     # constraints
     for c in cnts:
-        cmds.append("(constraint {})".format(c.sexpr()))
+        cmds.append(f"(constraint {c.sexpr()})")
     # Add check-synth command
     cmds.append("(check-synth)")
     cnt = "\n".join(cmds)
     return cnt
 
 
-def replace_func_with_template(formula: z3.ExprRef, func_to_rep: z3.FuncDeclRef, template: z3.ExprRef) -> z3.ExprRef:
+def replace_fun_with_synthesized_one(formula: z3.ExprRef,
+                                      func_to_rep: z3.FuncDeclRef,
+                                      func_def: z3.ExprRef) -> z3.ExprRef:
     """
     Replace an uninterpreted function with a concrete template in a formula.
-    
-    :param formula: Z3 formula containing the uninterpreted function
-    :param func_to_rep: Uninterpreted function to replace
-    :param template: Template to replace the uninterpreted function with
-    :return: Modified formula with the uninterpreted function replaced by the template
-    """
-    def update(exp: z3.ExprRef) -> Optional[z3.ExprRef]:
-        if z3.is_app(exp) and z3.eq(exp.decl(), func_to_rep):
-            args = [exp.arg(i) for i in range(exp.num_args())]
-            return z3.substitute_vars(template, *args)
-        return None
 
-    return modify(formula, update)
+    This is a wrapper around replace_func_with_template for backward
+    compatibility.
 
-
-def replace_fun_with_synthesized_one(formula: z3.ExprRef, func_to_rep: z3.FuncDeclRef, func_def: z3.ExprRef) -> z3.ExprRef:
-    """
-    Replace an uninterpreted function with a concrete template in a formula.
-    
-    This is a wrapper around replace_func_with_template for backward compatibility.
-    
     :param formula: Z3 formula containing the uninterpreted function
     :param func_to_rep: Uninterpreted function to replace
     :param func_def: Template to replace the uninterpreted function with
-    :return: Modified formula with the uninterpreted function replaced by the template
+    :return: Modified formula with the uninterpreted function replaced
+            by the template
     """
     return replace_func_with_template(formula, func_to_rep, func_def)
 
@@ -112,7 +97,7 @@ def replace_fun_with_synthesized_one(formula: z3.ExprRef, func_to_rep: z3.FuncDe
 def solve_sygus(sygus_problem: str, timeout: int = 60) -> Optional[str]:
     """
     Call CVC5 to solve a SyGuS problem.
-    
+
     :param sygus_problem: SyGuS problem as a string
     :param timeout: Timeout in seconds (default: 60)
     :return: CVC5 output as a string, or None if CVC5 fails or times out
@@ -120,22 +105,29 @@ def solve_sygus(sygus_problem: str, timeout: int = 60) -> Optional[str]:
     # print(sygus_problem)
     # Check if CVC5 is available
     if not config.check_available("cvc5"):
-        print("CVC5 executable not found at: " + config.cvc5_exec)
+        cvc5_path = getattr(config, 'cvc5_exec', 'unknown')
+        print(f"CVC5 executable not found at: {cvc5_path}")
         return None
     
     # Create a temporary file for the SyGuS problem
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.sy', delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.sy',
+                                      delete=False) as tmp:
         tmp.write(sygus_problem)
         tmp_path = tmp.name
-    
+
     try:
         # Call CVC5 with the SyGuS problem
         # Add options to improve performance
+        cvc5_exec_path = getattr(config, 'cvc5_exec', None)
+        if cvc5_exec_path is None:
+            print("CVC5 executable not configured")
+            return None
+
         cmd = [
-            config.cvc5_exec,
+            cvc5_exec_path,
             "--lang=sygus2",
             f"--tlimit={timeout * 1000}",  # Convert seconds to milliseconds
-            "--sygus-grammar-cons=any-const",  # Allow any constants in grammar
+            "--sygus-grammar-cons=any-const",  # Allow any constants
             "--sygus-abort-size=10",  # Abort if solution size exceeds 10
             "--sygus-repair-const",  # Repair constants in solutions
             "--sygus-out=status-and-def",  # Output status and definition
@@ -143,22 +135,25 @@ def solve_sygus(sygus_problem: str, timeout: int = 60) -> Optional[str]:
             "--dump-models",  # Dump models
             tmp_path
         ]
-        
+
         print(f"Running CVC5 command: {' '.join(cmd)}")
-        
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        
+
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True)
+
         try:
-            stdout, stderr = process.communicate(timeout=timeout + 5)  # Add 5 seconds buffer
+            # Add 5 seconds buffer
+            stdout, stderr = process.communicate(timeout=timeout + 5)
             if process.returncode != 0:
                 print(f"CVC5 failed with return code {process.returncode}")
                 print(f"stderr: {stderr}")
                 return None
-            
+
             # Clean up the output
             # Remove any control characters or other non-printable characters
-            stdout = ''.join(c for c in stdout if c.isprintable() or c.isspace())
-            
+            stdout = ''.join(c for c in stdout
+                             if c.isprintable() or c.isspace())
+
             return stdout
         except subprocess.TimeoutExpired:
             process.kill()
@@ -172,7 +167,7 @@ def solve_sygus(sygus_problem: str, timeout: int = 60) -> Optional[str]:
 def parse_sygus_solution(cvc5_output: str) -> Dict[str, Dict[str, str]]:
     """
     Parse the output of CVC5 to extract the synthesized functions.
-    
+
     :param cvc5_output: CVC5 output as a string
     :return: Dictionary mapping function names to their definitions
     """
@@ -303,7 +298,7 @@ def parse_sygus_solution(cvc5_output: str) -> Dict[str, Dict[str, str]]:
 def convert_bv_literal(literal: str) -> str:
     """
     Convert a bit-vector literal from SyGuS format to Z3 format.
-    
+
     :param literal: SyGuS bit-vector literal (e.g., "#b101", "#x1A")
     :return: Z3-compatible bit-vector expression
     """
@@ -323,7 +318,7 @@ def convert_bv_literal(literal: str) -> str:
 def convert_string_literal(literal: str) -> str:
     """
     Convert a string literal from SyGuS format to Z3 format.
-    
+
     :param literal: SyGuS string literal
     :return: Z3-compatible string expression
     """
@@ -336,17 +331,19 @@ def convert_string_literal(literal: str) -> str:
     return literal
 
 
-def convert_sygus_expr_to_z3(expr: str, var_dict: Dict[str, int], return_type: str) -> str:
+def convert_sygus_expr_to_z3(expr: str, var_dict: Dict[str, int],
+                             return_type: str) -> str:
     """
     Convert a SyGuS expression to a Z3 expression.
-    
+
     :param expr: SyGuS expression
-    :param var_dict: Dictionary mapping variable names to their indices in the variables list
+    :param var_dict: Dictionary mapping variable names to their indices
+                    in the variables list
     :param return_type: Return type of the expression
     :return: Z3-compatible expression
     """
     # Handle literals based on return type
-    if return_type == "Bool" and (expr == "true" or expr == "false"):
+    if return_type == "Bool" and expr in ("true", "false"):
         return "True" if expr == "true" else "False"
     
     if return_type.startswith("(_ BitVec"):
@@ -421,10 +418,11 @@ def convert_sygus_expr_to_z3(expr: str, var_dict: Dict[str, int], return_type: s
     return expr
 
 
-def sygus_to_z3(func_name: str, func_def: Dict[str, str], variables: List[z3.ExprRef]) -> z3.ExprRef:
+def sygus_to_z3(func_name: str, func_def: Dict[str, str],
+                variables: List[z3.ExprRef]) -> z3.ExprRef:
     """
     Convert a SyGuS function definition to a Z3 expression.
-    
+
     :param func_name: Name of the function
     :param func_def: Function definition from parse_sygus_solution
     :param variables: List of Z3 variables to use in the expression
@@ -432,38 +430,38 @@ def sygus_to_z3(func_name: str, func_def: Dict[str, str], variables: List[z3.Exp
     """
     body = func_def["body"]
     return_type = func_def["return_type"]
-    
+
     print(f"Converting SyGuS solution to Z3: {func_name}")
     print(f"  Body: {body}")
     print(f"  Return type: {return_type}")
-    
-    # Create a dictionary mapping variable names to their indices in the variables list
+
+    # Create a dictionary mapping variable names to their indices
     var_dict = {}
     args = func_def["args"].split()
     for i in range(0, len(args), 2):
         if i+1 < len(args):
             var_name = args[i].strip("()")
             var_dict[var_name] = i//2
-    
+
     print(f"  Variable mapping: {var_dict}")
-    
+
     # Direct pattern matching for common functions
-    
+
     # Max function
     if "max" in func_name.lower():
         print("  Detected max function")
         return z3.If(variables[0] > variables[1], variables[0], variables[1])
-    
+
     # Bit-vector XOR function
     if "xor" in func_name.lower() and z3.is_bv_sort(variables[0].sort()):
         print("  Detected bit-vector XOR function")
         return variables[0] ^ variables[1]
-    
+
     # String concatenation function
     if "concat" in func_name.lower() and variables[0].sort() == z3.StringSort():
         print("  Detected string concatenation function")
         return z3.Concat(variables[0], variables[1])
-    
+
     # If we can't directly pattern match, try to parse the body
     try:
         # For bit-vector functions
@@ -471,191 +469,229 @@ def sygus_to_z3(func_name: str, func_def: Dict[str, str], variables: List[z3.Exp
             if len(variables) == 2:
                 if "and" in func_name.lower():
                     return variables[0] & variables[1]
-                elif "or" in func_name.lower():
+                if "or" in func_name.lower():
                     return variables[0] | variables[1]
-                elif "xor" in func_name.lower():
+                if "xor" in func_name.lower():
                     return variables[0] ^ variables[1]
-                elif "add" in func_name.lower():
+                if "add" in func_name.lower():
                     return variables[0] + variables[1]
-                elif "sub" in func_name.lower():
+                if "sub" in func_name.lower():
                     return variables[0] - variables[1]
-                elif "mul" in func_name.lower():
+                if "mul" in func_name.lower():
                     return variables[0] * variables[1]
-        
+
         # For string functions
         if variables[0].sort() == z3.StringSort():
             if len(variables) == 2:
                 if "concat" in func_name.lower():
                     return z3.Concat(variables[0], variables[1])
-                elif "replace" in func_name.lower():
-                    return z3.Replace(variables[0], variables[1], z3.StringVal(""))
-        
+                if "replace" in func_name.lower():
+                    return z3.Replace(variables[0], variables[1],
+                                      z3.StringVal(""))
+
         # For integer functions
         if variables[0].sort() == z3.IntSort():
             if len(variables) == 2:
                 if "max" in func_name.lower():
-                    return z3.If(variables[0] > variables[1], variables[0], variables[1])
-                elif "min" in func_name.lower():
-                    return z3.If(variables[0] < variables[1], variables[0], variables[1])
-                elif "add" in func_name.lower() or "sum" in func_name.lower() or "plus" in func_name.lower():
+                    return z3.If(variables[0] > variables[1],
+                                 variables[0], variables[1])
+                if "min" in func_name.lower():
+                    return z3.If(variables[0] < variables[1],
+                                 variables[0], variables[1])
+                if any(x in func_name.lower()
+                       for x in ("add", "sum", "plus")):
                     return variables[0] + variables[1]
-                elif "sub" in func_name.lower() or "minus" in func_name.lower():
+                if any(x in func_name.lower()
+                       for x in ("sub", "minus")):
                     return variables[0] - variables[1]
-                elif "mul" in func_name.lower() or "times" in func_name.lower():
+                if any(x in func_name.lower()
+                       for x in ("mul", "times")):
                     return variables[0] * variables[1]
-                elif "div" in func_name.lower():
+                if "div" in func_name.lower():
                     return variables[0] / variables[1]
-        
+
         # For boolean functions
         if variables[0].sort() == z3.BoolSort():
             if len(variables) == 2:
                 if "and" in func_name.lower():
                     return z3.And(variables[0], variables[1])
-                elif "or" in func_name.lower():
+                if "or" in func_name.lower():
                     return z3.Or(variables[0], variables[1])
-                elif "xor" in func_name.lower():
+                if "xor" in func_name.lower():
                     return z3.Xor(variables[0], variables[1])
-                elif "impl" in func_name.lower():
+                if "impl" in func_name.lower():
                     return z3.Implies(variables[0], variables[1])
-        
+
         # If we can't match by function name, try to convert the body
         z3_expr = convert_sygus_expr_to_z3(body, var_dict, return_type)
         print(f"  Converted expression: {z3_expr}")
-        
+
         # Evaluate the expression in the context of Z3
         try:
             local_vars = {"z3": z3, "variables": variables}
+            # pylint: disable=eval-used
             return eval(z3_expr, {"__builtins__": {}}, local_vars)
         except Exception as e:
             print(f"  Error evaluating Z3 expression: {e}")
-            
+
             # Fallback for common functions
             if len(variables) == 2:
                 if func_name == "max":
-                    return z3.If(variables[0] > variables[1], variables[0], variables[1])
-                elif func_name == "min":
-                    return z3.If(variables[0] < variables[1], variables[0], variables[1])
-            
+                    return z3.If(variables[0] > variables[1],
+                                 variables[0], variables[1])
+                if func_name == "min":
+                    return z3.If(variables[0] < variables[1],
+                                 variables[0], variables[1])
+
             raise
     except Exception as e:
         print(f"  Error converting SyGuS to Z3: {e}")
-        
+
         # Fallback for common functions
         if len(variables) == 2:
             if "max" in func_name.lower():
-                return z3.If(variables[0] > variables[1], variables[0], variables[1])
-            elif "min" in func_name.lower():
-                return z3.If(variables[0] < variables[1], variables[0], variables[1])
-            elif "xor" in func_name.lower() and z3.is_bv_sort(variables[0].sort()):
+                return z3.If(variables[0] > variables[1],
+                             variables[0], variables[1])
+            if "min" in func_name.lower():
+                return z3.If(variables[0] < variables[1],
+                             variables[0], variables[1])
+            if ("xor" in func_name.lower() and
+                    z3.is_bv_sort(variables[0].sort())):
                 return variables[0] ^ variables[1]
-            elif "concat" in func_name.lower() and variables[0].sort() == z3.StringSort():
+            if ("concat" in func_name.lower() and
+                    variables[0].sort() == z3.StringSort()):
                 return z3.Concat(variables[0], variables[1])
-        
+
         raise
 
 
-def synthesize_function(func: z3.FuncDeclRef, constraints: List[z3.BoolRef], 
-                        variables: List[z3.ExprRef], logic: str = "ALL", 
-                        timeout: int = 60, force_cvc5: bool = False) -> Optional[z3.ExprRef]:
+def synthesize_function(func: z3.FuncDeclRef, constraints: List[z3.BoolRef],
+                        variables: List[z3.ExprRef], logic: str = "ALL",
+                        timeout: int = 60,
+                        force_cvc5: bool = False) -> Optional[z3.ExprRef]:
     """
     Synthesize a function using SyGuS.
-    
+
     :param func: Function to synthesize
     :param constraints: Constraints the function must satisfy
     :param variables: Variables used in the constraints
     :param logic: SMT logic to use (default: "ALL")
     :param timeout: Timeout in seconds (default: 60)
-    :param force_cvc5: If True, always try to use CVC5 even for common functions (default: False)
-    :return: Z3 expression representing the synthesized function, or None if synthesis fails
+    :param force_cvc5: If True, always try to use CVC5 even for common
+                      functions (default: False)
+    :return: Z3 expression representing the synthesized function, or None
+            if synthesis fails
     """
     # Determine appropriate logic based on function signature
     if logic == "ALL":
         # Auto-detect logic based on function signature
-        if all(var.sort() == z3.IntSort() for var in variables) and func.range() == z3.IntSort():
+        if (all(var.sort() == z3.IntSort() for var in variables) and
+                func.range() == z3.IntSort()):
             logic = "LIA"  # Linear Integer Arithmetic
-        elif all(z3.is_bv_sort(var.sort()) for var in variables) and z3.is_bv_sort(func.range()):
+        elif (all(z3.is_bv_sort(var.sort()) for var in variables) and
+              z3.is_bv_sort(func.range())):
             logic = "BV"   # Bit-Vectors
-        elif any(var.sort() == z3.StringSort() for var in variables) or func.range() == z3.StringSort():
+        elif (any(var.sort() == z3.StringSort() for var in variables) or
+              func.range() == z3.StringSort()):
             logic = "S"    # Strings
-    
+
     # For common functions, use direct implementations unless force_cvc5 is True
     # This is more reliable than trying to parse complex solutions from CVC5
     func_name = func.name()
-    
+
     if not force_cvc5:
         # Integer functions
-        if func.range() == z3.IntSort() and all(var.sort() == z3.IntSort() for var in variables):
+        if (func.range() == z3.IntSort() and
+                all(var.sort() == z3.IntSort() for var in variables)):
             if len(variables) == 2:
                 if "max" in func_name.lower():
-                    print(f"Using direct implementation for {func_name}: If(variables[0] > variables[1], variables[0], variables[1])")
-                    return z3.If(variables[0] > variables[1], variables[0], variables[1])
-                elif "min" in func_name.lower():
-                    print(f"Using direct implementation for {func_name}: If(variables[0] < variables[1], variables[0], variables[1])")
-                    return z3.If(variables[0] < variables[1], variables[0], variables[1])
-        
+                    msg = (f"Using direct implementation for {func_name}: "
+                           "If(variables[0] > variables[1], "
+                           "variables[0], variables[1])")
+                    print(msg)
+                    return z3.If(variables[0] > variables[1],
+                                 variables[0], variables[1])
+                if "min" in func_name.lower():
+                    msg = (f"Using direct implementation for {func_name}: "
+                           "If(variables[0] < variables[1], "
+                           "variables[0], variables[1])")
+                    print(msg)
+                    return z3.If(variables[0] < variables[1],
+                                 variables[0], variables[1])
+
         # Bit-vector functions
-        if z3.is_bv_sort(func.range()) and all(z3.is_bv_sort(var.sort()) for var in variables):
+        if (z3.is_bv_sort(func.range()) and
+                all(z3.is_bv_sort(var.sort()) for var in variables)):
             if len(variables) == 2:
                 if "xor" in func_name.lower():
-                    print(f"Using direct implementation for {func_name}: variables[0] ^ variables[1]")
+                    msg = (f"Using direct implementation for {func_name}: "
+                           "variables[0] ^ variables[1]")
+                    print(msg)
                     return variables[0] ^ variables[1]
-                elif "and" in func_name.lower():
-                    print(f"Using direct implementation for {func_name}: variables[0] & variables[1]")
+                if "and" in func_name.lower():
+                    msg = (f"Using direct implementation for {func_name}: "
+                           "variables[0] & variables[1]")
+                    print(msg)
                     return variables[0] & variables[1]
-                elif "or" in func_name.lower():
-                    print(f"Using direct implementation for {func_name}: variables[0] | variables[1]")
+                if "or" in func_name.lower():
+                    msg = (f"Using direct implementation for {func_name}: "
+                           "variables[0] | variables[1]")
+                    print(msg)
                     return variables[0] | variables[1]
-        
+
         # String functions
-        if func.range() == z3.StringSort() and all(var.sort() == z3.StringSort() for var in variables):
+        if (func.range() == z3.StringSort() and
+                all(var.sort() == z3.StringSort() for var in variables)):
             if len(variables) == 2:
                 if "concat" in func_name.lower():
-                    print(f"Using direct implementation for {func_name}: z3.Concat(variables[0], variables[1])")
+                    msg = (f"Using direct implementation for {func_name}: "
+                           "z3.Concat(variables[0], variables[1])")
+                    print(msg)
                     return z3.Concat(variables[0], variables[1])
-    
+
     # For other functions, or if force_cvc5 is True, try to use SyGuS
     print(f"Attempting to synthesize {func_name} using SyGuS...")
-    
+
     try:
         # Build the SyGuS problem
         sygus_problem = build_sygus_cnt([func], constraints, variables, logic)
-        
+
         # Solve the SyGuS problem
         cvc5_output = solve_sygus(sygus_problem, timeout)
         if not cvc5_output:
             print(f"CVC5 failed to synthesize {func_name}")
             return None
-        
+
         # Parse the SyGuS solution
         solutions = parse_sygus_solution(cvc5_output)
         if not solutions or func.name() not in solutions:
             print(f"Failed to parse CVC5 output for {func_name}")
             return None
-        
+
         # Try to convert the SyGuS solution to a Z3 expression
         try:
             func_def = solutions[func.name()]
-            print(f"CVC5 synthesized solution for {func_name}: {func_def['body']}")
+            print(f"CVC5 synthesized solution for {func_name}: "
+                  f"{func_def['body']}")
             z3_expr = sygus_to_z3(func.name(), func_def, variables)
-            
+
             # Verify that the synthesized function satisfies the constraints
             s = z3.Solver()
             for c in constraints:
                 # Replace the function with the synthesized expression
                 c_with_synth = replace_func_with_template(c, func, z3_expr)
                 s.add(z3.Not(c_with_synth))
-            
+
             if s.check() == z3.unsat:
                 print(f"Successfully synthesized and verified {func_name}")
                 return z3_expr
-            else:
-                print(f"Synthesized function for {func_name} failed verification")
-                return None
-                
+            print(f"Synthesized function for {func_name} failed verification")
+            return None
+
         except Exception as e:
             print(f"Error converting SyGuS solution to Z3 for {func_name}: {e}")
             return None
-    
+
     except Exception as e:
         print(f"Error during synthesis of {func_name}: {e}")
         return None
