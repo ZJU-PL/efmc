@@ -78,7 +78,8 @@ class RecurrenceSolver:
         self.logic = logic
         self.solver = solver
 
-    def solve(self, vc: z3.ExprRef, template, timeout: Optional[int] = None) -> NonTerminationResult:
+    def solve(self, vc: z3.ExprRef, template,
+              timeout: Optional[int] = None) -> NonTerminationResult:
         """Solve the recurrence set verification condition."""
         exists_vars = extract_all(template.template_vars)
         if hasattr(template, 'condition_vars'):
@@ -127,5 +128,3 @@ class RecurrenceSolver:
         except Exception as e:
             logger.error("Error in Z3 solver: %s", e)
             return NonTerminationResult(result=False, error=f"Z3 solver error: {e}")
-
-        

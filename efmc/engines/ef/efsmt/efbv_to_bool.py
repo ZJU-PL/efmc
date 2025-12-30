@@ -42,7 +42,10 @@ class EFBV2BoolAux:
         _, bool2id, _, bool_clauses = translate_smt2formula_to_numeric_clauses(fml)
         return bool2id, bool_clauses
 
-    def flattening(self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef], universal_vars: List[z3.ExprRef]):
+    def flattening(  # pylint: disable=too-many-locals
+        self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef]
+    ):
         """
         The flattening function takes a bit-vector formula and translates it to a Boolean formula.
         It also initializes some fields of the class:
@@ -102,7 +105,7 @@ class EFBV2BoolAux:
                     z3_var = int2var[numeric_var]
                 else:
                     # create new Boolean vars
-                    z3_var = z3.Bool("{0}{1}".format(prefix, numeric_var))
+                    z3_var = z3.Bool(f"{prefix}{numeric_var}")
                     int2var[numeric_var] = z3_var
                     if numeric_var in self.universal_bools:
                         universal_vars.append(z3_var)
@@ -124,8 +127,9 @@ class EFBV2BoolAux:
         # { NOTE a trick for eliminating a subset of aux variables that are
         #     equivalent with existential or universal variables
         # FIXME: I forgot what algorithms the following code follow
+        # Commented out - not currently used
         """
-        auxiliary_boolean_vars = []
+        # auxiliary_boolean_vars = []
         replace_mappings = []
         cared_vars_length = len(self.existential_bools) + len(self.universal_bools)
 
@@ -226,9 +230,9 @@ class EFBVFormulaTranslator:
         self.seed = kwargs.get("seed", 1)  # random seed
         """
         qe_level: 
-          To convert an EFSMT(BV)formula to a Boolean formula without quantifies, we need 
-          to perform quantifier elimination (QE) somewhere, e.g., before bit-blasting (word-level QE),
-          or after bit-blasting (bool-level QE)
+          To convert an EFSMT(BV)formula to a Boolean formula without quantifies,
+          we need to perform quantifier elimination (QE) somewhere, e.g., before
+          bit-blasting (word-level QE), or after bit-blasting (bool-level QE)
         qe_tactic:
           To perform the QE, currently we rely on Z3's tactics.
           TODO: implement a native expansion-based qe procedure?
@@ -309,10 +313,13 @@ class EFBVFormulaTranslator:
 
 
 def demo_efbv2bool():
+    """Demo function for EFBV to Boolean translation."""
     x, y, z = z3.BitVecs("x y z", 4)
     fml = z3.Or(z > 3, z3.And(x + y == 6, x - y == 3))
     fml_manager = EFBVFormulaTranslator()
-    qdimacs = fml_manager.to_qdimacs_str(fml, existential_vars=[z], universal_vars=[x, y])
+    qdimacs = fml_manager.to_qdimacs_str(
+        fml, existential_vars=[z], universal_vars=[x, y]
+    )
     return qdimacs
 
 

@@ -4,12 +4,13 @@ This module contains the code for the CEGIS-based algorithm for EFSMT.
 from typing import List
 import logging
 import z3
+from pysmt.logics import QF_BV, QF_LIA, QF_LRA, AUTO
 from efmc.smttools.pysmt_solver import PySMTSolver
 
 logger = logging.getLogger(__name__)
 
 
-def simple_cegis_efsmt(
+def simple_cegis_efsmt(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     logic: str, x: List[z3.ExprRef], y: List[z3.ExprRef], phi: z3.ExprRef,
     maxloops=None, pysmt_solver="z3", timeout=None
 ):
@@ -24,7 +25,6 @@ def simple_cegis_efsmt(
     :param timeout: The timeout for the solver
     :return: The solution
     """
-    from pysmt.logics import QF_BV, QF_LIA, QF_LRA, AUTO  # noqa: E402
     if "IA" in logic:
         qf_logic = QF_LIA
     elif "RA" in logic:

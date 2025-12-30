@@ -12,7 +12,7 @@ import z3
 logger = logging.getLogger(__name__)
 
 
-def _dump_challenging_query(
+def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-locals
     synthesis_solver: z3.Solver, verification_solver: z3.Solver,
     phi: z3.ExprRef, x: List[z3.ExprRef], y: List[z3.ExprRef],
     dump_dir: Optional[str], iteration: int, reason: str
@@ -61,7 +61,8 @@ def _dump_challenging_query(
                     number = number[1:]
                 # Wrap the to_fp expression with fp.neg
                 return f"(fp.neg ((_ to_fp {fp_params}) roundNearestTiesToEven {number}))"
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Catch any regex processing errors and return original match
                 return match.group(0)
 
         # Pattern 1: ((_ to_fp X Y) roundNearestTiesToEven (- number))
@@ -85,7 +86,8 @@ def _dump_challenging_query(
                 if number.startswith('-'):
                     number = number[1:]
                 return f"(fp.neg ((_ to_fp {fp_params}) roundNearestTiesToEven {number}))"
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Catch any regex processing errors and return original match
                 return match.group(0)
 
         to_fp_negation_direct_pattern = (
@@ -116,8 +118,8 @@ def _dump_challenging_query(
                     return formatted
                 # Keep original if division by zero
                 return match.group(0)
-            except Exception:
-                # If we can't compute, keep original
+            except Exception:  # pylint: disable=broad-exception-caught
+                # If we can't compute, keep original (catch conversion/computation errors)
                 return match.group(0)
 
         # Replace simple divisions like (/ 3.0 10.0) with computed values
@@ -151,9 +153,9 @@ def _dump_challenging_query(
     logger.info("Dumped challenging query to %s", filepath)
 
 
-def simple_cegis_efsmt_fp(
+def simple_cegis_efsmt_fp(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
     logic: str, x: List[z3.ExprRef], y: List[z3.ExprRef], phi: z3.ExprRef,
-    maxloops=None, timeout=None, solver_timeout: int = 10,
+    maxloops=None, timeout=None, solver_timeout: int = 10,  # pylint: disable=unused-argument
     dump_dir: Optional[str] = None, dump_threshold: int = 5
 ) -> Tuple[str, Optional[z3.ModelRef]]:
     """
@@ -190,19 +192,20 @@ def simple_cegis_efsmt_fp(
     timeout_count = 0
 
     for loop in range(maxloops):
-        logger.debug(f"CEGIS iteration {loop + 1}")
+        logger.debug("CEGIS iteration %s", loop + 1)
 
         # Synthesize: Find a candidate solution for existential variables
         result = synthesis_solver.check()
         if result == z3.unsat:
             logger.info("Synthesis solver returned UNSAT - no solution exists")
             return "unsat", None
-        elif result == z3.unknown:
+        if result == z3.unknown:
             # Check if it's a timeout or keyboard interrupt
             try:
                 reason = synthesis_solver.reason_unknown()
                 reason_str = str(reason).lower() if reason else ""
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Z3 may raise various exceptions, catch all for robustness
                 reason_str = ""
 
             # Check for keyboard interrupt
@@ -212,7 +215,10 @@ def simple_cegis_efsmt_fp(
 
             if "timeout" in reason_str or "time" in reason_str:
                 timeout_count += 1
-                logger.warning(f"Synthesis solver timed out at iteration {loop + 1} (timeout count: {timeout_count})")
+                logger.warning(
+                    "Synthesis solver timed out at iteration %s (timeout count: %s)",
+                    loop + 1, timeout_count
+                )
 
                 # Dump challenging query if enabled
                 if dump_dir and (timeout_count == 1 or loop + 1 >= dump_threshold):
@@ -244,8 +250,8 @@ def simple_cegis_efsmt_fp(
                 val = model.eval(var, True)
                 if val is not None:
                     candidate[var] = val
-            except Exception:
-                # Use default value if model doesn't provide one
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Z3 model evaluation may raise various exceptions, use default
                 if var.sort().name() == "FPSort":
                     candidate[var] = z3.FPVal(0.0, var.sort())
                 else:
@@ -257,7 +263,7 @@ def simple_cegis_efsmt_fp(
 
         # Verify: Check if candidate works for all universal variables
         # Substitute candidate values into phi
-        phi_substituted = z3.substitute(phi, [(var, value) for var, value in candidate.items()])
+        phi_substituted = z3.substitute(phi, list(candidate.items()))
 
         # Check if Not(phi_substituted) is satisfiable (i.e., if there's a counterexample)
         verification_solver = z3.Solver()
@@ -268,14 +274,15 @@ def simple_cegis_efsmt_fp(
         result = verification_solver.check()
         if result == z3.unsat:
             # No counterexample found - candidate is valid
-            logger.info(f"Found valid solution after {loop + 1} iterations")
+            logger.info("Found valid solution after %s iterations", loop + 1)
             return "sat", model
-        elif result == z3.unknown:
+        if result == z3.unknown:
             # Check if it's a timeout or keyboard interrupt
             try:
                 reason = verification_solver.reason_unknown()
                 reason_str = str(reason).lower() if reason else ""
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Z3 may raise various exceptions, catch all for robustness
                 reason_str = ""
 
             # Check for keyboard interrupt
@@ -285,7 +292,10 @@ def simple_cegis_efsmt_fp(
 
             if "timeout" in reason_str or "time" in reason_str:
                 timeout_count += 1
-                logger.warning(f"Verification solver timed out at iteration {loop + 1} (timeout count: {timeout_count})")
+                logger.warning(
+                    "Verification solver timed out at iteration %s (timeout count: %s)",
+                    loop + 1, timeout_count
+                )
 
                 # Dump challenging query if enabled
                 if dump_dir and (timeout_count == 1 or loop + 1 >= dump_threshold):
@@ -315,12 +325,13 @@ def simple_cegis_efsmt_fp(
                 val = counterexample_model.eval(var, True)
                 if val is not None:
                     counterexample[var] = val
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Z3 model evaluation may raise various exceptions, skip this var
                 pass
 
         # Add counterexample as constraint to synthesis solver
         phi_with_counterexample = z3.substitute(
-            phi, [(var, value) for var, value in counterexample.items()]
+            phi, list(counterexample.items())
         )
         synthesis_solver.add(phi_with_counterexample)
 
@@ -349,7 +360,7 @@ def simple_cegis_efsmt_fp(
 
 
 # Keep the old function name for backward compatibility
-def cegis_efsmt_fp(
+def cegis_efsmt_fp(  # pylint: disable=too-many-arguments
     x: List[z3.ExprRef], y: List[z3.ExprRef], phi: z3.ExprRef,
     max_loops: Optional[int] = None, timeout: Optional[int] = None,
     solver_timeout: int = 10, dump_dir: Optional[str] = None,

@@ -169,7 +169,8 @@ class TerminationProver:
         if hasattr(self.ranking_template, 'build_invariant_expr'):
             dummy_model = self._create_dummy_model()
             if dummy_model:
-                return self.ranking_template.build_invariant_expr(dummy_model, use_prime_variables=False)
+                return self.ranking_template.build_invariant_expr(
+                    dummy_model, use_prime_variables=False)
         return None
 
     def _extract_recurrence_set(self) -> Optional[z3.ExprRef]:
@@ -177,11 +178,12 @@ class TerminationProver:
         if hasattr(self.recurrence_template, 'build_invariant_expr'):
             dummy_model = self._create_dummy_model()
             if dummy_model:
-                return self.recurrence_template.build_invariant_expr(dummy_model, use_prime_variables=False)
+                return self.recurrence_template.build_invariant_expr(
+                    dummy_model, use_prime_variables=False)
         return None
 
     def _create_dummy_model(self):
         """Create a dummy model for testing purposes."""
         solver = z3.Solver()
         solver.add(z3.BoolVal(True))
-        return solver.model() if solver.check() == z3.sat else None 
+        return solver.model() if solver.check() == z3.sat else None

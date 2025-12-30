@@ -37,29 +37,40 @@ def terminate(process, is_timeout_flag: List):
             if process.poll() is None:
                 process.kill()
             is_timeout_flag[0] = True
-        except Exception as ex:
+        except (OSError, ProcessLookupError) as ex:
+            # Process may have already terminated or doesn't exist
             logger.error("Error while interrupting process: %s", str(ex))
             try:
                 process.kill()
-            except Exception:
+            except (OSError, ProcessLookupError):
+                pass
+            is_timeout_flag[0] = True
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            # Catch-all for any other unexpected errors during process termination
+            logger.error("Unexpected error while interrupting process: %s", str(ex))
+            try:
+                process.kill()
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
             is_timeout_flag[0] = True
 
 
 def _run_solver_with_timeout(cmd, timeout=g_bin_solver_timeout):
     """Run solver command with timeout and return output."""
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    # Using Popen directly due to timer-based termination logic
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # pylint: disable=consider-using-with
     is_timeout_flag = [False]
     timer = Timer(timeout, terminate, args=[p, is_timeout_flag])
     timer.start()
 
-    out_lines = p.stdout.readlines()
-    out_str = ' '.join([element.decode('UTF-8') for element in out_lines])
-    p.stdout.close()
-    timer.cancel()
-
-    if p.poll() is None:
-        p.terminate()
+    try:
+        out_lines = p.stdout.readlines()
+        out_str = ' '.join([element.decode('UTF-8') for element in out_lines])
+    finally:
+        p.stdout.close()
+        timer.cancel()
+        if p.poll() is None:
+            p.terminate()
 
     return out_str, is_timeout_flag[0]
 
@@ -89,7 +100,7 @@ def solve_with_bin_qbf(fml_str: str, solver_name: str):
             os.remove(tmp_filename)
 
 
-def solve_with_bin_smt(
+def solve_with_bin_smt(  # pylint: disable=too-many-locals
     logic: str, x: List[z3.ExprRef], y: List[z3.ExprRef],
     phi: z3.ExprRef, solver_name: str
 ):

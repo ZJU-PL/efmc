@@ -4,8 +4,10 @@ The uniformed interface for solving Exists-ForAll problems over bit-vectors.
 
 Approaches:
 - 1. Quantifier instantiation: Direct solving with SMT solvers that support quantifiers
-- 2. Bit-blasting: Translation to QBF, BDD, or SAT, and solving with QBF solvers, BDD solvers, or SAT solvers
-- 3. CEGIS: CEGIS-based iterative approach (using a SMT oracle for deciding quantifier-free formulas)
+- 2. Bit-blasting: Translation to QBF, BDD, or SAT, and solving with QBF solvers,
+   BDD solvers, or SAT solvers
+- 3. CEGIS: CEGIS-based iterative approach (using a SMT oracle for deciding
+   quantifier-free formulas)
 
 FIXME: if we call a binary solver, it would be hard to obtain a z3 model
 (for building the invariant)
@@ -40,7 +42,7 @@ from efmc.utils.pysat_solver_utils import solve_with_sat_solver
 logger = logging.getLogger(__name__)
 
 
-class EFSMTSolver:
+class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
     """Solving exists forall problem over bit-vectors."""
 
     def __init__(self, logic: str, **kwargs):
@@ -100,7 +102,7 @@ class EFSMTSolver:
 
             quant_vars = "("
             for v in self.forall_vars:
-                quant_vars += "({0} {1}) ".format(v.sexpr(), v.sort().sexpr())
+                quant_vars += f"({v.sexpr()} {v.sort().sexpr()}) "
             quant_vars += ")\n"
 
             quant_fml_body = "(and \n"
@@ -142,14 +144,15 @@ class EFSMTSolver:
         assert self.logic in ("BV", "UFBV")
         fml_manager = EFBVFormulaTranslator()
         # FIXME: to_cnf_str() is not implemented
-        cnf_str = fml_manager.to_cnf_str(
+        # Using to_dimacs_str instead as workaround
+        cnf_str = fml_manager.to_dimacs_str(
             self.phi, existential_vars=self.exists_vars,
             universal_vars=self.forall_vars
         )
         with open(dimacs_file_name, "w", encoding='utf-8') as tmp:
             tmp.write(cnf_str)
 
-    def solve(self):
+    def solve(self):  # pylint: disable=too-many-return-statements,too-many-branches
         """
         Solve EFSMT(BV) formulas via different strategies
         """
@@ -161,16 +164,26 @@ class EFSMTSolver:
             return self.solve_with_z3_api()
         elif self.solver == "z3":
             return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "z3")
-        elif self.solver == "cvc5":
-            return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "cvc5")
-        elif self.solver == "btor":
-            return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "boolector2")
-        elif self.solver == "yices2":
-            return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "yices2")
-        elif self.solver == "mathsat":
-            return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "mathsat")
-        elif self.solver == "bitwuzla":
-            return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "bitwuzla")
+        if self.solver == "cvc5":
+            return solve_with_bin_smt(
+                self.logic, self.exists_vars, self.forall_vars, self.phi, "cvc5"
+            )
+        if self.solver == "btor":
+            return solve_with_bin_smt(
+                self.logic, self.exists_vars, self.forall_vars, self.phi, "boolector2"
+            )
+        if self.solver == "yices2":
+            return solve_with_bin_smt(
+                self.logic, self.exists_vars, self.forall_vars, self.phi, "yices2"
+            )
+        if self.solver == "mathsat":
+            return solve_with_bin_smt(
+                self.logic, self.exists_vars, self.forall_vars, self.phi, "mathsat"
+            )
+        if self.solver == "bitwuzla":
+            return solve_with_bin_smt(
+                self.logic, self.exists_vars, self.forall_vars, self.phi, "bitwuzla"
+            )
 
         # 2. Bit-blasting approach
         if self.solver == "z3qbf":
@@ -207,7 +220,7 @@ class EFSMTSolver:
         
         Returns:
             str: "sat" if the formula is satisfiable, "unsat" if unsatisfiable,
-                 or "unknown" if Z3 cannot determine satisfiability.
+            or "unknown" if Z3 cannot determine satisfiability.
         """
         print("Solving with Z3 API directly")
 
@@ -324,7 +337,7 @@ class EFSMTSolver:
 def demo_efsmt():
     """Demo function for EFSMT solver."""
     import time  # noqa: E402
-    x, y, z = z3.BitVecs("x y z", 16)
+    x, y, _z = z3.BitVecs("x y z", 16)  # z unused in this demo
     # x, y, z = z3.Reals("x y z")
     fmla = z3.Implies(z3.And(y > 0, y < 10), y - 2 * x < 7)
 

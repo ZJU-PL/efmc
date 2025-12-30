@@ -78,6 +78,7 @@ class RankingVCGenerator:
         return solver.model() if solver.check() == z3.sat else None
 
 
+
 class RecurrenceVCGenerator:
     """Generates verification conditions for recurrence set synthesis."""
 

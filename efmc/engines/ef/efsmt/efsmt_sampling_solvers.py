@@ -13,7 +13,7 @@ from efmc.smttools.pysmt_solver import PySMTSolver, to_pysmt_vars
 logger = logging.getLogger(__name__)
 
 
-class SamplingEFSMTSolver:
+class SamplingEFSMTSolver:  # pylint: disable=too-few-public-methods
     """Sampling-based CEGIS solver for exists-forall problems over QF_BV."""
 
     def __init__(self, **kwargs):
@@ -115,7 +115,7 @@ class SamplingEFSMTSolver:
         return {var: counterexample[var] for var in y_vars}
 
 
-def sampling_efsmt(
+def sampling_efsmt(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     evars: List[z3.ExprRef], uvars: List[z3.ExprRef], z3fml: z3.ExprRef,
     maxloops=None, esolver_name="z3", fsolver_name="z3",
     verbose=False, timeout=None, sample_size=10, max_samples=100
