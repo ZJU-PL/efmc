@@ -1,11 +1,11 @@
 """Command-line interface for PolyHorn.
-This module provides the main CLI interface for running PolyHorn on transition systems specified in various formats.
+This module provides the main CLI interface for running PolyHorn on transition
+systems specified in various formats.
 """
 
 import argparse
 import json
 import logging
-import os
 import signal
 import sys
 import time
@@ -16,7 +16,7 @@ from efmc.engines.polyhorn.main import execute, add_default_config
 logger = logging.getLogger(__name__)
 
 
-class PolyHornRunner:
+class PolyHornRunner:  # pylint: disable=too-few-public-methods
     """Main runner class for PolyHorn solving tasks"""
 
     def __init__(self):
@@ -26,16 +26,16 @@ class PolyHornRunner:
         """Solve a PolyHorn problem from a file"""
         try:
             start_time = time.time()
-            
+
             # Execute PolyHorn
             result, model = execute(file_path, config)
-            
+
             # Print results
             print(f"Result: {result}")
             if model:
                 print(f"Model: {model}")
             print(f"Time: {time.time() - start_time:.2f}s")
-            
+
             # Save output if requested
             if output_file:
                 output_data = {
@@ -43,12 +43,17 @@ class PolyHornRunner:
                     "model": model,
                     "time": time.time() - start_time
                 }
-                with open(output_file, 'w') as f:
+                with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(output_data, f, indent=2)
-                self.logger.info(f"Results saved to {output_file}")
-                
+                self.logger.info("Results saved to %s", output_file)
+
+            return None
+
+        except (ValueError, FileNotFoundError, OSError) as e:
+            self.logger.error("Error solving PolyHorn: %s", str(e))
+            return str(e)
         except Exception as e:
-            self.logger.error(f"Error solving PolyHorn: {str(e)}")
+            self.logger.error("Unexpected error solving PolyHorn: %s", str(e))
             return str(e)
 
 
@@ -64,17 +69,17 @@ def parse_arguments():
                         help='Input SMT2 file to solve')
     parser.add_argument('--config', type=str,
                         help='Configuration file (JSON format)')
-    
+
     # Theorem selection
     parser.add_argument('--theorem', type=str, default='auto',
                         choices=['auto', 'farkas', 'handelman', 'putinar'],
                         help='Theorem to use (default: auto)')
-    
+
     # Solver options
     parser.add_argument('--solver', type=str, default='z3',
                         choices=['z3', 'cvc4', 'cvc5', 'yices2', 'mathsat'],
                         help='SMT solver to use (default: z3)')
-    
+
     # Degree control
     parser.add_argument('--degree-sat', type=int, default=0,
                         help='Maximum degree for satisfiability constraints (default: 0)')
@@ -82,7 +87,7 @@ def parse_arguments():
                         help='Maximum degree for unsatisfiability constraints (default: 0)')
     parser.add_argument('--degree-strict', type=int, default=0,
                         help='Maximum degree for strict unsatisfiability constraints (default: 0)')
-    
+
     # Advanced options
     parser.add_argument('--integer', action='store_true', default=False,
                         help='Use integer arithmetic instead of real arithmetic')
@@ -90,7 +95,7 @@ def parse_arguments():
                         help='Enable SAT heuristics')
     parser.add_argument('--unsat-core', action='store_true', default=False,
                         help='Enable unsat core heuristics')
-    
+
     # Output options
     parser.add_argument('--output', type=str,
                         help='Output file for results (JSON format)')
@@ -113,11 +118,11 @@ def create_config_from_args(args):
         "SAT_heuristic": args.sat_heuristic,
         "unsat_core_heuristic": args.unsat_core
     }
-    
+
     return add_default_config(config)
 
 
-def signal_handler(sig, frame):
+def signal_handler(_sig, _frame):
     """Handle Ctrl+C gracefully"""
     print("\nTerminating...")
     sys.exit(0)
@@ -126,7 +131,7 @@ def signal_handler(sig, frame):
 def main():
     """Main entry point"""
     signal.signal(signal.SIGINT, signal_handler)
-    
+
     args = parse_arguments()
 
     if args.verbose:
@@ -144,8 +149,8 @@ def main():
         if not Path(args.config).exists():
             print(f"Error: Config file '{args.config}' does not exist")
             sys.exit(1)
-        
-        with open(args.config, 'r') as f:
+
+        with open(args.config, 'r', encoding='utf-8') as f:
             config = json.load(f)
         config = add_default_config(config)
     else:

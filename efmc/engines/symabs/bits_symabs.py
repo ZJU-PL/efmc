@@ -2,16 +2,18 @@
 FIXME: by LLM, to check.
 Compute most-precise (best) bit-level abstractions for bit-vector formulas.
 
+- Known Bits Abstraction: For each bit position of each bit-vector variable,
+  we track whether the bit must be 0, must be 1, or is unknown.
 
-- Known Bits Abstraction: For each bit position of each bit-vector variable, we track whether the bit must be 0, must be 1, or is unknown.
-
-This will be used to compute the strongest consequence of a formula in a given domain. The "strongest consequence" is operation is then used by the symabs_prover to compute the strongest inductive invariant.
+This will be used to compute the strongest consequence of a formula in a given
+domain. The "strongest consequence" is operation is then used by the
+symabs_prover to compute the strongest inductive invariant.
 """
 
-import z3
 import logging
-from typing import Dict, List, Tuple, Set, Optional
 from timeit import default_timer as symabs_timer
+
+import z3
 
 from efmc.utils.z3_solver_utils import is_entail
 
@@ -22,8 +24,7 @@ def get_bv_size(x: z3.ExprRef) -> int:
     """Get bit-vector size"""
     if z3.is_bv(x):
         return x.sort().size()
-    else:
-        return -1
+    return -1
 
 
 class BitSymbolicAbstraction:
@@ -57,13 +58,13 @@ class BitSymbolicAbstraction:
             start = symabs_timer()
             self.formula = z3.simplify(self.formula)
             end = symabs_timer()
-            logger.debug(f"Simplification took {end - start:.2f} seconds")
+            logger.debug("Simplification took %.2f seconds", end - start)
 
     def init_from_fml(self, fml: z3.BoolRef):
         """Initialize from a formula"""
         self.formula = fml
         self.initialized = True
-        self.vars = list(set([v for v in z3.z3util.get_vars(fml)]))
+        self.vars = list(z3.z3util.get_vars(fml))
         if not self.vars:
             logger.warning("No variables found in formula")
         self.do_simplification()
@@ -83,13 +84,12 @@ class BitSymbolicAbstraction:
                     min_val = opt.lower(min_handle)
                     return z3.BitVecVal(min_val.as_long(), exp.sort().size())
                 except z3.Z3Exception as e:
-                    logger.warning(f"Z3 exception in min_once: {e}")
+                    logger.warning("Z3 exception in min_once: %s", e)
 
             # Fallback to a large negative value
             return z3.BitVecVal(0, exp.sort().size())
-        else:
-            # For non-bit-vectors, return the expression itself
-            return exp
+        # For non-bit-vectors, return the expression itself
+        return exp
 
     def max_once(self, exp: z3.ExprRef) -> z3.ExprRef:
         """Find the maximum value of an expression under the formula"""
@@ -106,13 +106,12 @@ class BitSymbolicAbstraction:
                     max_val = opt.upper(max_handle)
                     return z3.BitVecVal(max_val.as_long(), exp.sort().size())
                 except z3.Z3Exception as e:
-                    logger.warning(f"Z3 exception in max_once: {e}")
+                    logger.warning("Z3 exception in max_once: %s", e)
 
             # Fallback to a large positive value
             return z3.BitVecVal((1 << exp.sort().size()) - 1, exp.sort().size())
-        else:
-            # For non-bit-vectors, return the expression itself
-            return exp
+        # For non-bit-vectors, return the expression itself
+        return exp
 
     def is_bit_must_be_0(self, var: z3.ExprRef, bit_idx: int) -> bool:
         """Check if a specific bit must be 0"""
@@ -189,7 +188,7 @@ class BitSymbolicAbstraction:
             self.known_bits_abs_as_fml = z3.BoolVal(True)
 
         end = symabs_timer()
-        logger.debug(f"Known bits abstraction took {end - start:.2f} seconds")
+        logger.debug("Known bits abstraction took %.2f seconds", end - start)
 
     def compute_abstraction(self, domain: str = "known_bits"):
         """Compute the abstraction in the specified domain"""
@@ -204,9 +203,8 @@ class BitSymbolicAbstraction:
         """Get the abstraction as a formula"""
         if domain in ["known_bits", "all"]:
             return self.known_bits_abs_as_fml
-        else:
-            logger.warning(f"Unknown domain: {domain}")
-            return z3.BoolVal(True)
+        logger.warning("Unknown domain: %s", domain)
+        return z3.BoolVal(True)
 
 
 def strongest_consequence(fml: z3.ExprRef, domain: str = "known_bits") -> z3.ExprRef:

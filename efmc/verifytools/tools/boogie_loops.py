@@ -1,11 +1,10 @@
-from efmc.verifytools.boogie.paths import is_nd_bb_path_possible
-from efmc.verifytools.boogie.ast import AstAssume, ast_or, AstTrue, parseExprAst, AstAssume
-#from lib.boogie.z3_embed import *
-from efmc.verifytools.boogie.bb import BB, get_bbs, bbEntry
-from efmc.verifytools.boogie.paths import get_path_vars
-#from lib.boogie.ssa import *
-from efmc.verifytools.boogie.eval import env_to_expr
+"""Functions for analyzing and unrolling loops in Boogie programs."""
 from collections import namedtuple
+
+from efmc.verifytools.boogie.ast import AstAssume, AstTrue, ast_or, parseExprAst
+from efmc.verifytools.boogie.bb import BB, bbEntry
+from efmc.verifytools.boogie.eval import env_to_expr
+from efmc.verifytools.boogie.paths import get_path_vars, is_nd_bb_path_possible
 from efmc.verifytools.common.util import unique
 
 Loop = namedtuple("Loop", ["header", "loop_paths", "exit_paths", "entry_cond"])
@@ -30,7 +29,8 @@ Loop = namedtuple("Loop", ["header", "loop_paths", "exit_paths", "entry_cond"])
 #
 # 3) is particularly risky.
 def _loops(bbs, curpath, loop_m):
-    if (curpath == []):
+    """Find loops in basic blocks."""
+    if curpath == []:
         curpath.append(bbEntry(bbs))
 
     #TODO: Is the code resilient to random dead loops?
@@ -38,11 +38,11 @@ def _loops(bbs, curpath, loop_m):
     #    return
 
     for s in bbs[curpath[-1]].successors:
-        if (s in curpath):
+        if s in curpath:
             prefix = tuple(curpath[:curpath.index(s)])
             body = curpath[curpath.index(s):]
 
-            if (prefix not in loop_m):
+            if prefix not in loop_m:
                 loop_m[prefix] = []
 
             loop_m[prefix].append(body)
@@ -53,40 +53,51 @@ def _loops(bbs, curpath, loop_m):
         curpath.pop()
     return loop_m
 
-def loop_path_entry_cond(p,bbs):
+
+def loop_path_entry_cond(p, bbs):
+    """Get the entry condition for a loop path."""
     # We are relying on boogie placing the entry condition in
     # the second bb for a given path as the first statement
     bb = bbs[p[1]]
     assert isinstance(bb.stmts[0], AstAssume)
     return bb.stmts[0].expr
 
+
 def loops(bbs):
+    """Find all loops in basic blocks and return Loop objects."""
     loop_m = _loops(bbs, [], {})
-    return [ Loop(k, v, [[ v[0][0], loop_exit_bb(v, bbs) ]],
-                        ast_or([loop_path_entry_cond(p, bbs) for p in v])) \
-        for (k,v) in loop_m.items() ]
+    return [Loop(k, v, [[v[0][0], loop_exit_bb(v, bbs)]],
+                ast_or([loop_path_entry_cond(p, bbs) for p in v]))
+            for (k, v) in loop_m.items()]
+
 
 def loop_exit_bb(body_paths, bbs):
+    """Find the exit basic block for a loop."""
     loop_header_succ = set(bbs[body_paths[0][0]].successors)
-    bbs_in_loop = set([p[1] for p in body_paths])
-    assert (len(loop_header_succ) == len(bbs_in_loop) + 1) # Singular exit node
+    bbs_in_loop = {p[1] for p in body_paths}
+    assert len(loop_header_succ) == len(bbs_in_loop) + 1  # Singular exit node
     # TODO: Check that no other paths exit the loop (sanity)
     return unique(loop_header_succ.difference(bbs_in_loop))
 
+
 # Assumes single loop at the end of the path
-def unroll_loop(loop, nunrolls, extra_pred_bb = None, exact = False):
+def unroll_loop(loop, nunrolls, extra_pred_bb=None, exact=False):
+    """Unroll a loop a specified number of times."""
     return list(loop.header) + ([extra_pred_bb] if extra_pred_bb else []) + \
-      nunrolls * [ loop.loop_paths ] + ([ loop.exit_paths ] if exact else [])
+        nunrolls * [loop.loop_paths] + ([loop.exit_paths] if exact else [])
+
 
 def bad_envs_to_expr(bad_envs):
-    s = "&&".join(["!(" + \
-                    "&&".join([("(%s==%s)" %(k, str(v))) \
-                                for (k,v) in bad_env.items()]) + \
-                    ")"
-                    for bad_env in bad_envs])
-    if (s == ""):
+    """Convert bad environments to an expression."""
+    s = "&&".join(["!(" +
+                   "&&".join([f"({k}=={v})"
+                              for (k, v) in bad_env.items()]) +
+                   ")"
+                   for bad_env in bad_envs])
+    if s == "":
         return AstTrue()
     return parseExprAst(s)
+
 
 # get_loop_header_values tries to unroll the given loop between min_unrolls and
 # max_unrolls.
@@ -103,30 +114,31 @@ def bad_envs_to_expr(bad_envs):
 #     partially unrolled loop
 #   exact - if true, look for loop unrolling that exit the loop afterwards
 #
-def get_loop_header_values(loop, bbs, min_unrolls = 0, max_unrolls = 5, \
-  forbidden_envs = None, start_env = None, exact = False):
+def get_loop_header_values(loop, bbs, min_unrolls=0, max_unrolls=5,
+                           forbidden_envs=None, start_env=None, exact=False):
+    """Get loop header values by unrolling the loop."""
     # Try unrolling it up to to the limit times
     loop_header_bb = loop.loop_paths[0][0]
-    nunrolls = min_unrolls;
+    nunrolls = min_unrolls
 
     extra_bb = None
-    if (forbidden_envs or start_env):
+    if forbidden_envs or start_env:
         assert not (forbidden_envs and start_env)
         extra_bb = "_tmp_header_pred_"
         if forbidden_envs:
             expr = bad_envs_to_expr(forbidden_envs)
         else:
             expr = env_to_expr(start_env)
-        bbs[extra_bb] = BB([], [ AstAssume(expr) ], [])
+        bbs[extra_bb] = BB([], [AstAssume(expr)], [])
 
-    while (is_nd_bb_path_possible(unroll_loop(loop, nunrolls+1, extra_bb,\
-                                              exact),
-                                  bbs) \
+    while (is_nd_bb_path_possible(unroll_loop(loop, nunrolls+1, extra_bb,
+                                               exact),
+                                  bbs)
            and nunrolls < max_unrolls):
-        nunrolls += 1;
+        nunrolls += 1
 
-    if (not is_nd_bb_path_possible(unroll_loop(loop, nunrolls, extra_bb, exact),
-                                   bbs)):
+    if not is_nd_bb_path_possible(unroll_loop(loop, nunrolls, extra_bb, exact),
+                                  bbs):
         return []
 
     unrolled_path = unroll_loop(loop, nunrolls, extra_bb, exact)

@@ -27,7 +27,6 @@
 
 from typing import List, Set, Any
 import z3
-from z3.z3util import get_vars
 
 
 def absolute_value_bv(bv):
@@ -58,6 +57,7 @@ def absolute_value_int(x):
 
 
 def get_expr_vars(exp):
+    """Get all variables from a Z3 expression."""
     try:
         syms = set()
         stack = [exp]
@@ -80,7 +80,11 @@ def get_expr_vars(exp):
 
 
 def get_expr_vars_v2(exp):
-    # For complex expressions with shared subexpressions, add a visited set to avoid processing the same subexpression multiple times
+    """
+    Get all variables from a Z3 expression.
+    For complex expressions with shared subexpressions, add a visited set
+    to avoid processing the same subexpression multiple times.
+    """
     try:
         syms = set()
         visited = set()
@@ -128,7 +132,7 @@ def get_atoms(expr: z3.BoolRef):
             for e_ in exp.children():
                 get_preds_(e_)
             return
-        assert (z3.is_bool(exp))
+        assert z3.is_bool(exp)
         s.add(exp)
 
     # convert to NNF and then look for preds
@@ -193,6 +197,7 @@ def big_and(exp_list: List[z3.ExprRef]):
 
 
 def big_or(ll: List[z3.ExprRef]):
+    """Make or."""
     if len(ll) == 1:
         return ll[0]
     return z3.Or(*ll)
@@ -202,8 +207,7 @@ def negate(f: z3.ExprRef) -> z3.ExprRef:
     """Negate a formula"""
     if z3.is_not(f):
         return f.arg(0)
-    else:
-        return z3.Not(f)
+    return z3.Not(f)
 
 
 def ctx_simplify(exp: z3.ExprRef):
@@ -273,8 +277,8 @@ def is_term(a) -> bool:
         return False
     if z3.is_const(a):  # covers both const value and var
         return True
-    else:  # covers f(t1,..,tn)
-        return not z3.is_bool(a) and all(is_term(c) for c in a.children())
+    # covers f(t1,..,tn)
+    return not z3.is_bool(a) and all(is_term(c) for c in a.children())
 
 
 CONNECTIVE_OPS = [z3.Z3_OP_NOT, z3.Z3_OP_AND, z3.Z3_OP_OR, z3.Z3_OP_IMPLIES,
@@ -297,7 +301,8 @@ def is_atom(a) -> bool:
     if is_expr_var(a):
         return True
 
-    return z3.is_app(a) and a.decl().kind() not in CONNECTIVE_OPS and all(is_term(c) for c in a.children())
+    return (z3.is_app(a) and a.decl().kind() not in CONNECTIVE_OPS and
+            all(is_term(c) for c in a.children()))
 
 
 def is_pos_lit(a) -> bool:
@@ -346,16 +351,16 @@ def is_lit(a) -> bool:
 
 
 def create_function_body_str(funcname: str, varlist: List, body: z3.ExprRef) -> [str]:
-    """"""
+    """Create SMT-LIB2 function definition string."""
     res = []
-    target = "(define-fun {} (".format(funcname)
-    for i in range(len(varlist)):
-        target += "({} {}) ".format(str(varlist[i]), varlist[i].sort().sexpr())
-    target += ") Bool {})".format(body.sexpr())  # return value
+    target = f"(define-fun {funcname} ("
+    for var in varlist:
+        target += f"({var} {var.sort().sexpr()}) "
+    target += f") Bool {body.sexpr()})"  # return value
     res.append(target)
 
     for var in varlist:
-        res.append("(declare-const {} {})".format(var, var.sort().sexpr()))
+        res.append(f"(declare-const {var} {var.sort().sexpr()})")
     return res
 
 
@@ -369,13 +374,13 @@ def z3_string_decoder(z3str: z3.StringVal) -> str:
     assert solver.check() == z3.sat
 
     model = solver.model()
-    assert model[length].is_int()
-    num_chars = model[length].as_long()
+    assert model[length].is_int()  # pylint: disable=no-member
+    num_chars = model[length].as_long()  # pylint: disable=no-member
 
     solver.push()
     char_bvs = []
     for i in range(num_chars):
-        char_bvs.append(z3.BitVec("ch_%d" % i, 8))
+        char_bvs.append(z3.BitVec(f"ch_{i}", 8))
         solver.add(z3.Unit(char_bvs[i]) == z3.SubString(tmp_string, i, 1))
 
     assert solver.check() == z3.sat
@@ -385,86 +390,89 @@ def z3_string_decoder(z3str: z3.StringVal) -> str:
 
 
 def z3_value_to_python(value):
+    """Convert a Z3 value to its Python equivalent."""
     if z3.is_true(value):
         return True
-    elif z3.is_false(value):
+    if z3.is_false(value):
         return False
-    elif z3.is_int_value(value):
+    if z3.is_int_value(value):
         return value.as_long()
-    elif z3.is_rational_value(value):
+    if z3.is_rational_value(value):
         return float(value.numerator_as_long()) / float(value.denominator_as_long())
-    elif z3.is_string_value(value):
+    if z3.is_string_value(value):
         return z3_string_decoder(value)
-    elif z3.is_algebraic_value(value):
+    if z3.is_algebraic_value(value):
         raise NotImplementedError()
-    else:
-        raise NotImplementedError()
+    raise NotImplementedError()
 
 
 class FormulaInfo:
+    """Information about a Z3 formula including quantifiers and logic."""
     def __init__(self, fml):
         self.formula = fml
-        self.has_quantifier = self.has_quantifier()
+        self.has_quantifier = self._check_has_quantifier()
         self.logic = self.get_logic()
 
     def apply_probe(self, name):
+        """Apply a Z3 probe to the formula."""
         g = z3.Goal()
         g.add(self.formula)
         p = z3.Probe(name)
         return p(g)
 
-    def has_quantifier(self):
+    def _check_has_quantifier(self):
+        """Check if the formula has quantifiers."""
         return self.apply_probe('has-quantifiers')
 
     def logic_has_bv(self):
+        """Check if the logic contains bit-vectors."""
         return "BV" in self.logic
 
     def get_logic(self):
+        """Determine the logic of the formula."""
         try:
             if not self.has_quantifier:
                 if self.apply_probe("is-propositional"):
                     return "QF_UF"
-                elif self.apply_probe("is-qfbv"):
+                if self.apply_probe("is-qfbv"):
                     return "QF_BV"
-                elif self.apply_probe("is-qfaufbv"):
+                if self.apply_probe("is-qfaufbv"):
                     return "QF_AUFBV"
-                elif self.apply_probe("is-qflia"):
+                if self.apply_probe("is-qflia"):
                     return "QF_LIA"
-                # elif self.apply_probe("is-quauflia"):
+                # if self.apply_probe("is-quauflia"):
                 #    return "QF_AUFLIA"
-                elif self.apply_probe("is-qflra"):
+                if self.apply_probe("is-qflra"):
                     return "QF_LRA"
-                elif self.apply_probe("is-qflira"):
+                if self.apply_probe("is-qflira"):
                     return "QF_LIRA"
-                elif self.apply_probe("is-qfnia"):
+                if self.apply_probe("is-qfnia"):
                     return "QF_NIA"
-                elif self.apply_probe("is-qfnra"):
+                if self.apply_probe("is-qfnra"):
                     return "QF_NRA"
-                elif self.apply_probe("is-qfufnra"):
+                if self.apply_probe("is-qfufnra"):
                     return "QF_UFNRA"
-                else:
-                    return "ALL"
-            else:
-                if self.apply_probe("is-lia"):
-                    return "LIA"
-                elif self.apply_probe("is-lra"):
-                    return "LRA"
-                elif self.apply_probe("is-lira"):
-                    return "LIRA"
-                elif self.apply_probe("is-nia"):
-                    return "NIA"
-                elif self.apply_probe("is-nra"):
-                    return "NRA"
-                elif self.apply_probe("is-nira"):
-                    return "NIRA"
-                else:
-                    return "ALL"
-        except Exception as ex:
+                return "ALL"
+            if self.apply_probe("is-lia"):
+                return "LIA"
+            if self.apply_probe("is-lra"):
+                return "LRA"
+            if self.apply_probe("is-lira"):
+                return "LIRA"
+            if self.apply_probe("is-nia"):
+                return "NIA"
+            if self.apply_probe("is-nra"):
+                return "NRA"
+            if self.apply_probe("is-nira"):
+                return "NIRA"
+            return "ALL"
+        except (z3.Z3Exception, AttributeError) as ex:
             print(ex)
             return "ALL"
 
 
 def get_z3_logic(fml: z3.ExprRef):
+    """Get the logic of a Z3 formula."""
     fml_info = FormulaInfo(fml)
     return fml_info.get_logic()
 

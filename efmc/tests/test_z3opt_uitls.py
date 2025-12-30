@@ -91,11 +91,12 @@ class TestBoxOptimize(unittest.TestCase):
         min_list = [self.x]
         max_list = [self.y]
 
-        # Call the function - should return None for unsatisfiable formula
-        result = box_optimize(formula, min_list, max_list)
+        # Call the function - should return (None, None) for unsatisfiable formula
+        min_res, max_res = box_optimize(formula, min_list, max_list)
 
         # Check results
-        self.assertIsNone(result)
+        self.assertIsNone(min_res)
+        self.assertIsNone(max_res)
 
     def test_box_optimize_empty_objectives(self):
         """Test with empty minimize and maximize lists."""

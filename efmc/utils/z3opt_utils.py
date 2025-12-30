@@ -3,8 +3,9 @@ Mode: pareto, lex, box
 Engine: farkas, symba, ...
 """
 
-import z3
 from typing import List
+
+import z3
 
 
 def optimize(fml: z3.ExprRef, obj: z3.ExprRef, minimize=False, timeout: int = 0):
@@ -30,6 +31,7 @@ def optimize(fml: z3.ExprRef, obj: z3.ExprRef, minimize=False, timeout: int = 0)
         obj = s.maximize(obj)
     if s.check() == z3.sat:
         return obj.value()
+    return None
 
 
 def box_optimize(fml: z3.ExprRef, minimize: List, maximize: List, timeout: int = 0):
@@ -52,6 +54,7 @@ def box_optimize(fml: z3.ExprRef, minimize: List, maximize: List, timeout: int =
         min_res = [obj.value() for obj in min_objectives]
         max_res = [obj.value() for obj in max_objectives]
         return min_res, max_res
+    return None, None
 
 
 def pareto_optimize(fml: z3.ExprRef, minimize: List, maximize: List, timeout: int = 0):
@@ -73,8 +76,7 @@ def pareto_optimize(fml: z3.ExprRef, minimize: List, maximize: List, timeout: in
         min_res = [obj.value() for obj in min_objectives]
         max_res = [obj.value() for obj in max_objectives]
         return min_res, max_res
-    else:
-        return None, None
+    return None, None
 
 
 def maxsmt(hard: z3.BoolRef, soft: List[z3.BoolRef], weight: List[int], timeout=0) -> int:
@@ -87,11 +89,11 @@ def maxsmt(hard: z3.BoolRef, soft: List[z3.BoolRef], weight: List[int], timeout=
     s.add(hard)
     if timeout > 0:
         s.set("timeout", timeout)
-    for i in range(len(soft)):
-        s.add_soft(soft[i], weight=weight[i])
+    for i, clause in enumerate(soft):
+        s.add_soft(clause, weight=weight[i])
     if s.check() == z3.sat:
         m = s.model()
-        for i in range(len(soft)):
-            if z3.is_false(m.eval(soft[i], True)):
+        for i, clause in enumerate(soft):
+            if z3.is_false(m.eval(clause, True)):
                 cost += weight[i]
     return cost

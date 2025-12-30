@@ -21,11 +21,15 @@ def get_bv_size(x: z3.ExprRef) -> int:
     """get bv size"""
     if z3.is_bv(x):
         return x.sort().size()
-    else:
-        return -1
+    return -1
 
 
 class BVSymbolicAbstraction:
+    """Symbolic abstraction for bit-vector formulas.
+    
+    Supports interval, zone, and octagon abstractions.
+    """
+    
     def __init__(self):
         self.initialized = False
         self.formula = z3.BoolVal(True)
@@ -62,7 +66,10 @@ class BVSymbolicAbstraction:
             #  non-terminating on some formulas
             # TODO: use try_for?
             simp_start = symabs_timer()
-            tac = z3.Then(z3.Tactic("simplify"), z3.Tactic("propagate-values"), z3.Tactic("propagate-bv-bounds"))
+            tac = z3.Then(
+                z3.Tactic("simplify"),
+                z3.Tactic("propagate-values"),
+                z3.Tactic("propagate-bv-bounds"))
             simp_formula = tac.apply(self.formula).as_expr()
             simp_end = symabs_timer()
             if simp_end - simp_start > 6:
@@ -72,6 +79,7 @@ class BVSymbolicAbstraction:
             print("error: not initialized")
 
     def init_from_file(self, fname: str) -> None:
+        """Initialize from an SMT2 file."""
         try:
             fvec = z3.parse_smt2_file(fname)
             self.formula = z3.And(fvec)
@@ -86,6 +94,7 @@ class BVSymbolicAbstraction:
             print(ex)
 
     def init_from_fml(self, fml: z3.BoolRef) -> None:
+        """Initialize from a formula."""
         try:
             self.formula = fml
             for var in get_variables(self.formula):
@@ -132,20 +141,25 @@ class BVSymbolicAbstraction:
         """
         # n_queries = len(multi_queries)
         # timeout = n_queries * self.single_query_timeout * 2 # is this reasonable?
-        min_res, max_res = box_optimize(self.formula, minimize=multi_queries, maximize=multi_queries, timeout=30000)
+        min_res, max_res = box_optimize(
+            self.formula, minimize=multi_queries,
+            maximize=multi_queries, timeout=30000)
         # TODO: the res of handler.xx() is not a BitVec val, but Int?
-        # TODO: what if it is a value large than the biggest integer of the size (is it possible? e.g., due to overflow)
+        # TODO: what if it is a value large than the biggest integer of the
+        # size (is it possible? e.g., due to overflow)
         cnts: List[z3.ExprRef] = []
-        for i in range(len(multi_queries)):
+        for i, query in enumerate(multi_queries):
             vmin = min_res[i]
             vmax = max_res[i]
-            vmin_bvval = z3.BitVecVal(vmin.as_long(), multi_queries[i].sort().size())
-            vmax_bvval = z3.BitVecVal(vmax.as_long(), multi_queries[i].sort().size())
+            vmin_bvval = z3.BitVecVal(vmin.as_long(), query.sort().size())
+            vmax_bvval = z3.BitVecVal(vmax.as_long(), query.sort().size())
             # print(self.vars[i].sort(), vmin.sort(), vmax.sort())
             if self.signed:
-                cnts.append(z3.And(multi_queries[i] >= vmin_bvval, multi_queries[i] <= vmax_bvval))
+                cnts.append(z3.And(
+                    query >= vmin_bvval, query <= vmax_bvval))
             else:
-                cnts.append(z3.And(z3.UGE(multi_queries[i], vmin_bvval), z3.ULE(multi_queries[i], vmax_bvval)))
+                cnts.append(z3.And(
+                    z3.UGE(query, vmin_bvval), z3.ULE(query, vmax_bvval)))
         return z3.And(cnts)
 
     def interval_abs(self) -> None:
@@ -162,14 +176,14 @@ class BVSymbolicAbstraction:
             # print(self.interval_abs_as_fml)
         else:
             cnts: List[z3.ExprRef] = []
-            for i in range(len(self.vars)):
-                vmin = self.min_once(self.vars[i])
-                vmax = self.max_once((self.vars[i]))
+            for i, var in enumerate(self.vars):
+                vmin = self.min_once(var)
+                vmax = self.max_once(var)
                 if self.signed:
-                    cnts.append(z3.And(self.vars[i] >= vmin, self.vars[i] <= vmax))
+                    cnts.append(z3.And(var >= vmin, var <= vmax))
                 else:
-                    cnts.append(z3.And(z3.UGE(self.vars[i], vmin), z3.ULE(self.vars[i], vmax)))
-                print(self.vars[i], "[", vmin, ", ", vmax, "]")
+                    cnts.append(z3.And(z3.UGE(var, vmin), z3.ULE(var, vmax)))
+                print(var, "[", vmin, ", ", vmax, "]")
             self.interval_abs_as_fml = z3.And(cnts)
 
     def zone_abs(self) -> None:
@@ -287,6 +301,7 @@ class BVSymbolicAbstraction:
 
 
 def feat_test() -> None:
+    """Test interval and zone abstractions."""
     x = z3.BitVec("x", 8)
     y = z3.BitVec("y", 8)
     fml = z3.And(z3.UGT(x, 0), z3.UGT(y, 0), z3.ULT(x, 10), z3.ULT(y, 10))
@@ -297,6 +312,7 @@ def feat_test() -> None:
 
 
 def feat_test_counting() -> None:
+    """Test counting features."""
     x = z3.BitVec("x", 8)
     y = z3.BitVec("y", 8)
     z = z3.BitVec("z", 8)
@@ -327,32 +343,30 @@ def feat_test_counting() -> None:
         print("abs has no false positives!")
     else:
         print("abs has false positives!")
-        '''
         # Count the number of false positives
         # print(solver.to_smt2()) # TODO: may save as a file
-        fp_fml = And(solver.assertions())
-        mc_abs = ModelCountrer()
-        mc_abs.init_from_fml(fp_fml)
+        # fp_fml = And(solver.assertions())
+        # mc_abs = ModelCountrer()
+        # mc_abs.init_from_fml(fp_fml)
         # mc_abs.count_models_by_bit_enumeration()
-        mc_abs.count_model_by_bv_enumeration()
+        # mc_abs.count_model_by_bv_enumeration()
         # mc_abs.count_models_by_sharpSAT()
-        '''
 
 
 def test() -> None:
+    """Run tests."""
     # test_multi_opt()
-    feat_test_counting('../test/t1.smt2')
+    feat_test_counting()
 
 
 if __name__ == '__main__':
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--domain', dest='domain', default='interval', type=str,
-                      help="domain: interval, octagon, zone")
-    parser.add_argument('--timeout', dest='timeout', default=30, type=int, help="timeout")
-    parser.add_argument('--file', dest='file', default='none', type=str, help="file")
-
-    args = parser.parse_args()
-    main(args.file, args.timeout, args.domain)
-    """
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--domain', dest='domain', default='interval',
+    #                     type=str, help="domain: interval, octagon, zone")
+    # parser.add_argument('--timeout', dest='timeout', default=30, type=int,
+    #                     help="timeout")
+    # parser.add_argument('--file', dest='file', default='none', type=str,
+    #                     help="file")
+    # args = parser.parse_args()
+    # main(args.file, args.timeout, args.domain)
     test()
