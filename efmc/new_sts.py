@@ -4,12 +4,13 @@ Enhanced TransitionSystem that supports:
 2. Mixed variable types (int, real, bool, bv, array)
 3. Flexible number of variables and prime variables
 """
-from typing import List, Dict, Set, Any, Optional, Tuple
+from typing import List, Dict, Set, Optional
 from collections import defaultdict
 import z3
 
 
 class NewTransitionSystem:
+    """Enhanced transition system supporting multiple invariants and mixed variable types."""
     def __init__(self):
         # Core components
         self.variables: Dict[str, z3.ExprRef] = {}  # name -> var
@@ -80,7 +81,8 @@ class NewTransitionSystem:
                 vars_of_type = [self.variables[name] for name in var_names]
                 sort = vars_of_type[0].sort()
                 inv_name = f"inv_{type_name}"
-                inv_funcs[type_name] = z3.Function(inv_name, *([sort] * len(vars_of_type)), z3.BoolSort())
+                inv_funcs[type_name] = z3.Function(
+                    inv_name, *([sort] * len(vars_of_type)), z3.BoolSort())
 
         # Initial states imply invariants
         for type_name, inv_func in inv_funcs.items():
@@ -112,41 +114,42 @@ class NewTransitionSystem:
 
 
 def demo():
+    """Demonstrate the NewTransitionSystem with a simple example."""
     # Create transition system
     ts = NewTransitionSystem()
-    
+
     # Add variables: x (int) and y (bool)
     x = ts.add_variable("x", z3.IntSort())
     x_prime = ts.add_variable("x", z3.IntSort(), prime=True)
     y = ts.add_variable("y", z3.BoolSort())
     y_prime = ts.add_variable("y", z3.BoolSort(), prime=True)
-    
+
     # Initial: x = 0, y = True
-    ts.set_init(z3.And(x == 0, y == True))
-    
+    ts.set_init(z3.And(x == 0, y == z3.BoolVal(True)))
+
     # Transition: x' = x + 1, y' = !y
     ts.set_trans(z3.And(x_prime == x + 1, y_prime == z3.Not(y)))
-    
+
     # Property: x >= 0 (safety property)
     ts.set_post(x >= 0)
-    
+
     # Convert to CHC and solve with PDR
     chc_constraints = ts.to_chc_constraints()
     solver = z3.SolverFor("HORN")
     solver.add(chc_constraints)
 
     print(chc_constraints)
-    
+
     result = solver.check()
     print(f"PDR result: {result}")
-    
+
     if result == z3.sat:
         print("Property holds!")
     elif result == z3.unsat:
         print("Property violated!")
     else:
         print("Unknown result")
-    
+
     return result
 
 if __name__ == "__main__":
