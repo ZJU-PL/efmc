@@ -4,11 +4,10 @@ This module contains the abstract base class for template-based verification.
 The Template class is an abstract base class that defines the interface for
 template-based program verification. It provides methods for managing template
 variables, constraints, and building invariants and ranking functions.
-
 """
 
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, List
 from abc import ABC, abstractmethod
 import z3
 
@@ -144,3 +143,60 @@ class Template(ABC):
             Z3 expression representing the invariant in terms of current state variables
         """
         return self.build_invariant_expr(model, use_prime_variables=False)
+
+    @staticmethod
+    def _init_signedness_from_sts(sts) -> Optional['Signedness']:
+        """Helper method to initialize signedness from a transition system.
+        
+        Args:
+            sts: Transition system with signedness attribute
+            
+        Returns:
+            Signedness enum value or None if not applicable
+        """
+        try:
+            from efmc.utils.bv_utils import Signedness
+            if sts.signedness == "signed":
+                return Signedness.SIGNED
+            elif sts.signedness == "unsigned":
+                return Signedness.UNSIGNED
+        except (ImportError, AttributeError):
+            pass
+        return None
+
+    def _build_linear_term(self, template_vars: List[z3.ExprRef], 
+                          variables: List[z3.ExprRef], 
+                          start_idx: int = 0) -> z3.ExprRef:
+        """Helper method to build a linear term from template variables.
+        
+        Builds a term of the form: template_vars[start_idx] + 
+                                   variables[0] * template_vars[start_idx+1] + 
+                                   variables[1] * template_vars[start_idx+2] + ...
+        
+        Args:
+            template_vars: List of template variable expressions
+            variables: List of program variables
+            start_idx: Starting index in template_vars (default: 0)
+            
+        Returns:
+            Z3 expression representing the linear term
+        """
+        term = template_vars[start_idx]
+        for j in range(len(variables)):
+            term = term + variables[j] * template_vars[start_idx + j + 1]
+        return term
+
+    def _get_variable(self, index: int, use_prime_variables: bool) -> z3.ExprRef:
+        """Helper method to get a variable (prime or non-prime) by index.
+        
+        Args:
+            index: Index of the variable
+            use_prime_variables: If True, return prime variable, else return regular variable
+            
+        Returns:
+            Z3 variable expression
+        """
+        if use_prime_variables:
+            return self.sts.prime_variables[index]
+        else:
+            return self.sts.variables[index]

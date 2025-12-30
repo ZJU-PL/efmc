@@ -159,10 +159,7 @@ class DisjunctiveIntervalTemplateV3(Template):
         for dis_idx in range(self.num_disjunctions):
             cnts = []
             for i in range(self.arity):
-                if use_prime_variables:
-                    var = self.sts.prime_variables[i]
-                else:
-                    var = self.sts.variables[i]
+                var = self._get_variable(i, use_prime_variables)
                 tvar_l = self.template_vars[dis_idx][i][0]
                 tvar_u = self.template_vars[dis_idx][i][1]
                 cnts.append(z3.And(model[tvar_l] < var, model[tvar_u] > var))

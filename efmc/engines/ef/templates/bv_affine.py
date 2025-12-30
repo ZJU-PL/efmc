@@ -31,10 +31,9 @@ class BitVecAffineTemplate(Template):
         self.sts = sts
         self.arity = len(self.sts.variables)
 
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         self.obj_no_overflow = kwargs.get("no_overflow", False)
         self.obj_no_underflow = kwargs.get("no_underflow", False)
@@ -88,15 +87,8 @@ class BitVecAffineTemplate(Template):
         cnts_init_post: List[z3.ExprRef] = []  # For sts.variables
         cnts_trans: List[z3.ExprRef] = []  # For sts.prime_variables
         for i in range(self.template_index):  # num. of templates
-            term_init_post = self.template_vars[i][0]
-            term_trans = self.template_vars[i][0]
-
-            for j in range(1, self.arity + 1):
-                # For sts.variables
-                term_init_post = term_init_post + self.sts.variables[j - 1] * self.template_vars[i][j]
-
-                # For sts.prime_variables
-                term_trans = term_trans + self.sts.prime_variables[j - 1] * self.template_vars[i][j]
+            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
+            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts_init_post.append(term_init_post == 0)
@@ -120,10 +112,8 @@ class BitVecAffineTemplate(Template):
             for j in range(1, self.arity + 1):
                 tvar = self.template_vars[i][j]
                 # model[tvar] is the value of tvar in the model
-                if use_prime_variables:
-                    term = term + self.sts.prime_variables[j - 1] * model[tvar]
-                else:
-                    term = term + self.sts.variables[j - 1] * model[tvar]
+                var = self._get_variable(j - 1, use_prime_variables)
+                term = term + var * model[tvar]
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts.append(term == 0)
@@ -151,10 +141,9 @@ class DisjunctiveBitVecAffineTemplate(Template):
         self.sts = sts
         self.arity = len(self.sts.variables)
 
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
         else:
             raise NotImplementedError(f"Unsupported signedness: {sts.signedness}")
 
@@ -213,14 +202,8 @@ class DisjunctiveBitVecAffineTemplate(Template):
         for i in range(self.num_disjunctions):  # num. of disjunctions
             # d1_0 + x*d1_1 + y*d1_2  == 0 OR
             # d2_0 + x*d2_1 + y*d2_2  == 0
-            term_init_post = self.template_vars[i][0]  # For sts.variables, e.g., d1_0
-            term_trans = self.template_vars[i][0]  # For sts.prime_variables, e.g., d1_0
-
-            for j in range(1, self.arity + 1):
-                # For sts.variables
-                term_init_post = term_init_post + self.sts.variables[j - 1] * self.template_vars[i][j]
-                # For sts.prime_variables
-                term_trans = term_trans + self.sts.prime_variables[j - 1] * self.template_vars[i][j]
+            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
+            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
 
             if self.signedness == Signedness.UNSIGNED:
                 cnt_init_and_post_dis.append(term_init_post == 0)
@@ -244,10 +227,8 @@ class DisjunctiveBitVecAffineTemplate(Template):
             for j in range(1, self.arity + 1):
                 tvar = self.template_vars[i][j]
                 # model[tvar] is the value of tvar in the model
-                if use_prime_variables:
-                    term = term + self.sts.prime_variables[j - 1] * model[tvar]
-                else:
-                    term = term + self.sts.variables[j - 1] * model[tvar]
+                var = self._get_variable(j - 1, use_prime_variables)
+                term = term + var * model[tvar]
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts.append(term == 0)

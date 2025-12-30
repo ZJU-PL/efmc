@@ -16,10 +16,9 @@ class BitVecZoneTemplate(Template):
         self.template_type = TemplateType.BV_ZONE
 
         # TODO: infer the signedness of variables? (or design a domain that is signedness-irrelevant
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         # prevent over/under flows in the template exprs, e.g., x - y
         self.obj_no_overflow = kwargs.get("no_overflow", False)
@@ -142,10 +141,9 @@ class DisjunctiveBitVecZoneTemplate(Template):
         self.template_type = TemplateType.BV_DISJUNCTIVE_ZONE
 
         # TODO: infer the signedness of variables? (or design a domain that is signedness-irrelevant
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         # prevent over/under flows in the template exprs, e.g., x - y
         self.obj_no_overflow = kwargs.get("no_overflow", False)
@@ -267,10 +265,7 @@ class DisjunctiveBitVecZoneTemplate(Template):
             vars_for_ith_disjunct = self.template_vars[i]
             cnts: List[z3.ExprRef] = []  # constraints for one disjunct
             for j in range(len(self.zones)):
-                if use_prime_variables:
-                    term = self.prime_zones[j]
-                else:
-                    term = self.zones[j]
+                term = self.prime_zones[j] if use_prime_variables else self.zones[j]
                 template_vars_for_term = vars_for_ith_disjunct[j]
                 term_l = template_vars_for_term[0]  # lower bound of the term
                 term_u = template_vars_for_term[1]  # upper bound of the term

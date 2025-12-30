@@ -79,15 +79,8 @@ class AffineTemplate(Template):
         cnts_init_post = []  # For sts.variables
         cnts_trans = []  # For sts.prime_variables
         for i in range(self.template_index):  # num. of templates
-            term_init_post = self.template_vars[i][0]
-            term_trans = self.template_vars[i][0]
-
-            for j in range(1, self.arity + 1):
-                # For sts.variables
-                term_init_post = term_init_post + self.sts.variables[j - 1] * self.template_vars[i][j]
-
-                # For sts.prime_variables
-                term_trans = term_trans + self.sts.prime_variables[j - 1] * self.template_vars[i][j]
+            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
+            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
 
             cnts_init_post.append(term_init_post == 0)
             cnts_trans.append(term_trans == 0)
@@ -107,10 +100,8 @@ class AffineTemplate(Template):
             for j in range(1, self.arity + 1):
                 tvar = self.template_vars[i][j]
                 # model[tvar] is the value of tvar in the model
-                if use_prime_variables:
-                    term = term + self.sts.prime_variables[j - 1] * model[tvar]
-                else:
-                    term = term + self.sts.variables[j - 1] * model[tvar]
+                var = self._get_variable(j - 1, use_prime_variables)
+                term = term + var * model[tvar]
             cnts.append(term == 0)
 
         return big_and(cnts)
@@ -188,15 +179,8 @@ class DisjunctiveAffineTemplate(Template):
         cnts_init_post = []  # For sts.variables
         cnts_trans = []  # For sts.prime_variables
         for i in range(self.template_index):  # num. of templates
-            term_init_post = self.template_vars[i][0]
-            term_trans = self.template_vars[i][0]
-
-            for j in range(1, self.arity + 1):
-                # For sts.variables
-                term_init_post = term_init_post + self.sts.variables[j - 1] * self.template_vars[i][j]
-
-                # For sts.prime_variables
-                term_trans = term_trans + self.sts.prime_variables[j - 1] * self.template_vars[i][j]
+            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
+            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
 
             cnts_init_post.append(term_init_post == 0)
             cnts_trans.append(term_trans == 0)
@@ -216,10 +200,8 @@ class DisjunctiveAffineTemplate(Template):
             for j in range(1, self.arity + 1):
                 tvar = self.template_vars[i][j]
                 # model[tvar] is the value of tvar in the model
-                if use_prime_variables:
-                    term = term + self.sts.prime_variables[j - 1] * model[tvar]
-                else:
-                    term = term + self.sts.variables[j - 1] * model[tvar]
+                var = self._get_variable(j - 1, use_prime_variables)
+                term = term + var * model[tvar]
             cnts.append(term == 0)
 
         return big_or(cnts)

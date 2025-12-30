@@ -39,10 +39,9 @@ class BitVecLinearRecurrenceTemplate(Template):
         self.template_type = TemplateType.BV_INTERVAL  # Reusing existing type for now
         
         # Handle signedness
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
         else:
             self.signedness = Signedness.UNSIGNED  # Default to unsigned
             

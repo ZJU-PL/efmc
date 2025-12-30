@@ -1,15 +1,18 @@
+"""Module for Ordered Binary Decision Diagrams (OBDD)."""
 import ast
 
 from .BDD import BDDNode
 from .BDD import apply as BDDapply
-from .ordering import *
+from .ordering import Ordering, ListOrdering
 
 
 def parse_args(args_node):
+    """Parse arguments node to create an Ordering."""
     return Ordering([id(arg) for arg in args_node.args])
 
 
 def parse_name(ordering, node):
+    """Parse a name node into an OBDD."""
     if node.id == 'True':
         return OBDD(BDDNode(True), ordering)
     if node.id == 'False':
@@ -19,12 +22,14 @@ def parse_name(ordering, node):
 
 
 def parse_binary_unary_op(ordering, node):
-    if (isinstance(node.op, ast.Not) or isinstance(node.op, ast.Invert)):
-
+    """Parse a unary operation node."""
+    if isinstance(node.op, (ast.Not, ast.Invert)):
         return ~parse_binary_expr(ordering, node.operand)
+    return None
 
 
 def parse_binary_op(ordering, node):
+    """Parse a binary operation node."""
     if isinstance(node.op, ast.BitAnd):
         return (parse_binary_expr(ordering, node.left) &
                 parse_binary_expr(ordering, node.right))
@@ -33,11 +38,11 @@ def parse_binary_op(ordering, node):
         return (parse_binary_expr(ordering, node.left) |
                 parse_binary_expr(ordering, node.right))
 
-    raise SyntaxError('expected a binary operator, got a ' +
-                      '{}'.format(node.op.__class__))
+    raise SyntaxError(f'expected a binary operator, got a {node.op.__class__}')
 
 
 def parse_binary_binary_op(ordering, node):
+    """Parse a binary boolean operation node."""
     if isinstance(node.op, ast.And):
         result = OBDD(BDDNode(True), ordering)
         for arg in node.values:
@@ -52,11 +57,11 @@ def parse_binary_binary_op(ordering, node):
 
         return result
 
-    raise SyntaxError('expected a binary operator, got a ' +
-                      '{}'.format(node.op.__class__))
+    raise SyntaxError(f'expected a binary operator, got a {node.op.__class__}')
 
 
 def parse_binary_expr(ordering, node):
+    """Parse a binary expression node."""
     if isinstance(node, ast.BinOp):
         return parse_binary_op(ordering, node)
 
@@ -73,14 +78,12 @@ def parse_binary_expr(ordering, node):
         if node.value in [0, 1]:
             return OBDD(BDDNode(node.value), ordering)
 
-        raise SyntaxError('expected a binary expression, got number ' +
-                          '{}'.format(node.n))
+        raise SyntaxError(f'expected a binary expression, got number {node.value}')
 
-    raise SyntaxError('expected a binary expression, got a ' +
-                      '{}'.format(node.__class__))
+    raise SyntaxError(f'expected a binary expression, got a {node.__class__}')
 
 
-class BinaryParser(object):
+class BinaryParser:
     r'''
     A class to represent parsers of binary functions.
 

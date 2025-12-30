@@ -5,11 +5,11 @@ Checks three conditions: initiation, inductiveness, and safety.
 """
 
 import logging
-import z3
-from typing import List, Tuple, Optional, Dict, Set
+from typing import Optional, Tuple
 
-from efmc.utils.z3_solver_utils import is_entail, is_sat, is_equiv
-from efmc.utils.z3_expr_utils import get_variables, negate, get_atoms, big_and
+import z3
+
+from efmc.utils.z3_solver_utils import is_entail
 from efmc.sts import TransitionSystem
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ class InductiveGeneralizer:
                 return False, "initiation", s.model()
 
         # Check inductiveness: inv && trans => inv'
-        inv_prime = z3.substitute(inv, list(zip(self.sts.variables, self.sts.prime_variables)))
+        inv_prime = z3.substitute(
+            inv, list(zip(self.sts.variables, self.sts.prime_variables)))
         if not is_entail(z3.And(inv, self.sts.trans), inv_prime):
             s = z3.Solver()
             s.set("timeout", self.timeout)
@@ -71,7 +72,7 @@ class InductiveGeneralizer:
                 val = cti.eval(v)
                 if val is not None:
                     state_constraints.append(v == val)
-            except:
+            except Exception:
                 # Skip variables that don't have values in the model
                 pass
 
@@ -86,7 +87,7 @@ class InductiveGeneralizer:
                 val = cti.eval(v)
                 if val is not None:
                     state_constraints.append(v == val)
-            except:
+            except Exception:
                 # Skip variables that don't have values in the model
                 pass
 
@@ -107,17 +108,25 @@ class InductiveGeneralizer:
                 necessary_clauses.append(clause)
                 continue
 
-            candidate = z3.And(*remaining_clauses) if len(remaining_clauses) > 1 else remaining_clauses[0]
-            inv_prime = z3.substitute(candidate, list(zip(self.sts.variables, self.sts.prime_variables)))
-            
-            if is_entail(z3.And(candidate, self.sts.trans), inv_prime) and is_entail(candidate, self.sts.post):
+            candidate = (z3.And(*remaining_clauses)
+                         if len(remaining_clauses) > 1
+                         else remaining_clauses[0])
+            inv_prime = z3.substitute(
+                candidate, list(zip(self.sts.variables,
+                                    self.sts.prime_variables)))
+
+            if (is_entail(z3.And(candidate, self.sts.trans), inv_prime) and
+                    is_entail(candidate, self.sts.post)):
                 return self.generalize_by_dropping_literals(candidate)
-            else:
-                necessary_clauses.append(clause)
+            necessary_clauses.append(clause)
 
-        return z3.And(*necessary_clauses) if len(necessary_clauses) > 1 else necessary_clauses[0]
+        return (z3.And(*necessary_clauses)
+                if len(necessary_clauses) > 1
+                else necessary_clauses[0])
 
-    def generalize_by_craig_interpolation(self, A: z3.ExprRef, B: z3.ExprRef) -> Optional[z3.ExprRef]:
+    def generalize_by_craig_interpolation(self, expr_a: z3.ExprRef,
+                                          expr_b: z3.ExprRef
+                                          ) -> Optional[z3.ExprRef]:
         """Use Craig interpolation to find separating formula"""
         raise NotImplementedError
 
@@ -125,7 +134,7 @@ class InductiveGeneralizer:
         """Learn inductive invariant using counterexample-guided refinement"""
         inv = self.sts.post
 
-        for iteration in range(max_iterations):
+        for _ in range(max_iterations):
             valid, condition, cti = self.check_invariant(inv)
             if valid:
                 return inv

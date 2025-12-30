@@ -14,10 +14,9 @@ class BitVecOctagonTemplate(Template):
         self.template_type = TemplateType.BV_OCTAGON
 
         # TODO: infer the signedness of variables? (or design a domain that is signedness-irrelevant
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         #  prevent over/under flows in the template exprs, e.g., x - y, x + y
         self.obj_no_overflow = kwargs.get("no_overflow", False)
@@ -201,10 +200,9 @@ class DisjunctiveBitVecOctagonTemplate(Template):
         self.template_type = TemplateType.BV_DISJUNCTIVE_OCTAGON
 
         # TODO: infer the signedness of variables? (or design a domain that is signedness-irrelevant
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         self.obj_no_overflow = kwargs.get("no_overflow", False)
         self.obj_no_underflow = kwargs.get("no_underflow", False)
@@ -371,10 +369,7 @@ class DisjunctiveBitVecOctagonTemplate(Template):
             # Invariant: len(self.template_vars) = self.num_disjunctions
             aux_vars_for_vars_ith_disjunct = self.template_vars_for_vars[i]
             for j in range(self.arity):
-                if use_prime_variables:
-                    var = self.sts.prime_variables[j]
-                else:
-                    var = self.sts.variables[j]
+                var = self._get_variable(j, use_prime_variables)
                 tvar_l = aux_vars_for_vars_ith_disjunct[j][0]
                 tvar_u = aux_vars_for_vars_ith_disjunct[j][1]
                 if self.signedness == Signedness.UNSIGNED:

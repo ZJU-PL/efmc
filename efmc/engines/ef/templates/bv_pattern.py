@@ -15,10 +15,9 @@ class BitVecPatternTemplate(Template):
     def __init__(self, sts):
         self.template_type = TemplateType.BV_PATTERN
         
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
         
         self.sts = sts
         #number of bits in vector
@@ -93,10 +92,9 @@ class DisjunctiveBitVecPatternTemplate(Template):
 
         # TODO: infer the signedness of variables? (or design a domain that is
         #  signedness-irrelevant. Currently, we use unsigned by default
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         self.sts = sts
         self.arity = len(self.sts.variables)

@@ -2,7 +2,8 @@
 This module contains the code for the SAT solver 
 
 
-Current, it is used to solve EFSMT problems with the SAT solver "directly", we need to translate the problem into a CNF formula.
+Currently, it is used to solve EFSMT problems with the SAT solver "directly".
+We need to translate the problem into a CNF formula.
 
 A possible way to solve EFSMT problems with the SAT solver is as follows:
 1. Translate the EFSMT problem into a QBF formula. (TODO)
@@ -45,7 +46,7 @@ def solve_with_sat_solver(dimacs_str: str, solver_name: str) -> str:
     """
     assert solver_name in sat_solvers_in_pysat
     # print(dimacs_str)
-    print("Calling SAT solver {}".format(solver_name))
+    print(f"Calling SAT solver {solver_name}")
     pos = CNF(from_string=dimacs_str)
     # pos.to_fp(sys.stdout)
     aux = Solver(name=solver_name, bootstrap_with=pos)

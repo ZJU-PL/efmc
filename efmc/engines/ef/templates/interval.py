@@ -245,10 +245,7 @@ class DisjunctiveIntervalTemplate(Template):
         for vars_for_dis in self.template_vars:
             cnts = []
             for i in range(self.arity):
-                if use_prime_variables:
-                    var = self.sts.prime_variables[i]
-                else:
-                    var = self.sts.variables[i]
+                var = self._get_variable(i, use_prime_variables)
                 template_vars_for_var = vars_for_dis[i]
                 i0, i1 = template_vars_for_var[0], template_vars_for_var[1]
                 i2, i3 = template_vars_for_var[2], template_vars_for_var[3]

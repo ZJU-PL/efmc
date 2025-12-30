@@ -12,10 +12,9 @@ class BitVecXorParityTemplate(Template):
 
         self.template_type = TemplateType.BV_XOR_PARITY
 
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         self.sts = sts
         self.bit_len = self.sts.variables[0].sort().size()
@@ -95,10 +94,9 @@ class DisjunctiveBitVecXorParityTemplate(Template):
 
         # TODO: infer the signedness of variables? (or design a domain that is
         #  signedness-irrelevant. Currently, we use unsigned by default
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
 
         self.sts = sts
         self.arity = len(self.sts.variables)
@@ -180,10 +178,7 @@ class DisjunctiveBitVecXorParityTemplate(Template):
             sum = z3.BitVecVal(0,self.bit_len)
 
             for j in range(self.arity):
-                if use_prime_variables:
-                    var = self.sts.prime_variables[j]
-                else:
-                    var = self.sts.variables[j]
+                var = self._get_variable(j, use_prime_variables)
 
                 tvar_a = vars_for_ith_disjunct[j]
                 sum = sum ^ model[tvar_a] * var

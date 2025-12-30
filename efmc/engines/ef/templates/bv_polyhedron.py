@@ -16,10 +16,9 @@ class BitVecPolyhedronTemplate(Template):
         self.template_type = TemplateType.BV_POLYHEDRON
 
         # TODO: infer the signedness of variables? (or design a domain that is signedness-irrelevant
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
         else:
             raise NotImplementedError
 
@@ -78,15 +77,8 @@ class BitVecPolyhedronTemplate(Template):
         cnts_init_post = []  # For sts.variables
         cnts_trans = []  # For sts.prime_variables
         for i in range(self.template_index):  # num. of templates
-            term_init_post = self.template_vars[i][0]
-            term_trans = self.template_vars[i][0]
-
-            for j in range(1, self.arity + 1):
-                # For sts.variables
-                term_init_post = term_init_post + self.sts.variables[j - 1] * self.template_vars[i][j]
-
-                # For sts.prime_variables
-                term_trans = term_trans + self.sts.prime_variables[j - 1] * self.template_vars[i][j]
+            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
+            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts_init_post.append(z3.UGE(term_init_post, 0))
@@ -110,10 +102,8 @@ class BitVecPolyhedronTemplate(Template):
             for j in range(1, self.arity + 1):
                 tvar = self.template_vars[i][j]
                 # model[tvar] is the value of tvar in the model
-                if use_prime_variables:
-                    term = term + self.sts.prime_variables[j - 1] * model[tvar]
-                else:
-                    term = term + self.sts.variables[j - 1] * model[tvar]
+                var = self._get_variable(j - 1, use_prime_variables)
+                term = term + var * model[tvar]
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts.append(z3.UGE(term, 0))
@@ -130,10 +120,9 @@ class DisjunctiveBitVecPolyhedronTemplate(Template):
     def __init__(self, sts: TransitionSystem, **kwargs):
         self.template_type = TemplateType.BV_DISJUNCTIVE_POLYHEDRON
 
-        if sts.signedness == "signed":
-            self.signedness = Signedness.SIGNED
-        elif sts.signedness == "unsigned":
-            self.signedness = Signedness.UNSIGNED
+        signedness_val = self._init_signedness_from_sts(sts)
+        if signedness_val is not None:
+            self.signedness = signedness_val
         else:
             raise NotImplementedError
 
@@ -195,14 +184,8 @@ class DisjunctiveBitVecPolyhedronTemplate(Template):
         for i in range(self.num_disjunctions):  # num. of disjunctions
             # d1_0 + x*d1_1 + y*p1_2  >= 0 OR
             # d2_0 + x*d2_1 + y*d2_2  >= 0
-            term_init_post = self.template_vars[i][0]  # For sts.variables, e.g., d1_0
-            term_trans = self.template_vars[i][0]  # For sts.prime_variables, e.g., d1_0
-
-            for j in range(1, self.arity + 1):
-                # For sts.variables
-                term_init_post = term_init_post + self.sts.variables[j - 1] * self.template_vars[i][j]
-                # For sts.prime_variables
-                term_trans = term_trans + self.sts.prime_variables[j - 1] * self.template_vars[i][j]
+            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
+            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
 
             if self.signedness == Signedness.UNSIGNED:
                 cnt_init_and_post_dis.append(z3.UGE(term_init_post, 0))
@@ -226,10 +209,8 @@ class DisjunctiveBitVecPolyhedronTemplate(Template):
             for j in range(1, self.arity + 1):
                 tvar = self.template_vars[i][j]
                 # model[tvar] is the value of tvar in the model
-                if use_prime_variables:
-                    term = term + self.sts.prime_variables[j - 1] * model[tvar]
-                else:
-                    term = term + self.sts.variables[j - 1] * model[tvar]
+                var = self._get_variable(j - 1, use_prime_variables)
+                term = term + var * model[tvar]
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts.append(z3.UGE(term, 0))
