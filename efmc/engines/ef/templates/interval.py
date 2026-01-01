@@ -2,6 +2,7 @@
 
 The encoding in this version is not elegant (but IntervalTemplateV2 is not complete, i.e., it will miss some states)
 """
+
 import logging
 
 from efmc.engines.ef.templates.abstract_template import *
@@ -57,11 +58,19 @@ class IntervalTemplate(Template):
             var = self.sts.variables[i]
             self.template_index += 1
             if self.use_real:
-                tvars = [z3.Real("i{}0".format(var)), z3.Real("i{}1".format(var)),
-                         z3.Real("i{}2".format(var)), z3.Real("i{}3".format(var))]
+                tvars = [
+                    z3.Real("i{}0".format(var)),
+                    z3.Real("i{}1".format(var)),
+                    z3.Real("i{}2".format(var)),
+                    z3.Real("i{}3".format(var)),
+                ]
             else:
-                tvars = [z3.Int("i{}0".format(var)), z3.Int("i{}1".format(var)),
-                         z3.Int("i{}2".format(var)), z3.Int("i{}3".format(var))]
+                tvars = [
+                    z3.Int("i{}0".format(var)),
+                    z3.Int("i{}1".format(var)),
+                    z3.Int("i{}2".format(var)),
+                    z3.Int("i{}3".format(var)),
+                ]
             self.template_vars.append(tvars)
 
         # print(self.template_vars)
@@ -186,11 +195,19 @@ class DisjunctiveIntervalTemplate(Template):
                 var = self.sts.variables[j]
                 self.template_index += 1
                 if self.use_real:
-                    tvars = [z3.Real("d_{}i{}0".format(i, var)), z3.Real("d_{}i{}1".format(i, var)),
-                             z3.Real("d_{}i{}2".format(i, var)), z3.Real("d_{}i{}3".format(i, var))]
+                    tvars = [
+                        z3.Real("d_{}i{}0".format(i, var)),
+                        z3.Real("d_{}i{}1".format(i, var)),
+                        z3.Real("d_{}i{}2".format(i, var)),
+                        z3.Real("d_{}i{}3".format(i, var)),
+                    ]
                 else:
-                    tvars = [z3.Int("d_{}i{}0".format(i, var)), z3.Int("d_{}i{}1".format(i, var)),
-                             z3.Int("d_{}i{}2".format(i, var)), z3.Int("d_{}i{}3".format(i, var))]
+                    tvars = [
+                        z3.Int("d_{}i{}0".format(i, var)),
+                        z3.Int("d_{}i{}1".format(i, var)),
+                        z3.Int("d_{}i{}2".format(i, var)),
+                        z3.Int("d_{}i{}3".format(i, var)),
+                    ]
                 vars_for_dis.append(tvars)
 
             self.template_vars.append(vars_for_dis)

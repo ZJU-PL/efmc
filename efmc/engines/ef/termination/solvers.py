@@ -20,13 +20,15 @@ class RankingSolver:
         self.logic = logic
         self.solver = solver
 
-    def solve(self, vc: z3.ExprRef, template, timeout: Optional[int] = None) -> TerminationResult:
+    def solve(
+        self, vc: z3.ExprRef, template, timeout: Optional[int] = None
+    ) -> TerminationResult:
         """Solve the ranking function verification condition."""
         exists_vars = extract_all(template.template_vars)
-        if hasattr(template, 'condition_vars'):
+        if hasattr(template, "condition_vars"):
             exists_vars.extend(template.condition_vars)
 
-        forall_vars = getattr(template, 'sts', None)
+        forall_vars = getattr(template, "sts", None)
         if forall_vars:
             forall_vars = forall_vars.all_variables
         else:
@@ -42,14 +44,19 @@ class RankingSolver:
 
             return TerminationResult(
                 result=(result == "sat"),
-                error=None if result == "sat" else f"Could not find ranking function: {result}"
+                error=(
+                    None
+                    if result == "sat"
+                    else f"Could not find ranking function: {result}"
+                ),
             )
         except Exception as e:
             logger.error("Error in EF solver: %s", e)
             return TerminationResult(result=False, error=f"Solver error: {e}")
 
-    def _solve_with_timeout(self, vc: z3.ExprRef, _exists_vars, forall_vars,
-                            timeout: int) -> TerminationResult:
+    def _solve_with_timeout(
+        self, vc: z3.ExprRef, _exists_vars, forall_vars, timeout: int
+    ) -> TerminationResult:
         """Solve with Z3 directly using timeout."""
         try:
             solver = z3.Solver()
@@ -63,8 +70,12 @@ class RankingSolver:
             if result == z3.sat:
                 return TerminationResult(result=True)
             if result == z3.unsat:
-                return TerminationResult(result=False, error="No ranking function exists")
-            return TerminationResult(result=False, error="Solver timeout or unknown result")
+                return TerminationResult(
+                    result=False, error="No ranking function exists"
+                )
+            return TerminationResult(
+                result=False, error="Solver timeout or unknown result"
+            )
 
         except Exception as e:
             logger.error("Error in Z3 solver: %s", e)
@@ -78,14 +89,15 @@ class RecurrenceSolver:
         self.logic = logic
         self.solver = solver
 
-    def solve(self, vc: z3.ExprRef, template,
-              timeout: Optional[int] = None) -> NonTerminationResult:
+    def solve(
+        self, vc: z3.ExprRef, template, timeout: Optional[int] = None
+    ) -> NonTerminationResult:
         """Solve the recurrence set verification condition."""
         exists_vars = extract_all(template.template_vars)
-        if hasattr(template, 'condition_vars'):
+        if hasattr(template, "condition_vars"):
             exists_vars.extend(template.condition_vars)
 
-        forall_vars = getattr(template, 'sts', None)
+        forall_vars = getattr(template, "sts", None)
         if forall_vars:
             forall_vars = forall_vars.all_variables
         else:
@@ -101,14 +113,19 @@ class RecurrenceSolver:
 
             return NonTerminationResult(
                 result=(result == "sat"),
-                error=None if result == "sat" else f"Could not find recurrence set: {result}"
+                error=(
+                    None
+                    if result == "sat"
+                    else f"Could not find recurrence set: {result}"
+                ),
             )
         except Exception as e:
             logger.error("Error in EF solver: %s", e)
             return NonTerminationResult(result=False, error=f"Solver error: {e}")
 
-    def _solve_with_timeout(self, vc: z3.ExprRef, _exists_vars, forall_vars,
-                            timeout: int) -> NonTerminationResult:
+    def _solve_with_timeout(
+        self, vc: z3.ExprRef, _exists_vars, forall_vars, timeout: int
+    ) -> NonTerminationResult:
         """Solve with Z3 directly using timeout."""
         try:
             solver = z3.Solver()
@@ -122,8 +139,12 @@ class RecurrenceSolver:
             if result == z3.sat:
                 return NonTerminationResult(result=True)
             if result == z3.unsat:
-                return NonTerminationResult(result=False, error="No recurrence set exists")
-            return NonTerminationResult(result=False, error="Solver timeout or unknown result")
+                return NonTerminationResult(
+                    result=False, error="No recurrence set exists"
+                )
+            return NonTerminationResult(
+                result=False, error="Solver timeout or unknown result"
+            )
 
         except Exception as e:
             logger.error("Error in Z3 solver: %s", e)

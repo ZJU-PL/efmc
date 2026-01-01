@@ -27,7 +27,9 @@ class InductiveGeneralizer:
         """Set timeout for SMT solver calls"""
         self.timeout = timeout_ms
 
-    def check_invariant(self, inv: z3.ExprRef) -> Tuple[bool, Optional[str], Optional[z3.ModelRef]]:
+    def check_invariant(
+        self, inv: z3.ExprRef
+    ) -> Tuple[bool, Optional[str], Optional[z3.ModelRef]]:
         """Check if invariant satisfies initiation, inductiveness, and safety"""
         # Check initiation: init => inv
         if not is_entail(self.sts.init, inv):
@@ -39,7 +41,8 @@ class InductiveGeneralizer:
 
         # Check inductiveness: inv && trans => inv'
         inv_prime = z3.substitute(
-            inv, list(zip(self.sts.variables, self.sts.prime_variables)))
+            inv, list(zip(self.sts.variables, self.sts.prime_variables))
+        )
         if not is_entail(z3.And(inv, self.sts.trans), inv_prime):
             s = z3.Solver()
             s.set("timeout", self.timeout)
@@ -103,30 +106,35 @@ class InductiveGeneralizer:
 
         necessary_clauses = []
         for i, clause in enumerate(clauses):
-            remaining_clauses = clauses[:i] + clauses[i + 1:]
+            remaining_clauses = clauses[:i] + clauses[i + 1 :]
             if not remaining_clauses:
                 necessary_clauses.append(clause)
                 continue
 
-            candidate = (z3.And(*remaining_clauses)
-                         if len(remaining_clauses) > 1
-                         else remaining_clauses[0])
+            candidate = (
+                z3.And(*remaining_clauses)
+                if len(remaining_clauses) > 1
+                else remaining_clauses[0]
+            )
             inv_prime = z3.substitute(
-                candidate, list(zip(self.sts.variables,
-                                    self.sts.prime_variables)))
+                candidate, list(zip(self.sts.variables, self.sts.prime_variables))
+            )
 
-            if (is_entail(z3.And(candidate, self.sts.trans), inv_prime) and
-                    is_entail(candidate, self.sts.post)):
+            if is_entail(z3.And(candidate, self.sts.trans), inv_prime) and is_entail(
+                candidate, self.sts.post
+            ):
                 return self.generalize_by_dropping_literals(candidate)
             necessary_clauses.append(clause)
 
-        return (z3.And(*necessary_clauses)
-                if len(necessary_clauses) > 1
-                else necessary_clauses[0])
+        return (
+            z3.And(*necessary_clauses)
+            if len(necessary_clauses) > 1
+            else necessary_clauses[0]
+        )
 
-    def generalize_by_craig_interpolation(self, expr_a: z3.ExprRef,
-                                          expr_b: z3.ExprRef
-                                          ) -> Optional[z3.ExprRef]:
+    def generalize_by_craig_interpolation(
+        self, expr_a: z3.ExprRef, expr_b: z3.ExprRef
+    ) -> Optional[z3.ExprRef]:
         """Use Craig interpolation to find separating formula"""
         raise NotImplementedError
 

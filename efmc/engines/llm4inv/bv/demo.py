@@ -10,22 +10,24 @@ import z3
 from efmc.sts import TransitionSystem
 from efmc.engines.llm4inv.bv.llm4inv_prover import LLM4InvProver
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
 def create_counter_example() -> TransitionSystem:
     """
     Create a simple counter example with overflow check.
-    
-    Program: 
+
+    Program:
     - x starts at 0
     - x increments by 1 while x < 100
     - Safety property: x <= 100
     """
     # Create bit-vector variables
-    x = z3.BitVec('x', 32)
-    x_prime = z3.BitVec('x!', 32)
+    x = z3.BitVec("x", 32)
+    x_prime = z3.BitVec("x!", 32)
 
     # Initial condition: x == 0
     init = x == z3.BitVecVal(0, 32)
@@ -33,7 +35,7 @@ def create_counter_example() -> TransitionSystem:
     # Transition relation: x' = x + 1 if x < 100, else x' = x
     trans = z3.Or(
         z3.And(z3.ULT(x, z3.BitVecVal(100, 32)), x_prime == x + z3.BitVecVal(1, 32)),
-        z3.And(z3.UGE(x, z3.BitVecVal(100, 32)), x_prime == x)
+        z3.And(z3.UGE(x, z3.BitVecVal(100, 32)), x_prime == x),
     )
 
     # Safety property: x <= 100
@@ -41,29 +43,25 @@ def create_counter_example() -> TransitionSystem:
 
     # Create transition system
     sts = TransitionSystem(
-        variables=[x],
-        prime_variables=[x_prime],
-        init=init,
-        trans=trans,
-        post=post
+        variables=[x], prime_variables=[x_prime], init=init, trans=trans, post=post
     )
-    
+
     return sts
 
 
 def create_array_bounds_example() -> TransitionSystem:
     """
     Create an array bounds checking example.
-    
+
     Program:
     - i starts at 0
     - i increments while i < n
     - Safety property: i <= n
     """
-    i = z3.BitVec('i', 32)
-    n = z3.BitVec('n', 32)
-    i_prime = z3.BitVec('i!', 32)
-    n_prime = z3.BitVec('n!', 32)
+    i = z3.BitVec("i", 32)
+    n = z3.BitVec("n", 32)
+    i_prime = z3.BitVec("i!", 32)
+    n_prime = z3.BitVec("n!", 32)
 
     # Initial condition: i == 0, n > 0
     init = z3.And(i == z3.BitVecVal(0, 32), z3.UGT(n, z3.BitVecVal(0, 32)))
@@ -72,9 +70,9 @@ def create_array_bounds_example() -> TransitionSystem:
     trans = z3.And(
         z3.Or(
             z3.And(z3.ULT(i, n), i_prime == i + z3.BitVecVal(1, 32)),
-            z3.And(z3.UGE(i, n), i_prime == i)
+            z3.And(z3.UGE(i, n), i_prime == i),
         ),
-        n_prime == n
+        n_prime == n,
     )
 
     # Safety property: i <= n
@@ -85,13 +83,15 @@ def create_array_bounds_example() -> TransitionSystem:
         prime_variables=[i_prime, n_prime],
         init=init,
         trans=trans,
-        post=post
+        post=post,
     )
-    
+
     return sts
 
 
-def run_demo_with_prover(sts: TransitionSystem, example_name: str, **kwargs) -> Dict[str, Any]:
+def run_demo_with_prover(
+    sts: TransitionSystem, example_name: str, **kwargs
+) -> Dict[str, Any]:
     """Run demo using the LLM4InvProver"""
     logger.info("Running %s with LLM4InvProver", example_name)
 
@@ -102,8 +102,8 @@ def run_demo_with_prover(sts: TransitionSystem, example_name: str, **kwargs) -> 
     solve_time = time.time() - start_time
 
     stats = prover.get_statistics()
-    stats['example_name'] = example_name
-    stats['solve_time'] = solve_time
+    stats["example_name"] = example_name
+    stats["solve_time"] = solve_time
 
     if result.is_safe:
         logger.info("✓ %s: Found invariant: %s", example_name, result.invariant)
@@ -119,30 +119,30 @@ def main():
 
     # Configuration
     config = {
-        'timeout': 300,  # 5 minutes
-        'max_iterations': 5,
-        'max_candidates_per_iter': 3,
-        'bit_width': 32,
-        'llm_provider': 'local',  # Use local LLM
-        'llm_model': 'qwen/qwen3-coder-30b',  # Local model name
-        'temperature': 0.1,
-        'max_output_length': 4096,
-        'measure_cost': False,
-        'local_provider': 'lm-studio'  # Local provider (lm-studio, vllm, sglang)
+        "timeout": 300,  # 5 minutes
+        "max_iterations": 5,
+        "max_candidates_per_iter": 3,
+        "bit_width": 32,
+        "llm_provider": "local",  # Use local LLM
+        "llm_model": "qwen/qwen3-coder-30b",  # Local model name
+        "temperature": 0.1,
+        "max_output_length": 4096,
+        "measure_cost": False,
+        "local_provider": "lm-studio",  # Local provider (lm-studio, vllm, sglang)
     }
 
     # Create examples
     examples = [
         ("Counter Example", create_counter_example()),
-        ("Array Bounds Example", create_array_bounds_example())
+        ("Array Bounds Example", create_array_bounds_example()),
     ]
 
     results = []
 
     for name, sts in examples:
-        logger.info("\n%s", '='*50)
+        logger.info("\n%s", "=" * 50)
         logger.info("Testing: %s", name)
-        logger.info("%s", '='*50)
+        logger.info("%s", "=" * 50)
 
         # Test with LLM4InvProver (uses CEGIS internally)
         try:
@@ -152,19 +152,22 @@ def main():
             logger.error("Error in %s: %s", name, e)
 
     # Print summary
-    logger.info("\n%s", '='*50)
+    logger.info("\n%s", "=" * 50)
     logger.info("DEMO SUMMARY")
-    logger.info("%s", '='*50)
+    logger.info("%s", "=" * 50)
 
     for stats in results:
-        name = stats.get('example_name', 'Unknown')
-        success = stats.get('success', False) or stats.get('is_safe', False)
-        solve_time = stats.get('solve_time', 0)
-        candidates = (stats.get('tried_candidates', 0) or
-                      stats.get('total_candidates_generated', 0))
+        name = stats.get("example_name", "Unknown")
+        success = stats.get("success", False) or stats.get("is_safe", False)
+        solve_time = stats.get("solve_time", 0)
+        candidates = stats.get("tried_candidates", 0) or stats.get(
+            "total_candidates_generated", 0
+        )
 
         status = "✓ SUCCESS" if success else "✗ FAILED"
-        logger.info("%s: %s (%.2fs, %s candidates)", name, status, solve_time, candidates)
+        logger.info(
+            "%s: %s (%.2fs, %s candidates)", name, status, solve_time, candidates
+        )
 
 
 if __name__ == "__main__":

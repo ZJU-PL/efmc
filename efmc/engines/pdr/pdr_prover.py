@@ -31,10 +31,10 @@ class PDRProver:
 
     def solve(self, timeout: Optional[int] = None) -> VerificationResult:
         """From transition system to CHC
-        
+
         Args:
             timeout: Timeout in seconds (default: 60)
-            
+
         Returns:
             VerificationResult: The verification result
         """
@@ -47,7 +47,7 @@ class PDRProver:
         if timeout is not None:
             s.set("timeout", timeout * 1000)  # does this work?
 
-        inv_sig = "z3.Function(\'inv\', "
+        inv_sig = "z3.Function('inv', "
 
         if self.sts.has_int:
             for _ in range(len(self.sts.variables)):
@@ -68,17 +68,23 @@ class PDRProver:
         inv_sig += "z3.BoolSort())"
         inv = eval(inv_sig)  # pylint: disable=eval-used
         # Init
-        s.add(z3.ForAll(self.sts.variables, z3.Implies(self.sts.init,
-                                                       inv(self.sts.variables))))
+        s.add(
+            z3.ForAll(
+                self.sts.variables, z3.Implies(self.sts.init, inv(self.sts.variables))
+            )
+        )
         # Inductive
         inductive_condition = z3.Implies(
             z3.And(inv(self.sts.variables), self.sts.trans),
-            inv(self.sts.prime_variables)
+            inv(self.sts.prime_variables),
         )
         s.add(z3.ForAll(self.sts.all_variables, inductive_condition))
         # Post
-        s.add(z3.ForAll(self.sts.variables, z3.Implies(inv(self.sts.variables),
-                                                       self.sts.post)))
+        s.add(
+            z3.ForAll(
+                self.sts.variables, z3.Implies(inv(self.sts.variables), self.sts.post)
+            )
+        )
 
         if self.verbose:
             print("PDR starting!!!")

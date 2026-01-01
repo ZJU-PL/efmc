@@ -10,14 +10,14 @@ from .termination_prover import TerminationProver
 from .api import (
     prove_termination_with_ranking_functions,
     prove_non_termination_with_recurrence_sets,
-    analyze_termination
+    analyze_termination,
 )
 
 __all__ = [
-    'TerminationResult',
-    'NonTerminationResult',
-    'TerminationProver',
-    'prove_termination_with_ranking_functions',
-    'prove_non_termination_with_recurrence_sets',
-    'analyze_termination'
+    "TerminationResult",
+    "NonTerminationResult",
+    "TerminationProver",
+    "prove_termination_with_ranking_functions",
+    "prove_non_termination_with_recurrence_sets",
+    "analyze_termination",
 ]

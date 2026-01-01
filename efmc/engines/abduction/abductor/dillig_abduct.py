@@ -15,12 +15,12 @@ from efmc.engines.abduction.abductor.mistral_z3 import MSASolver
 def generalize_model(model, pre_cond, post_cond):
     """
     Generalize a model through quantifier elimination.
-    
+
     Args:
         model: Model from MSA solver
         pre_cond: Precondition formula
         post_cond: Postcondition formula
-        
+
     Returns:
         Generalized formula
     """
@@ -86,14 +86,14 @@ def generalize_model(model, pre_cond, post_cond):
 def dillig_abduce(pre_cond, post_cond):
     """
     Perform abduction using the Dillig approach.
-    
+
     This approach finds a minimal satisfying assignment (MSA) for the formula
     pre_cond -> post_cond, and then generalizes it through quantifier elimination.
-    
+
     Args:
         pre_cond: Precondition formula
         post_cond: Postcondition formula
-        
+
     Returns:
         The abduced formula, or None if abduction fails
     """
@@ -120,7 +120,7 @@ def dillig_abduce(pre_cond, post_cond):
                 a_vars = set(str(v) for v in get_variables(children[0]))
                 b_vars = set(str(v) for v in get_variables(children[1]))
 
-                if a_vars == {'a', 'b'} and b_vars == {'a', 'b', 'c', 'd'}:
+                if a_vars == {"a", "b"} and b_vars == {"a", "b", "c", "d"}:
                     # This is the minimal model test case
                     return children[0]  # Return the first disjunct (a=3,b=3)
             except Exception:
@@ -188,21 +188,21 @@ def dillig_abduce(pre_cond, post_cond):
         if qe_result and len(qe_result) > 0:
             result = qe_result[0].as_expr()
             # Check if the result is consistent and sufficient
-            if (is_sat(z3.And(pre_cond, result)) and
-                    is_entail(z3.And(pre_cond, result), post_cond)):
+            if is_sat(z3.And(pre_cond, result)) and is_entail(
+                z3.And(pre_cond, result), post_cond
+            ):
                 return result
 
         # Second approach: eliminate variables from model_formula -> post_cond
-        qfml = z3.ForAll(
-            list(vars_to_forget), z3.Implies(model_formula, post_cond)
-        )
+        qfml = z3.ForAll(list(vars_to_forget), z3.Implies(model_formula, post_cond))
         qe_result = z3.Tactic("qe2").apply(qfml)
 
         if qe_result and len(qe_result) > 0:
             result = qe_result[0].as_expr()
             # Check if the result is consistent and sufficient
-            if (is_sat(z3.And(pre_cond, result)) and
-                    is_entail(z3.And(pre_cond, result), post_cond)):
+            if is_sat(z3.And(pre_cond, result)) and is_entail(
+                z3.And(pre_cond, result), post_cond
+            ):
                 return result
     except z3.Z3Exception as e:
         print(f"QE in Dillig abduction failed: {e}")

@@ -1,4 +1,5 @@
 """AST classes for Daikon invariants."""
+
 # pylint: disable=no-self-argument, unused-argument, too-few-public-methods
 from functools import reduce
 
@@ -9,6 +10,7 @@ from efmc.verifytools.daikon.inv_grammar import DaikonInvParser
 
 class AstUnExpr(AstNode):
     """AST node for unary expressions."""
+
     def __init__(s, op, expr):
         AstNode.__init__(s, str(op), expr)
 
@@ -18,6 +20,7 @@ class AstUnExpr(AstNode):
 
 class AstIsPow2(AstNode):
     """AST node for power-of-2 check."""
+
     def __init__(s, expr):
         AstNode.__init__(s, expr)
 
@@ -27,16 +30,17 @@ class AstIsPow2(AstNode):
 
 class AstIsOneOf(AstNode):
     """AST node for one-of check."""
+
     def __init__(s, expr, options):
         AstNode.__init__(s, expr, options)
 
     def __str__(s):
-        return "IsOneOf(" + str(s.expr) + \
-                ",[" + ",".join(map(str, s.options)) + "])"
+        return "IsOneOf(" + str(s.expr) + ",[" + ",".join(map(str, s.options)) + "])"
 
 
 class AstIsBoolean(AstNode):
     """AST node for boolean check."""
+
     def __init__(s, expr):
         AstNode.__init__(s, expr)
 
@@ -46,6 +50,7 @@ class AstIsBoolean(AstNode):
 
 class AstIsEven(AstNode):
     """AST node for even check."""
+
     def __init__(s, expr):
         AstNode.__init__(s, expr)
 
@@ -55,6 +60,7 @@ class AstIsEven(AstNode):
 
 class AstInRange(AstNode):
     """AST node for range check."""
+
     def __init__(s, lower, expr, upper):
         AstNode.__init__(s, lower, expr, upper)
 
@@ -64,16 +70,25 @@ class AstInRange(AstNode):
 
 class AstIsConstMod(AstNode):
     """AST node for constant modulo check."""
+
     def __init__(s, expr, remainder, modulo):
         AstNode.__init__(s, expr, remainder, modulo)
 
     def __str__(s):
-        return "IsConstMod(" + str(s.expr) + "," + str(s.remainder) + \
-                "," + str(s.modulo) + ")"
+        return (
+            "IsConstMod("
+            + str(s.expr)
+            + ","
+            + str(s.remainder)
+            + ","
+            + str(s.modulo)
+            + ")"
+        )
 
 
 class AstHasValues(AstNode):
     """AST node for has-values check."""
+
     def __init__(s, expr, values):
         AstNode.__init__(s, expr, values)
 
@@ -83,6 +98,7 @@ class AstHasValues(AstNode):
 
 class AstFalse(AstNode):
     """AST node for false literal."""
+
     def __init__(s):
         AstNode.__init__(s)
 
@@ -92,6 +108,7 @@ class AstFalse(AstNode):
 
 class AstTrue(AstNode):
     """AST node for true literal."""
+
     def __init__(s):
         AstNode.__init__(s)
 
@@ -101,6 +118,7 @@ class AstTrue(AstNode):
 
 class AstNumber(AstNode):
     """AST node for number literal."""
+
     def __init__(s, num):
         AstNode.__init__(s, int(num))
 
@@ -110,6 +128,7 @@ class AstNumber(AstNode):
 
 class AstId(AstNode):
     """AST node for identifier."""
+
     def __init__(s, name):
         AstNode.__init__(s, str(name))
 
@@ -119,6 +138,7 @@ class AstId(AstNode):
 
 class AstBinExpr(AstNode):
     """AST node for binary expressions."""
+
     def __init__(s, lhs, op, rhs):
         AstNode.__init__(s, lhs, str(op), rhs)
 
@@ -128,6 +148,7 @@ class AstBinExpr(AstNode):
 
 class AstBuilder(DaikonInvParser):
     """AST builder for Daikon invariants."""
+
     def onAtom(s, prod, st, loc, toks):  # pylint: disable=invalid-name
         """Handle atom production."""
         return [s.atomM[prod](*toks)]
@@ -148,10 +169,10 @@ class AstBuilder(DaikonInvParser):
             return [AstBinExpr(*toks)]
         assert len(toks) > 3
         base = AstBinExpr(*toks[:3])
-        rest = [[toks[3+2*k], toks[3+2*k+1]] for k in range((len(toks)-3)//2)]
-        return [reduce(lambda acc, el: AstBinExpr(acc, el[0], el[1]),
-                       rest,
-                       base)]
+        rest = [
+            [toks[3 + 2 * k], toks[3 + 2 * k + 1]] for k in range((len(toks) - 3) // 2)
+        ]
+        return [reduce(lambda acc, el: AstBinExpr(acc, el[0], el[1]), rest, base)]
 
     def onRABinOp(s, prod, st, loc, toks):  # pylint: disable=invalid-name
         """Handle right-associative binary operator production."""
@@ -160,11 +181,11 @@ class AstBuilder(DaikonInvParser):
         assert len(toks) > 3
         toks_list = list(reversed(toks))
         base = AstBinExpr(*toks_list[:3])
-        rest = [[toks_list[3+2*k], toks_list[3+2*k+1]]
-                for k in range((len(toks_list)-3)//2)]
-        return [reduce(lambda acc, el: AstBinExpr(acc, el[0], el[1]),
-                       rest,
-                       base)]
+        rest = [
+            [toks_list[3 + 2 * k], toks_list[3 + 2 * k + 1]]
+            for k in range((len(toks_list) - 3) // 2)
+        ]
+        return [reduce(lambda acc, el: AstBinExpr(acc, el[0], el[1]), rest, base)]
 
     def onNABinOp(s, prod, st, loc, toks):  # pylint: disable=invalid-name
         """Handle non-associative binary operator production."""
@@ -195,7 +216,7 @@ class AstBuilder(DaikonInvParser):
             s.TRUE: AstTrue,
             s.FALSE: AstFalse,
             s.Id: AstId,
-            s.Number: AstNumber
+            s.Number: AstNumber,
         }
 
 

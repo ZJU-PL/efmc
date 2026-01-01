@@ -28,7 +28,9 @@ class EquivalenceProver(BaseKSafetyProver):
         self.sts_b = sts_b
         self.logger.info("Initialized equivalence prover for two systems")
 
-    def _make_step_variables_for(self, sts: TransitionSystem, trace_idx: int, bound: int):
+    def _make_step_variables_for(
+        self, sts: TransitionSystem, trace_idx: int, bound: int
+    ):
         step_vars: Dict[int, List[z3.ExprRef]] = {}
         for step in range(bound + 1):
             vars_at_step: List[z3.ExprRef] = []
@@ -58,7 +60,7 @@ class EquivalenceProver(BaseKSafetyProver):
         bound: int,
         input_vars: List[str],
         output_vars: List[str],
-        inputs_equal_all_steps: bool
+        inputs_equal_all_steps: bool,
     ) -> VerificationResult:
         sv_a = self._make_step_variables_for(self.sts_a, 0, bound)
         sv_b = self._make_step_variables_for(self.sts_b, 1, bound)
@@ -100,17 +102,13 @@ class EquivalenceProver(BaseKSafetyProver):
             trans_subst_a = []
             for i, _ in enumerate(self.sts_a.variables):
                 trans_subst_a.append((self.sts_a.variables[i], sv_a[step][i]))
-                trans_subst_a.append(
-                    (self.sts_a.prime_variables[i], sv_a[step + 1][i])
-                )
+                trans_subst_a.append((self.sts_a.prime_variables[i], sv_a[step + 1][i]))
             conditions.append(z3.substitute(self.sts_a.trans, trans_subst_a))
 
             trans_subst_b = []
             for i, _ in enumerate(self.sts_b.variables):
                 trans_subst_b.append((self.sts_b.variables[i], sv_b[step][i]))
-                trans_subst_b.append(
-                    (self.sts_b.prime_variables[i], sv_b[step + 1][i])
-                )
+                trans_subst_b.append((self.sts_b.prime_variables[i], sv_b[step + 1][i]))
             conditions.append(z3.substitute(self.sts_b.trans, trans_subst_b))
 
         antecedent = z3.And(*conditions) if conditions else z3.BoolVal(True)
@@ -153,7 +151,7 @@ class EquivalenceProver(BaseKSafetyProver):
         self,
         input_vars: List[str],
         output_vars: List[str],
-        inputs_equal_all_steps: bool = True
+        inputs_equal_all_steps: bool = True,
     ) -> VerificationResult:
         """Verify functional equivalence between two systems."""
         self.logger.info("Verifying functional equivalence between two systems")

@@ -1,7 +1,8 @@
-"""Template polyhedral domain over bit-vectors
-"""
+"""Template polyhedral domain over bit-vectors"""
+
 from efmc.engines.ef.templates.abstract_template import *
 from efmc.utils.bv_utils import Signedness
+
 # from typing import List
 from efmc.sts import TransitionSystem
 from efmc.utils import big_and, big_or
@@ -67,18 +68,23 @@ class BitVecPolyhedronTemplate(Template):
             tvars = [z3.BitVec("p%d_%d" % (self.template_index, 0), self.bv_size)]
             # creating p1_1, p1_2, p2_1, p2_2, ...
             for i in range(1, self.arity + 1):
-                tvars.append(z3.BitVec("p%d_%d" % (self.template_index, i), self.bv_size))
+                tvars.append(
+                    z3.BitVec("p%d_%d" % (self.template_index, i), self.bv_size)
+                )
             self.template_vars.append(tvars)
         # print(self.template_vars)
 
     def add_template_cnts(self):
-        """ For initializing self.template_cnt_init_and_post and self.template_cnt_trans
-        """
+        """For initializing self.template_cnt_init_and_post and self.template_cnt_trans"""
         cnts_init_post = []  # For sts.variables
         cnts_trans = []  # For sts.prime_variables
         for i in range(self.template_index):  # num. of templates
-            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
-            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
+            term_init_post = self._build_linear_term(
+                self.template_vars[i], self.sts.variables
+            )
+            term_trans = self._build_linear_term(
+                self.template_vars[i], self.sts.prime_variables
+            )
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts_init_post.append(z3.UGE(term_init_post, 0))
@@ -90,7 +96,9 @@ class BitVecPolyhedronTemplate(Template):
         self.template_cnt_init_and_post = big_and(cnts_init_post)
         self.template_cnt_trans = big_and(cnts_trans)
 
-    def build_invariant_expr(self, model: z3.ModelRef, use_prime_variables=False) -> z3.ExprRef:
+    def build_invariant_expr(
+        self, model: z3.ModelRef, use_prime_variables=False
+    ) -> z3.ExprRef:
         """
         Build an invariant from a model, i.e., fixing the values of the template vars
         :param model the model used for building expr
@@ -176,16 +184,19 @@ class DisjunctiveBitVecPolyhedronTemplate(Template):
         # print(self.template_vars)
 
     def add_template_cnts(self):
-        """ For initializing self.template_cnt_init_and_post and self.template_cnt_trans
-        """
+        """For initializing self.template_cnt_init_and_post and self.template_cnt_trans"""
         cnt_init_and_post_dis = []
         cnt_trans_dis = []
 
         for i in range(self.num_disjunctions):  # num. of disjunctions
             # d1_0 + x*d1_1 + y*p1_2  >= 0 OR
             # d2_0 + x*d2_1 + y*d2_2  >= 0
-            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
-            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
+            term_init_post = self._build_linear_term(
+                self.template_vars[i], self.sts.variables
+            )
+            term_trans = self._build_linear_term(
+                self.template_vars[i], self.sts.prime_variables
+            )
 
             if self.signedness == Signedness.UNSIGNED:
                 cnt_init_and_post_dis.append(z3.UGE(term_init_post, 0))
@@ -197,7 +208,9 @@ class DisjunctiveBitVecPolyhedronTemplate(Template):
         self.template_cnt_init_and_post = big_or(cnt_init_and_post_dis)
         self.template_cnt_trans = big_or(cnt_trans_dis)
 
-    def build_invariant_expr(self, model: z3.ModelRef, use_prime_variables=False) -> z3.ExprRef:
+    def build_invariant_expr(
+        self, model: z3.ModelRef, use_prime_variables=False
+    ) -> z3.ExprRef:
         """
         Build an invariant from a model, i.e., fixing the values of the template vars
         :param model the model used for building expr

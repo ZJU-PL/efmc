@@ -29,7 +29,7 @@ def proj_id_last(var, n_proj_vars, n_vars):
         var: The projected variable ID to convert.
         n_proj_vars: The number of projected variables.
         n_vars: The total number of variables.
-    
+
     """
     assert var != 0
     is_neg = var < 0
@@ -59,7 +59,7 @@ def bitblast(formula: z3.ExprRef):
     g = z3.Goal()
     g.add(map_clauses)  # why adding these constraints?
     g.add(formula)
-    t = z3.Then('simplify', 'bit-blast', 'tseitin-cnf')
+    t = z3.Then("simplify", "bit-blast", "tseitin-cnf")
     blasted = t(g)[0]
     return blasted, id_table, bv2bool
 
@@ -72,7 +72,9 @@ def to_dimacs(cnf, table, proj_last) -> Tuple[List[str], List[str]]:
     projection_scope = len(table)
 
     for clause_expr in cnf:
-        assert z3.is_or(clause_expr) or z3.is_not(clause_expr) or is_literal(clause_expr)
+        assert (
+            z3.is_or(clause_expr) or z3.is_not(clause_expr) or is_literal(clause_expr)
+        )
         dimacs_clause = list(dimacs_visitor(clause_expr, table))
         # dimacs_clause.append('0') # TODO: why append 0???
         cnf_clauses.append(" ".join(dimacs_clause))
@@ -82,7 +84,9 @@ def to_dimacs(cnf, table, proj_last) -> Tuple[List[str], List[str]]:
         clauses = []
         for clause in cnf_clauses:
             int_clause = [int(x) for x in clause.split(" ")[:-1]]
-            proj_clause = [proj_id_last(x, projection_scope, n_vars) for x in int_clause]
+            proj_clause = [
+                proj_id_last(x, projection_scope, n_vars) for x in int_clause
+            ]
             # proj_clause.append(0)  # TODO: why append 0???
             str_clause = " ".join([str(x) for x in proj_clause])
             clauses.append(str_clause)
@@ -90,12 +94,12 @@ def to_dimacs(cnf, table, proj_last) -> Tuple[List[str], List[str]]:
         cnf_clauses = clauses
         cnf_header = [
             f"p cnf {len(table)} {len(cnf_clauses)}",
-            f"cr {' '.join([str(x) for x in range(n_vars - projection_scope + 1, n_vars + 1)])}"
+            f"cr {' '.join([str(x) for x in range(n_vars - projection_scope + 1, n_vars + 1)])}",
         ]
     else:
         cnf_header = [
             f"p cnf {len(table)} {len(cnf_clauses)}",
-            f"cr {' '.join([str(x) for x in range(1, projection_scope + 1)])}"
+            f"cr {' '.join([str(x) for x in range(1, projection_scope + 1)])}",
         ]
     return cnf_header, cnf_clauses
 
@@ -108,7 +112,9 @@ def to_dimacs_numeric(cnf, table, proj_last):
     projection_scope = len(table)
 
     for clause_expr in cnf:
-        assert z3.is_or(clause_expr) or z3.is_not(clause_expr) or is_literal(clause_expr)
+        assert (
+            z3.is_or(clause_expr) or z3.is_not(clause_expr) or is_literal(clause_expr)
+        )
         dimacs_clause_numeric = list(dimacs_visitor_numeric(clause_expr, table))
         cnf_clauses.append(dimacs_clause_numeric)
 
@@ -117,7 +123,9 @@ def to_dimacs_numeric(cnf, table, proj_last):
         clauses = []
         for clause in cnf_clauses:
             int_clause = clause
-            proj_clause = [proj_id_last(x, projection_scope, n_vars) for x in int_clause]
+            proj_clause = [
+                proj_id_last(x, projection_scope, n_vars) for x in int_clause
+            ]
             clauses.append(proj_clause)
         cnf_clauses = clauses
         cnf_header = ["p"]
@@ -209,7 +217,7 @@ def dimacs_visitor_numeric(exp, table):
 def collect_vars(exp, seen=None):
     """
     Collect all variables in an SMT2 formula.
-    TODO: this can be slow? 
+    TODO: this can be slow?
     """
     if seen is None:
         seen = {}
@@ -230,12 +238,12 @@ def collect_vars(exp, seen=None):
 
 
 def translate_smt2formula_to_cnf(
-    formula: z3.ExprRef
+    formula: z3.ExprRef,
 ) -> Tuple[Dict[str, list], Dict[str, int], List[str], List[str]]:
     """
     Translate an SMT2 formula to a CNF.
     """
-    projection_last = ''
+    projection_last = ""
     projection_last = projection_last and projection_last.lower() != "false"
     # print("Generating DIMACS with projection...")
     blasted, id_table, bv2bool = bitblast(formula)
@@ -247,12 +255,12 @@ def translate_smt2formula_to_cnf(
 
 
 def translate_smt2formula_to_numeric_clauses(
-    formula: z3.ExprRef
+    formula: z3.ExprRef,
 ) -> Tuple[Dict[str, list], Dict[str, int], List[str], List[int]]:
     """
     Translate an SMT2 formula to numeric clauses.
     """
-    projection_last = ''
+    projection_last = ""
     projection_last = projection_last and projection_last.lower() != "false"
     # print("Generating DIMACS with projection...")
     blasted, id_table, bv2bool = bitblast(formula)
@@ -264,21 +272,21 @@ def translate_smt2formula_to_cnf_file(formula: z3.ExprRef, output_file: str):
     """
     Translate an SMT2 formula to a CNF file.
     """
-    projection_last = ''
+    projection_last = ""
     projection_last = projection_last and projection_last.lower() != "false"
     blasted, id_table, bv2bool = bitblast(formula)
     header, clauses = to_dimacs(blasted, id_table, projection_last)
     saved_stdout = sys.stdout
-    with open(output_file, 'w+', encoding='utf-8') as file:
+    with open(output_file, "w+", encoding="utf-8") as file:
         sys.stdout = file
-        print('\n'.join(header))
-        print('\n'.join(clauses))
+        print("\n".join(header))
+        print("\n".join(clauses))
     sys.stdout = saved_stdout
 
 
 # TODO: what is projection_last
 def test_blast(input_file):
-    projection_last = ''
+    projection_last = ""
     projection_last = projection_last and projection_last.lower() != "false"
 
     formula_vec = z3.parse_smt2_file(input_file)
@@ -287,5 +295,5 @@ def test_blast(input_file):
     blasted, id_table, _ = bitblast(formula)
     header, clauses = to_dimacs(blasted, id_table, projection_last)
     # print('\n'.join(header))
-    print('\n'.join(clauses))
+    print("\n".join(clauses))
     # print(id_table)

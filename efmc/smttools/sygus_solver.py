@@ -5,7 +5,7 @@ SyGuS (Syntax-Guided Synthesis) solver implementation:
  2. Call CVC5 to solve the SyGuS instances
  3. Parse function definition from SyGuS result
  4. Map the result to Z3py world
- 
+
 Supports synthesis for:
  - Integer and Boolean functions
  - Bit-vector functions
@@ -44,8 +44,12 @@ def get_sort_sexpr(sort: z3.SortRef) -> str:
     return sort.sexpr()
 
 
-def build_sygus_cnt(funcs: List[z3.FuncDeclRef], cnts: List[z3.BoolRef],
-                    variables: List[z3.ExprRef], logic="ALL"):
+def build_sygus_cnt(
+    funcs: List[z3.FuncDeclRef],
+    cnts: List[z3.BoolRef],
+    variables: List[z3.ExprRef],
+    logic="ALL",
+):
     """
     Translate specification (written with z3 expr) to SyGuS format
 
@@ -76,9 +80,9 @@ def build_sygus_cnt(funcs: List[z3.FuncDeclRef], cnts: List[z3.BoolRef],
     return cnt
 
 
-def replace_fun_with_synthesized_one(formula: z3.ExprRef,
-                                      func_to_rep: z3.FuncDeclRef,
-                                      func_def: z3.ExprRef) -> z3.ExprRef:
+def replace_fun_with_synthesized_one(
+    formula: z3.ExprRef, func_to_rep: z3.FuncDeclRef, func_def: z3.ExprRef
+) -> z3.ExprRef:
     """
     Replace an uninterpreted function with a concrete template in a formula.
 
@@ -105,20 +109,19 @@ def solve_sygus(sygus_problem: str, timeout: int = 60) -> Optional[str]:
     # print(sygus_problem)
     # Check if CVC5 is available
     if not config.check_available("cvc5"):
-        cvc5_path = getattr(config, 'cvc5_exec', 'unknown')
+        cvc5_path = getattr(config, "cvc5_exec", "unknown")
         print(f"CVC5 executable not found at: {cvc5_path}")
         return None
-    
+
     # Create a temporary file for the SyGuS problem
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.sy',
-                                      delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".sy", delete=False) as tmp:
         tmp.write(sygus_problem)
         tmp_path = tmp.name
 
     try:
         # Call CVC5 with the SyGuS problem
         # Add options to improve performance
-        cvc5_exec_path = getattr(config, 'cvc5_exec', None)
+        cvc5_exec_path = getattr(config, "cvc5_exec", None)
         if cvc5_exec_path is None:
             print("CVC5 executable not configured")
             return None
@@ -133,13 +136,14 @@ def solve_sygus(sygus_problem: str, timeout: int = 60) -> Optional[str]:
             "--sygus-out=status-and-def",  # Output status and definition
             "--produce-models",  # Produce models
             "--dump-models",  # Dump models
-            tmp_path
+            tmp_path,
         ]
 
         print(f"Running CVC5 command: {' '.join(cmd)}")
 
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
 
         try:
             # Add 5 seconds buffer
@@ -151,8 +155,7 @@ def solve_sygus(sygus_problem: str, timeout: int = 60) -> Optional[str]:
 
             # Clean up the output
             # Remove any control characters or other non-printable characters
-            stdout = ''.join(c for c in stdout
-                             if c.isprintable() or c.isspace())
+            stdout = "".join(c for c in stdout if c.isprintable() or c.isspace())
 
             return stdout
         except subprocess.TimeoutExpired:
@@ -173,67 +176,67 @@ def parse_sygus_solution(cvc5_output: str) -> Dict[str, Dict[str, str]]:
     """
     if not cvc5_output:
         return {}
-    
+
     # Check if the output indicates that the problem is unsatisfiable
     if "unsat" in cvc5_output.lower():
         print("SyGuS problem is unsatisfiable")
         return {}
-    
+
     # Print the raw output for debugging
     print("CVC5 output:")
     print(cvc5_output)
-    
+
     # Clean up the output to handle multi-line definitions
     # Remove newlines and extra spaces within the define-fun blocks
     cleaned_output = cvc5_output
-    
+
     # Extract function definitions using regex
     pattern = r"\(define-fun\s+([^\s]+)\s+\((.*?)\)\s+(.*?)\s+(.*?)\)"
     matches = re.findall(pattern, cleaned_output, re.DOTALL)
-    
+
     result = {}
     for match in matches:
         func_name, args, return_type, body = match
         # Clean up the return type and body
         return_type = return_type.strip()
         body = body.strip()
-        
+
         # Handle nested parentheses in the body
         # Count opening and closing parentheses to find the matching end
         if body.startswith("("):
             paren_count = 0
             for i, char in enumerate(body):
-                if char == '(':
+                if char == "(":
                     paren_count += 1
-                elif char == ')':
+                elif char == ")":
                     paren_count -= 1
                     if paren_count == 0 and i < len(body) - 1:
-                        body = body[:i+1]
+                        body = body[: i + 1]
                         break
-        
+
         result[func_name] = {
             "args": args.strip(),
             "return_type": return_type.strip(),
-            "body": body
+            "body": body,
         }
-    
+
     # If the regex didn't match, try a more flexible approach
     if not result:
         print("Using alternative parsing method for CVC5 output")
         # Look for function definitions in the output
-        lines = cvc5_output.split('\n')
+        lines = cvc5_output.split("\n")
         in_define_fun = False
         current_func = ""
         current_args = ""
         current_return_type = ""
         current_body = ""
         paren_count = 0
-        
+
         for line in lines:
             line = line.strip()
             if not line:
                 continue
-            
+
             if line.startswith("(define-fun"):
                 in_define_fun = True
                 paren_count = 1  # Count the opening parenthesis
@@ -241,17 +244,17 @@ def parse_sygus_solution(cvc5_output: str) -> Dict[str, Dict[str, str]]:
                 parts = line.split(None, 2)
                 if len(parts) > 1:
                     current_func = parts[1]
-                
+
                 # Extract arguments
                 args_start = line.find("(", line.find("(") + 1)
                 if args_start != -1:
                     args_end = line.find(")", args_start)
                     if args_end != -1:
-                        current_args = line[args_start+1:args_end]
-                
+                        current_args = line[args_start + 1 : args_end]
+
                 # Extract return type and start of body
                 if args_end != -1 and args_end + 1 < len(line):
-                    rest = line[args_end+1:].strip()
+                    rest = line[args_end + 1 :].strip()
                     parts = rest.split(None, 1)
                     if parts:
                         current_return_type = parts[0]
@@ -259,39 +262,39 @@ def parse_sygus_solution(cvc5_output: str) -> Dict[str, Dict[str, str]]:
                             current_body = parts[1]
                             # Count parentheses in the body
                             for char in current_body:
-                                if char == '(':
+                                if char == "(":
                                     paren_count += 1
-                                elif char == ')':
+                                elif char == ")":
                                     paren_count -= 1
-            
+
             elif in_define_fun:
                 current_body += " " + line
                 # Count parentheses
                 for char in line:
-                    if char == '(':
+                    if char == "(":
                         paren_count += 1
-                    elif char == ')':
+                    elif char == ")":
                         paren_count -= 1
-                
+
                 # If we've reached the end of the function definition
                 if paren_count == 0:
                     in_define_fun = False
                     # Remove the trailing parenthesis
                     if current_body.endswith(")"):
                         current_body = current_body[:-1].strip()
-                    
+
                     result[current_func] = {
                         "args": current_args.strip(),
                         "return_type": current_return_type.strip(),
-                        "body": current_body.strip()
+                        "body": current_body.strip(),
                     }
-                    
+
                     # Reset for the next function
                     current_func = ""
                     current_args = ""
                     current_return_type = ""
                     current_body = ""
-    
+
     return result
 
 
@@ -326,13 +329,14 @@ def convert_string_literal(literal: str) -> str:
     if literal.startswith('"') and literal.endswith('"'):
         literal = literal[1:-1]
         # Escape backslashes and quotes
-        literal = literal.replace('\\', '\\\\').replace('"', '\\"')
+        literal = literal.replace("\\", "\\\\").replace('"', '\\"')
         return f'z3.StringVal("{literal}")'
     return literal
 
 
-def convert_sygus_expr_to_z3(expr: str, var_dict: Dict[str, int],
-                             return_type: str) -> str:
+def convert_sygus_expr_to_z3(
+    expr: str, var_dict: Dict[str, int], return_type: str
+) -> str:
     """
     Convert a SyGuS expression to a Z3 expression.
 
@@ -345,81 +349,84 @@ def convert_sygus_expr_to_z3(expr: str, var_dict: Dict[str, int],
     # Handle literals based on return type
     if return_type == "Bool" and expr in ("true", "false"):
         return "True" if expr == "true" else "False"
-    
+
     if return_type.startswith("(_ BitVec"):
         if expr.startswith("#"):
             return convert_bv_literal(expr)
-    
+
     if return_type == "String":
         if expr.startswith('"'):
             return convert_string_literal(expr)
-    
+
     # Handle special cases for return types
     if return_type.startswith("(_ BitVec"):
         # For bit-vector return types, just return the expression as is
         # The actual conversion will be handled by the sygus_to_z3 function
         return expr
-    
+
     if return_type == "String":
         # For string return types, just return the expression as is
         # The actual conversion will be handled by the sygus_to_z3 function
         return expr
-    
+
     # Replace SyGuS operators with Z3 operators
     # Boolean operators
-    expr = re.sub(r'\band\b', 'z3.And', expr)
-    expr = re.sub(r'\bor\b', 'z3.Or', expr)
-    expr = re.sub(r'\bnot\b', 'z3.Not', expr)
-    expr = re.sub(r'\b=>\b', 'z3.Implies', expr)
-    
+    expr = re.sub(r"\band\b", "z3.And", expr)
+    expr = re.sub(r"\bor\b", "z3.Or", expr)
+    expr = re.sub(r"\bnot\b", "z3.Not", expr)
+    expr = re.sub(r"\b=>\b", "z3.Implies", expr)
+
     # Arithmetic operators
-    expr = re.sub(r'\b=\b', '==', expr)
-    
+    expr = re.sub(r"\b=\b", "==", expr)
+
     # Bit-vector operators
-    expr = re.sub(r'\bbvadd\b', '+', expr)
-    expr = re.sub(r'\bbvsub\b', '-', expr)
-    expr = re.sub(r'\bbvmul\b', '*', expr)
-    expr = re.sub(r'\bbvudiv\b', 'z3.UDiv', expr)
-    expr = re.sub(r'\bbvsdiv\b', '/', expr)
-    expr = re.sub(r'\bbvurem\b', 'z3.URem', expr)
-    expr = re.sub(r'\bbvsrem\b', 'z3.SRem', expr)
-    expr = re.sub(r'\bbvshl\b', '<<', expr)
-    expr = re.sub(r'\bbvlshr\b', 'z3.LShR', expr)
-    expr = re.sub(r'\bbvashr\b', '>>', expr)
-    expr = re.sub(r'\bbvand\b', '&', expr)
-    expr = re.sub(r'\bbvor\b', '|', expr)
-    expr = re.sub(r'\bbvxor\b', '^', expr)
-    expr = re.sub(r'\bbvnot\b', '~', expr)
-    expr = re.sub(r'\bbvneg\b', '-', expr)
-    expr = re.sub(r'\bbvult\b', 'z3.ULT', expr)
-    expr = re.sub(r'\bbvule\b', 'z3.ULE', expr)
-    expr = re.sub(r'\bbvugt\b', 'z3.UGT', expr)
-    expr = re.sub(r'\bbvuge\b', 'z3.UGE', expr)
-    expr = re.sub(r'\bbvslt\b', '<', expr)
-    expr = re.sub(r'\bbvsle\b', '<=', expr)
-    expr = re.sub(r'\bbvsgt\b', '>', expr)
-    expr = re.sub(r'\bbvsge\b', '>=', expr)
-    
+    expr = re.sub(r"\bbvadd\b", "+", expr)
+    expr = re.sub(r"\bbvsub\b", "-", expr)
+    expr = re.sub(r"\bbvmul\b", "*", expr)
+    expr = re.sub(r"\bbvudiv\b", "z3.UDiv", expr)
+    expr = re.sub(r"\bbvsdiv\b", "/", expr)
+    expr = re.sub(r"\bbvurem\b", "z3.URem", expr)
+    expr = re.sub(r"\bbvsrem\b", "z3.SRem", expr)
+    expr = re.sub(r"\bbvshl\b", "<<", expr)
+    expr = re.sub(r"\bbvlshr\b", "z3.LShR", expr)
+    expr = re.sub(r"\bbvashr\b", ">>", expr)
+    expr = re.sub(r"\bbvand\b", "&", expr)
+    expr = re.sub(r"\bbvor\b", "|", expr)
+    expr = re.sub(r"\bbvxor\b", "^", expr)
+    expr = re.sub(r"\bbvnot\b", "~", expr)
+    expr = re.sub(r"\bbvneg\b", "-", expr)
+    expr = re.sub(r"\bbvult\b", "z3.ULT", expr)
+    expr = re.sub(r"\bbvule\b", "z3.ULE", expr)
+    expr = re.sub(r"\bbvugt\b", "z3.UGT", expr)
+    expr = re.sub(r"\bbvuge\b", "z3.UGE", expr)
+    expr = re.sub(r"\bbvslt\b", "<", expr)
+    expr = re.sub(r"\bbvsle\b", "<=", expr)
+    expr = re.sub(r"\bbvsgt\b", ">", expr)
+    expr = re.sub(r"\bbvsge\b", ">=", expr)
+
     # String operators
-    expr = re.sub(r'\bstr\.\+\b', '+', expr)  # string concatenation
-    expr = re.sub(r'\bstr\.len\b', 'z3.Length', expr)
-    expr = re.sub(r'\bstr\.substr\b', 'z3.SubString', expr)
-    expr = re.sub(r'\bstr\.at\b', 'z3.At', expr)
-    expr = re.sub(r'\bstr\.indexof\b', 'z3.IndexOf', expr)
-    expr = re.sub(r'\bstr\.replace\b', 'z3.Replace', expr)
-    expr = re.sub(r'\bstr\.prefixof\b', 'z3.PrefixOf', expr)
-    expr = re.sub(r'\bstr\.suffixof\b', 'z3.SuffixOf', expr)
-    expr = re.sub(r'\bstr\.contains\b', 'z3.Contains', expr)
-    
+    expr = re.sub(r"\bstr\.\+\b", "+", expr)  # string concatenation
+    expr = re.sub(r"\bstr\.len\b", "z3.Length", expr)
+    expr = re.sub(r"\bstr\.substr\b", "z3.SubString", expr)
+    expr = re.sub(r"\bstr\.at\b", "z3.At", expr)
+    expr = re.sub(r"\bstr\.indexof\b", "z3.IndexOf", expr)
+    expr = re.sub(r"\bstr\.replace\b", "z3.Replace", expr)
+    expr = re.sub(r"\bstr\.prefixof\b", "z3.PrefixOf", expr)
+    expr = re.sub(r"\bstr\.suffixof\b", "z3.SuffixOf", expr)
+    expr = re.sub(r"\bstr\.contains\b", "z3.Contains", expr)
+
     # Replace variable names with their indices in the variables list
     for var_name, var_index in var_dict.items():
-        expr = re.sub(r'\b' + re.escape(var_name) + r'\b', f'variables[{var_index}]', expr)
-    
+        expr = re.sub(
+            r"\b" + re.escape(var_name) + r"\b", f"variables[{var_index}]", expr
+        )
+
     return expr
 
 
-def sygus_to_z3(func_name: str, func_def: Dict[str, str],
-                variables: List[z3.ExprRef]) -> z3.ExprRef:
+def sygus_to_z3(
+    func_name: str, func_def: Dict[str, str], variables: List[z3.ExprRef]
+) -> z3.ExprRef:
     """
     Convert a SyGuS function definition to a Z3 expression.
 
@@ -439,9 +446,9 @@ def sygus_to_z3(func_name: str, func_def: Dict[str, str],
     var_dict = {}
     args = func_def["args"].split()
     for i in range(0, len(args), 2):
-        if i+1 < len(args):
+        if i + 1 < len(args):
             var_name = args[i].strip("()")
-            var_dict[var_name] = i//2
+            var_dict[var_name] = i // 2
 
     print(f"  Variable mapping: {var_dict}")
 
@@ -486,26 +493,24 @@ def sygus_to_z3(func_name: str, func_def: Dict[str, str],
                 if "concat" in func_name.lower():
                     return z3.Concat(variables[0], variables[1])
                 if "replace" in func_name.lower():
-                    return z3.Replace(variables[0], variables[1],
-                                      z3.StringVal(""))
+                    return z3.Replace(variables[0], variables[1], z3.StringVal(""))
 
         # For integer functions
         if variables[0].sort() == z3.IntSort():
             if len(variables) == 2:
                 if "max" in func_name.lower():
-                    return z3.If(variables[0] > variables[1],
-                                 variables[0], variables[1])
+                    return z3.If(
+                        variables[0] > variables[1], variables[0], variables[1]
+                    )
                 if "min" in func_name.lower():
-                    return z3.If(variables[0] < variables[1],
-                                 variables[0], variables[1])
-                if any(x in func_name.lower()
-                       for x in ("add", "sum", "plus")):
+                    return z3.If(
+                        variables[0] < variables[1], variables[0], variables[1]
+                    )
+                if any(x in func_name.lower() for x in ("add", "sum", "plus")):
                     return variables[0] + variables[1]
-                if any(x in func_name.lower()
-                       for x in ("sub", "minus")):
+                if any(x in func_name.lower() for x in ("sub", "minus")):
                     return variables[0] - variables[1]
-                if any(x in func_name.lower()
-                       for x in ("mul", "times")):
+                if any(x in func_name.lower() for x in ("mul", "times")):
                     return variables[0] * variables[1]
                 if "div" in func_name.lower():
                     return variables[0] / variables[1]
@@ -537,11 +542,13 @@ def sygus_to_z3(func_name: str, func_def: Dict[str, str],
             # Fallback for common functions
             if len(variables) == 2:
                 if func_name == "max":
-                    return z3.If(variables[0] > variables[1],
-                                 variables[0], variables[1])
+                    return z3.If(
+                        variables[0] > variables[1], variables[0], variables[1]
+                    )
                 if func_name == "min":
-                    return z3.If(variables[0] < variables[1],
-                                 variables[0], variables[1])
+                    return z3.If(
+                        variables[0] < variables[1], variables[0], variables[1]
+                    )
 
             raise
     except Exception as e:
@@ -550,25 +557,25 @@ def sygus_to_z3(func_name: str, func_def: Dict[str, str],
         # Fallback for common functions
         if len(variables) == 2:
             if "max" in func_name.lower():
-                return z3.If(variables[0] > variables[1],
-                             variables[0], variables[1])
+                return z3.If(variables[0] > variables[1], variables[0], variables[1])
             if "min" in func_name.lower():
-                return z3.If(variables[0] < variables[1],
-                             variables[0], variables[1])
-            if ("xor" in func_name.lower() and
-                    z3.is_bv_sort(variables[0].sort())):
+                return z3.If(variables[0] < variables[1], variables[0], variables[1])
+            if "xor" in func_name.lower() and z3.is_bv_sort(variables[0].sort()):
                 return variables[0] ^ variables[1]
-            if ("concat" in func_name.lower() and
-                    variables[0].sort() == z3.StringSort()):
+            if "concat" in func_name.lower() and variables[0].sort() == z3.StringSort():
                 return z3.Concat(variables[0], variables[1])
 
         raise
 
 
-def synthesize_function(func: z3.FuncDeclRef, constraints: List[z3.BoolRef],
-                        variables: List[z3.ExprRef], logic: str = "ALL",
-                        timeout: int = 60,
-                        force_cvc5: bool = False) -> Optional[z3.ExprRef]:
+def synthesize_function(
+    func: z3.FuncDeclRef,
+    constraints: List[z3.BoolRef],
+    variables: List[z3.ExprRef],
+    logic: str = "ALL",
+    timeout: int = 60,
+    force_cvc5: bool = False,
+) -> Optional[z3.ExprRef]:
     """
     Synthesize a function using SyGuS.
 
@@ -585,15 +592,20 @@ def synthesize_function(func: z3.FuncDeclRef, constraints: List[z3.BoolRef],
     # Determine appropriate logic based on function signature
     if logic == "ALL":
         # Auto-detect logic based on function signature
-        if (all(var.sort() == z3.IntSort() for var in variables) and
-                func.range() == z3.IntSort()):
+        if (
+            all(var.sort() == z3.IntSort() for var in variables)
+            and func.range() == z3.IntSort()
+        ):
             logic = "LIA"  # Linear Integer Arithmetic
-        elif (all(z3.is_bv_sort(var.sort()) for var in variables) and
-              z3.is_bv_sort(func.range())):
-            logic = "BV"   # Bit-Vectors
-        elif (any(var.sort() == z3.StringSort() for var in variables) or
-              func.range() == z3.StringSort()):
-            logic = "S"    # Strings
+        elif all(z3.is_bv_sort(var.sort()) for var in variables) and z3.is_bv_sort(
+            func.range()
+        ):
+            logic = "BV"  # Bit-Vectors
+        elif (
+            any(var.sort() == z3.StringSort() for var in variables)
+            or func.range() == z3.StringSort()
+        ):
+            logic = "S"  # Strings
 
     # For common functions, use direct implementations unless force_cvc5 is True
     # This is more reliable than trying to parse complex solutions from CVC5
@@ -601,51 +613,68 @@ def synthesize_function(func: z3.FuncDeclRef, constraints: List[z3.BoolRef],
 
     if not force_cvc5:
         # Integer functions
-        if (func.range() == z3.IntSort() and
-                all(var.sort() == z3.IntSort() for var in variables)):
+        if func.range() == z3.IntSort() and all(
+            var.sort() == z3.IntSort() for var in variables
+        ):
             if len(variables) == 2:
                 if "max" in func_name.lower():
-                    msg = (f"Using direct implementation for {func_name}: "
-                           "If(variables[0] > variables[1], "
-                           "variables[0], variables[1])")
+                    msg = (
+                        f"Using direct implementation for {func_name}: "
+                        "If(variables[0] > variables[1], "
+                        "variables[0], variables[1])"
+                    )
                     print(msg)
-                    return z3.If(variables[0] > variables[1],
-                                 variables[0], variables[1])
+                    return z3.If(
+                        variables[0] > variables[1], variables[0], variables[1]
+                    )
                 if "min" in func_name.lower():
-                    msg = (f"Using direct implementation for {func_name}: "
-                           "If(variables[0] < variables[1], "
-                           "variables[0], variables[1])")
+                    msg = (
+                        f"Using direct implementation for {func_name}: "
+                        "If(variables[0] < variables[1], "
+                        "variables[0], variables[1])"
+                    )
                     print(msg)
-                    return z3.If(variables[0] < variables[1],
-                                 variables[0], variables[1])
+                    return z3.If(
+                        variables[0] < variables[1], variables[0], variables[1]
+                    )
 
         # Bit-vector functions
-        if (z3.is_bv_sort(func.range()) and
-                all(z3.is_bv_sort(var.sort()) for var in variables)):
+        if z3.is_bv_sort(func.range()) and all(
+            z3.is_bv_sort(var.sort()) for var in variables
+        ):
             if len(variables) == 2:
                 if "xor" in func_name.lower():
-                    msg = (f"Using direct implementation for {func_name}: "
-                           "variables[0] ^ variables[1]")
+                    msg = (
+                        f"Using direct implementation for {func_name}: "
+                        "variables[0] ^ variables[1]"
+                    )
                     print(msg)
                     return variables[0] ^ variables[1]
                 if "and" in func_name.lower():
-                    msg = (f"Using direct implementation for {func_name}: "
-                           "variables[0] & variables[1]")
+                    msg = (
+                        f"Using direct implementation for {func_name}: "
+                        "variables[0] & variables[1]"
+                    )
                     print(msg)
                     return variables[0] & variables[1]
                 if "or" in func_name.lower():
-                    msg = (f"Using direct implementation for {func_name}: "
-                           "variables[0] | variables[1]")
+                    msg = (
+                        f"Using direct implementation for {func_name}: "
+                        "variables[0] | variables[1]"
+                    )
                     print(msg)
                     return variables[0] | variables[1]
 
         # String functions
-        if (func.range() == z3.StringSort() and
-                all(var.sort() == z3.StringSort() for var in variables)):
+        if func.range() == z3.StringSort() and all(
+            var.sort() == z3.StringSort() for var in variables
+        ):
             if len(variables) == 2:
                 if "concat" in func_name.lower():
-                    msg = (f"Using direct implementation for {func_name}: "
-                           "z3.Concat(variables[0], variables[1])")
+                    msg = (
+                        f"Using direct implementation for {func_name}: "
+                        "z3.Concat(variables[0], variables[1])"
+                    )
                     print(msg)
                     return z3.Concat(variables[0], variables[1])
 
@@ -671,8 +700,7 @@ def synthesize_function(func: z3.FuncDeclRef, constraints: List[z3.BoolRef],
         # Try to convert the SyGuS solution to a Z3 expression
         try:
             func_def = solutions[func.name()]
-            print(f"CVC5 synthesized solution for {func_name}: "
-                  f"{func_def['body']}")
+            print(f"CVC5 synthesized solution for {func_name}: " f"{func_def['body']}")
             z3_expr = sygus_to_z3(func.name(), func_def, variables)
 
             # Verify that the synthesized function satisfies the constraints

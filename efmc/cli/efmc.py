@@ -7,6 +7,7 @@ import logging
 import os
 import signal
 import sys
+
 # from pathlib import Path
 # import logging
 # import subprocess
@@ -23,6 +24,7 @@ from efmc.engines.kinduction import KInductionProver
 from efmc.engines.pdr import PDRProver
 from efmc.engines.llm4inv import LLM4InvProver
 from efmc.utils.verification_utils import VerificationResult
+
 # for the less-used prover, I move them to the corresponding functions.
 # the followings only serve as "docs"
 """ 
@@ -35,29 +37,39 @@ from efmc.engines.symabs import SymbolicAbstractionProver
 from efmc.engines.bdd.bdd_prover import BDDProver
 from efmc.engines.symabs.symabs_prover import SymbolicAbstractionProver
 from efmc.engines.predabs.predabs_prover import PredicateAbstractionProver
-""" 
+"""
 
 # Available templates
 TEMPLATES = {
-    'int_real': [
-        "interval", "power_interval",
-        "zone", "octagon",
-        "affine", "power_affine",
-        "poly", "power_poly"
+    "int_real": [
+        "interval",
+        "power_interval",
+        "zone",
+        "octagon",
+        "affine",
+        "power_affine",
+        "poly",
+        "power_poly",
     ],
-    'bitvector': [
-        "bv_interval", "power_bv_interval",
-        "bv_zone", "power_bv_zone",
-        "bv_octagon", "power_bv_octagon",
-        "bv_poly", "power_bv_poly",
-        "knownbits", "bitpredabs",
-        "bv_pattern","power_bv_pattern",
-        "bv_xor_parity","power_bv_xor_parity",
-        "power_bv_rotation","bv_rotation",
+    "bitvector": [
+        "bv_interval",
+        "power_bv_interval",
+        "bv_zone",
+        "power_bv_zone",
+        "bv_octagon",
+        "power_bv_octagon",
+        "bv_poly",
+        "power_bv_poly",
+        "knownbits",
+        "bitpredabs",
+        "bv_pattern",
+        "power_bv_pattern",
+        "bv_xor_parity",
+        "power_bv_xor_parity",
+        "power_bv_rotation",
+        "bv_rotation",
     ],
-    'floating_point': [
-        "fp_interval", "fp_poly"
-    ]
+    "floating_point": ["fp_interval", "fp_poly"],
 }
 
 
@@ -100,13 +112,13 @@ class EFMCRunner:
         """Run template-based invariant generation using EF prover"""
         # Determine template and available templates based on variable types
         if sts.has_bv:
-            available_templates = TEMPLATES['bitvector']
+            available_templates = TEMPLATES["bitvector"]
             default_template = "bv_interval"
         elif sts.has_fp:
-            available_templates = TEMPLATES['floating_point'] 
+            available_templates = TEMPLATES["floating_point"]
             default_template = "fp_interval"
         else:
-            available_templates = TEMPLATES['int_real']
+            available_templates = TEMPLATES["int_real"]
             default_template = "interval"
 
         # Handle auto template selection
@@ -123,19 +135,24 @@ class EFMCRunner:
             prop_strengthen=g_verifier_args.prop_strengthen,
             abs_refine=g_verifier_args.abs_refine,
             validate_invariant=g_verifier_args.validate_invariant,
-            no_overflow=g_verifier_args.prevent_over_under_flows > 0 if sts.has_bv else False,
-            no_underflow=g_verifier_args.prevent_over_under_flows > 0 if sts.has_bv else False,
+            no_overflow=(
+                g_verifier_args.prevent_over_under_flows > 0 if sts.has_bv else False
+            ),
+            no_underflow=(
+                g_verifier_args.prevent_over_under_flows > 0 if sts.has_bv else False
+            ),
             pysmt_solver=g_verifier_args.pysmt_solver,
             strengthen_templates=g_verifier_args.strengthen_templates,
             num_disjunctions=g_verifier_args.num_disjunctions,
-            cegis_solver_timeout=getattr(g_verifier_args, 'cegis_solver_timeout', 10),
-            cegis_dump_dir=getattr(g_verifier_args, 'cegis_dump_dir', None),
-            cegis_dump_threshold=getattr(g_verifier_args, 'cegis_dump_threshold', 5)
+            cegis_solver_timeout=getattr(g_verifier_args, "cegis_solver_timeout", 10),
+            cegis_dump_dir=getattr(g_verifier_args, "cegis_dump_dir", None),
+            cegis_dump_threshold=getattr(g_verifier_args, "cegis_dump_threshold", 5),
         )
 
         # Set template and solver
-        ef_prover.set_template(g_verifier_args.template,
-                               num_disjunctions=g_verifier_args.num_disjunctions)
+        ef_prover.set_template(
+            g_verifier_args.template, num_disjunctions=g_verifier_args.num_disjunctions
+        )
         ef_prover.set_solver(g_verifier_args.efsmt_solver)
 
         if g_verifier_args.dump_ef_smt2 or g_verifier_args.dump_qbf:
@@ -153,10 +170,11 @@ class EFMCRunner:
     def run_qi(self, sts: TransitionSystem) -> None:
         """Run the Quantifier Instantiation (QI) based verification"""
         from efmc.engines.qi.qi_prover import QuantifierInstantiationProver
+
         qi_prover = QuantifierInstantiationProver(sts)
 
         # Set the QI strategy based on the command-line argument
-        if hasattr(g_verifier_args, 'qi_strategy'):
+        if hasattr(g_verifier_args, "qi_strategy"):
             qi_prover.set_strategy(g_verifier_args.qi_strategy)
             self.logger.info(f"Using QI strategy: {g_verifier_args.qi_strategy}")
 
@@ -166,14 +184,15 @@ class EFMCRunner:
     def run_k_induction(self, sts: TransitionSystem) -> None:
         """Run k-induction verification"""
         self.logger.info("Starting k-induction...")
-        
+
         # Choose between incremental and non-incremental k-induction
         if g_verifier_args.kind_incremental:
             from efmc.engines.kinduction.kind_prover_inc import KInductionProverInc
+
             kind_prover = KInductionProverInc(sts)
         else:
             kind_prover = KInductionProver(sts)
-            
+
         if g_verifier_args.kind_aux_inv:
             kind_prover.use_aux_invariant = True
         result = kind_prover.solve(int(g_verifier_args.kind_k))
@@ -182,6 +201,7 @@ class EFMCRunner:
     def run_qe(self, sts: TransitionSystem) -> None:
         """Run quantifier elimination based verification"""
         from efmc.engines.qe.qe_prover import QuantifierEliminationProver
+
         qe_prover = QuantifierEliminationProver(sts)
         result = qe_prover.solve()
         self.print_verification_result(result)
@@ -216,7 +236,7 @@ class EFMCRunner:
     def verify_boogie(self, filename: str) -> None:
         """Verify Boogie format file"""
         self.logger.info(f"Parsing Boogie file: {filename}")
-        
+
         # Parse Boogie file and get transition system directly
         sts = parse_boogie(filename, to_real_type=False)
         self.logger.info("Boogie file parsing completed")
@@ -263,6 +283,7 @@ class EFMCRunner:
     def run_houdini(self, sts: TransitionSystem) -> None:
         """Run Houdini-based invariant inference"""
         from efmc.engines.houdini.houdini_prover import HoudiniProver
+
         houdini_prover = HoudiniProver(sts)
         result = houdini_prover.solve()
         self.print_verification_result(result)
@@ -271,10 +292,11 @@ class EFMCRunner:
         """Run abduction-based invariant inference"""
         self.logger.info("Starting abduction-based verification...")
         from efmc.engines.abduction.abduction_prover import AbductionProver
+
         abduction_prover = AbductionProver(sts)
-        if hasattr(g_verifier_args, 'abduction_max_iterations'):
+        if hasattr(g_verifier_args, "abduction_max_iterations"):
             abduction_prover.max_iterations = g_verifier_args.abduction_max_iterations
-        if hasattr(g_verifier_args, 'abduction_timeout'):
+        if hasattr(g_verifier_args, "abduction_timeout"):
             abduction_prover.timeout = g_verifier_args.abduction_timeout
         result = abduction_prover.solve()
         self.print_verification_result(result)
@@ -282,15 +304,18 @@ class EFMCRunner:
     def run_bdd(self, sts: TransitionSystem) -> None:
         """Run BDD-based verification"""
         from efmc.engines.bdd.bdd_prover import BDDProver
+
         self.logger.info("Starting BDD-based verification...")
         use_forward = True
-        if hasattr(g_verifier_args, 'bdd_backward') and g_verifier_args.bdd_backward:
+        if hasattr(g_verifier_args, "bdd_backward") and g_verifier_args.bdd_backward:
             use_forward = False
         max_iterations = 1000
-        if hasattr(g_verifier_args, 'bdd_max_iterations'):
+        if hasattr(g_verifier_args, "bdd_max_iterations"):
             max_iterations = g_verifier_args.bdd_max_iterations
-        
-        bdd_prover = BDDProver(sts, use_forward=use_forward, max_iterations=max_iterations)
+
+        bdd_prover = BDDProver(
+            sts, use_forward=use_forward, max_iterations=max_iterations
+        )
         result = bdd_prover.solve()
         self.print_verification_result(result)
 
@@ -298,13 +323,18 @@ class EFMCRunner:
         """Run predicate abstraction-based verification"""
         self.logger.info("Starting predicate abstraction-based verification...")
         from efmc.engines.predabs.predabs_prover import PredicateAbstractionProver
+
         predabs_prover = PredicateAbstractionProver(sts)
-        
+
         # Set predicates if provided
-        if hasattr(g_verifier_args, 'predabs_predicates') and g_verifier_args.predabs_predicates:
+        if (
+            hasattr(g_verifier_args, "predabs_predicates")
+            and g_verifier_args.predabs_predicates
+        ):
             try:
                 # Parse predicates from strings if they are provided as strings
                 import z3
+
                 predicates = []
                 for pred_str in g_verifier_args.predabs_predicates:
                     # Try to parse as SMT-LIB2 string
@@ -312,15 +342,19 @@ class EFMCRunner:
                         pred = z3.parse_smt2_string(f"(assert {pred_str})")[0]
                         predicates.append(pred)
                     except Exception as e:
-                        self.logger.warning(f"Failed to parse predicate '{pred_str}': {e}")
-                
+                        self.logger.warning(
+                            f"Failed to parse predicate '{pred_str}': {e}"
+                        )
+
                 if predicates:
                     predabs_prover.set_predicates(predicates)
                 else:
-                    self.logger.warning("No valid predicates provided, using default predicates")
+                    self.logger.warning(
+                        "No valid predicates provided, using default predicates"
+                    )
             except Exception as e:
                 self.logger.error(f"Error setting predicates: {e}")
-        
+
         result = predabs_prover.solve()
         self.print_verification_result(result)
 
@@ -328,12 +362,13 @@ class EFMCRunner:
         """Run symbolic abstraction-based verification"""
         self.logger.info("Starting symbolic abstraction-based verification...")
         from efmc.engines.symabs.symabs_prover import SymbolicAbstractionProver
+
         symabs_prover = SymbolicAbstractionProver(sts)
-        
+
         # Set domain if provided
-        if hasattr(g_verifier_args, 'symabs_domain') and g_verifier_args.symabs_domain:
+        if hasattr(g_verifier_args, "symabs_domain") and g_verifier_args.symabs_domain:
             symabs_prover.domain = g_verifier_args.symabs_domain
-        
+
         result = symabs_prover.solve()
         self.print_verification_result(result)
 
@@ -348,146 +383,314 @@ class EFMCRunner:
 def parse_arguments():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description='EFMC - A Software Model Checker',
-        usage='efmc --file FILE [options]',
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description="EFMC - A Software Model Checker",
+        usage="efmc --file FILE [options]",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     # Input and general options
-    input_group = parser.add_argument_group('Input options')
-    input_group.add_argument('--file', type=str, required=True,
-                             help='Input file to verify')
-    input_group.add_argument('--lang', type=str, choices=['chc', 'sygus', 'boogie', 'auto'],
-                             default='auto', help='Input language format')
-    input_group.add_argument('--engine', type=str,
-                             choices=['ef', 'pdr', 'kind', 'qe', 'qi', 'houdini', 'abduction', 'bdd', 'predabs', 'symabs', 'llm4inv'],
-                             default='ef', help='Verification engine to use')
-    input_group.add_argument('--log-level', type=str,
-                             choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                             default='INFO', help='Set the logging level')
+    input_group = parser.add_argument_group("Input options")
+    input_group.add_argument(
+        "--file", type=str, required=True, help="Input file to verify"
+    )
+    input_group.add_argument(
+        "--lang",
+        type=str,
+        choices=["chc", "sygus", "boogie", "auto"],
+        default="auto",
+        help="Input language format",
+    )
+    input_group.add_argument(
+        "--engine",
+        type=str,
+        choices=[
+            "ef",
+            "pdr",
+            "kind",
+            "qe",
+            "qi",
+            "houdini",
+            "abduction",
+            "bdd",
+            "predabs",
+            "symabs",
+            "llm4inv",
+        ],
+        default="ef",
+        help="Verification engine to use",
+    )
+    input_group.add_argument(
+        "--log-level",
+        type=str,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Set the logging level",
+    )
 
     # Template-based verification options
-    template_group = parser.add_argument_group('Template-based verification options')
-    template_group.add_argument('--template', type=str, default="auto",
-                                help='Template for invariant generation. For integer/real: interval, power_interval, zone, octagon, affine, power_affine, poly, power_poly. For bitvector: bv_interval, power_bv_interval, bv_zone, power_bv_zone, bv_octagon, power_bv_octagon, bv_poly, power_bv_poly, bv_pattern, bv_xor_parity, bv_rotation. For floating-point: fp_interval, fp_poly')
-    template_group.add_argument('--num-disjunctions', type=int, default=1,
-                                help='Number of disjunctions in template')
-    template_group.add_argument('--prop-strengthen', action='store_true',
-                                help='Enable property strengthening')
-    template_group.add_argument('--abs-refine', action='store_true',
-                                help='Enable abstraction refinement')
-    template_group.add_argument('--validate-invariant', action='store_true',
-                                help='Validate generated invariants')
-    template_group.add_argument('--strengthen-templates',type=str,default="",
-                                help='Add some templates to strengthen the present template')
+    template_group = parser.add_argument_group("Template-based verification options")
+    template_group.add_argument(
+        "--template",
+        type=str,
+        default="auto",
+        help="Template for invariant generation. For integer/real: interval, power_interval, zone, octagon, affine, power_affine, poly, power_poly. For bitvector: bv_interval, power_bv_interval, bv_zone, power_bv_zone, bv_octagon, power_bv_octagon, bv_poly, power_bv_poly, bv_pattern, bv_xor_parity, bv_rotation. For floating-point: fp_interval, fp_poly",
+    )
+    template_group.add_argument(
+        "--num-disjunctions",
+        type=int,
+        default=1,
+        help="Number of disjunctions in template",
+    )
+    template_group.add_argument(
+        "--prop-strengthen", action="store_true", help="Enable property strengthening"
+    )
+    template_group.add_argument(
+        "--abs-refine", action="store_true", help="Enable abstraction refinement"
+    )
+    template_group.add_argument(
+        "--validate-invariant",
+        action="store_true",
+        help="Validate generated invariants",
+    )
+    template_group.add_argument(
+        "--strengthen-templates",
+        type=str,
+        default="",
+        help="Add some templates to strengthen the present template",
+    )
     # Solver options
     # currently, only affect the ef engine?
-    solver_group = parser.add_argument_group('Solver options')
+    solver_group = parser.add_argument_group("Solver options")
 
     # "z3api" means we use the z3py API to solve the constraints "in memory"
-    solver_group.add_argument('--efsmt-solver', dest='efsmt_solver', default='z3api', type=str,
-                              help="Solver for the exists-forall SMT problem. Options include:\n"
-                                   "1. Quantifier instantiation approach: [z3, cvc5, btor, yices2, mathsat, bitwuzla, z3api]\n"
-                                   "2. Bit-blasting approach: [z3qbf, caqe, q3b, z3sat]\n"
-                                   "3. CEGIS approach: [cegis] (implemented via pysmt, need to set pysmt_solver)")
-    
+    solver_group.add_argument(
+        "--efsmt-solver",
+        dest="efsmt_solver",
+        default="z3api",
+        type=str,
+        help="Solver for the exists-forall SMT problem. Options include:\n"
+        "1. Quantifier instantiation approach: [z3, cvc5, btor, yices2, mathsat, bitwuzla, z3api]\n"
+        "2. Bit-blasting approach: [z3qbf, caqe, q3b, z3sat]\n"
+        "3. CEGIS approach: [cegis] (implemented via pysmt, need to set pysmt_solver)",
+    )
+
     # We implement the CEGIS solver using pysmt's API, so we need to set the PySMT solver. However, pysmt may have limited support for some theories such as QF_FP and QF_SLIA.
-    solver_group.add_argument('--pysmt-solver', dest='pysmt_solver', default="z3", type=str,
-                              help="Set the PySMT solver for the CEGIS solver's backend. Options include: [z3, cvc5, btor, yices2, mathsat, bitwuzla]")
+    solver_group.add_argument(
+        "--pysmt-solver",
+        dest="pysmt_solver",
+        default="z3",
+        type=str,
+        help="Set the PySMT solver for the CEGIS solver's backend. Options include: [z3, cvc5, btor, yices2, mathsat, bitwuzla]",
+    )
 
     # Currently, the timeout is not used for the engines inside efmc
     # It is better to control the timeout in some "upper-level" scripts.
-    solver_group.add_argument('--timeout', type=int, default=3600,
-                             help='Timeout in seconds for external solvers and binary verifiers')
+    solver_group.add_argument(
+        "--timeout",
+        type=int,
+        default=3600,
+        help="Timeout in seconds for external solvers and binary verifiers",
+    )
 
     # Bitvector options (for controling the bit-vector expressions in the template)
-    bv_group = parser.add_argument_group('Bitvector options')
-    bv_group.add_argument('--prevent-over-under-flows', type=int, default=0,
-                          help='Prevent over/underflows in bitvector operations')
-    bv_group.add_argument('--signedness', type=str, default='signed',
-                          choices=['signed', 'unsigned'],
-                          help='Signedness for bitvector operations')
+    bv_group = parser.add_argument_group("Bitvector options")
+    bv_group.add_argument(
+        "--prevent-over-under-flows",
+        type=int,
+        default=0,
+        help="Prevent over/underflows in bitvector operations",
+    )
+    bv_group.add_argument(
+        "--signedness",
+        type=str,
+        default="signed",
+        choices=["signed", "unsigned"],
+        help="Signedness for bitvector operations",
+    )
 
     # Output options
-    output_group = parser.add_argument_group('EFSMT constraint dumping options')
-    output_group.add_argument('--dump-ef-smt2', action='store_true', default=False,
-                              help='Dump EF constraints in SMT2 format')
-    output_group.add_argument('--dump-qbf', action='store_true', default=False,
-                              help='Dump constraints in QBF format')
-    output_group.add_argument('--dump-cnt-dir', dest='dump_cnt_dir', default="/tmp", type=str,
-                              help="The dir for storing the dumped constraints")
-    
+    output_group = parser.add_argument_group("EFSMT constraint dumping options")
+    output_group.add_argument(
+        "--dump-ef-smt2",
+        action="store_true",
+        default=False,
+        help="Dump EF constraints in SMT2 format",
+    )
+    output_group.add_argument(
+        "--dump-qbf",
+        action="store_true",
+        default=False,
+        help="Dump constraints in QBF format",
+    )
+    output_group.add_argument(
+        "--dump-cnt-dir",
+        dest="dump_cnt_dir",
+        default="/tmp",
+        type=str,
+        help="The dir for storing the dumped constraints",
+    )
+
     # CEGIS-specific options (for FP logic)
-    cegis_group = parser.add_argument_group('CEGIS solver options (for FP logic)')
-    cegis_group.add_argument('--cegis-solver-timeout', type=int, default=10,
-                             help='Timeout per solver call in seconds for CEGIS (default: 10)')
-    cegis_group.add_argument('--cegis-dump-dir', type=str, default=None,
-                             help='Directory to dump challenging QF_FP queries (default: None, no dumping)')
-    cegis_group.add_argument('--cegis-dump-threshold', type=int, default=5,
-                             help='Dump queries that timeout or exceed this many iterations (default: 5)')
+    cegis_group = parser.add_argument_group("CEGIS solver options (for FP logic)")
+    cegis_group.add_argument(
+        "--cegis-solver-timeout",
+        type=int,
+        default=10,
+        help="Timeout per solver call in seconds for CEGIS (default: 10)",
+    )
+    cegis_group.add_argument(
+        "--cegis-dump-dir",
+        type=str,
+        default=None,
+        help="Directory to dump challenging QF_FP queries (default: None, no dumping)",
+    )
+    cegis_group.add_argument(
+        "--cegis-dump-threshold",
+        type=int,
+        default=5,
+        help="Dump queries that timeout or exceed this many iterations (default: 5)",
+    )
 
     # K-induction options
-    kind_group = parser.add_argument_group('K-induction options')
-    kind_group.add_argument('--kind-k', type=int, default=30,
-                            help='K value for k-induction')
-    kind_group.add_argument('--kind-incremental', dest='kind_incremental', default=False, action='store_true',
-                            help="Use incremental k-induction (default: False)")
-    kind_group.add_argument('--kind-aux-inv', action='store_true',
-                            help='Use auxiliary invariants in k-induction')
-    kind_group.add_argument('--kind-aux-inv-alg', dest='kind_aux_inv_alg', default='default', type=str,
-                            help="Select the approach for generating auxiliary invariants. Options include: [top, int, houdini]")
+    kind_group = parser.add_argument_group("K-induction options")
+    kind_group.add_argument(
+        "--kind-k", type=int, default=30, help="K value for k-induction"
+    )
+    kind_group.add_argument(
+        "--kind-incremental",
+        dest="kind_incremental",
+        default=False,
+        action="store_true",
+        help="Use incremental k-induction (default: False)",
+    )
+    kind_group.add_argument(
+        "--kind-aux-inv",
+        action="store_true",
+        help="Use auxiliary invariants in k-induction",
+    )
+    kind_group.add_argument(
+        "--kind-aux-inv-alg",
+        dest="kind_aux_inv_alg",
+        default="default",
+        type=str,
+        help="Select the approach for generating auxiliary invariants. Options include: [top, int, houdini]",
+    )
 
     # LLM4Inv options
-    llm4inv_group = parser.add_argument_group('LLM4Inv options')
-    llm4inv_group.add_argument('--llm4inv-max-candidates-per-iter', type=int, default=5,
-                              help='Maximum number of candidates for LLM4Inv (default: 5)')
-    llm4inv_group.add_argument('--llm4inv-provider', type=str, default='local',
-                              help='Provider for LLM4Inv: local, remote (default: local)')
-    llm4inv_group.add_argument('--llm4inv-local-provider', type=str, default='lm-studio',
-                              help='Local provider for LLM4Inv: lm-studio, vllm, sglang')
-    llm4inv_group.add_argument('--llm4inv-local-model', type=str, default='qwen/qwen3-coder-30b',
-                              help='Local model for LLM4Inv (default: qwen/qwen3-coder-30b)')
-    llm4inv_group.add_argument('--llm4inv-remote-model', type=str, default='deepseek-v3',
-                              help='Remote model for LLM4Inv: deepseek-v3, glm-4-flash, etc. (default: deepseek-v3)')
-    llm4inv_group.add_argument('--llm4inv-temperature', type=float, default=0.1,
-                              help='Temperature for LLM4Inv (default: 0.1)')
-    llm4inv_group.add_argument('--llm4inv-max-output-length', type=int, default=4096,
-                              help='Maximum output length for LLM4Inv (default: 4096)')
-    llm4inv_group.add_argument('--llm4inv-measure-cost', action='store_true', default=False,
-                              help='Measure cost for LLM4Inv (default: False)')
-    llm4inv_group.add_argument('--llm4inv-max-iterations', type=int, default=10,
-                              help='Maximum number of iterations for LLM4Inv (default: 10)')
-
+    llm4inv_group = parser.add_argument_group("LLM4Inv options")
+    llm4inv_group.add_argument(
+        "--llm4inv-max-candidates-per-iter",
+        type=int,
+        default=5,
+        help="Maximum number of candidates for LLM4Inv (default: 5)",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-provider",
+        type=str,
+        default="local",
+        help="Provider for LLM4Inv: local, remote (default: local)",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-local-provider",
+        type=str,
+        default="lm-studio",
+        help="Local provider for LLM4Inv: lm-studio, vllm, sglang",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-local-model",
+        type=str,
+        default="qwen/qwen3-coder-30b",
+        help="Local model for LLM4Inv (default: qwen/qwen3-coder-30b)",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-remote-model",
+        type=str,
+        default="deepseek-v3",
+        help="Remote model for LLM4Inv: deepseek-v3, glm-4-flash, etc. (default: deepseek-v3)",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-temperature",
+        type=float,
+        default=0.1,
+        help="Temperature for LLM4Inv (default: 0.1)",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-max-output-length",
+        type=int,
+        default=4096,
+        help="Maximum output length for LLM4Inv (default: 4096)",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-measure-cost",
+        action="store_true",
+        default=False,
+        help="Measure cost for LLM4Inv (default: False)",
+    )
+    llm4inv_group.add_argument(
+        "--llm4inv-max-iterations",
+        type=int,
+        default=10,
+        help="Maximum number of iterations for LLM4Inv (default: 10)",
+    )
 
     # Quantifier instantiation-based verification options
-    qi_group = parser.add_argument_group('Quantifier instantiation-based verification options')
-    qi_group.add_argument('--qi-strategy', type=str, default='mbqi',
-                          help='Quantifier instantiation strategy (mbqi, ematching, combined, auto)')
+    qi_group = parser.add_argument_group(
+        "Quantifier instantiation-based verification options"
+    )
+    qi_group.add_argument(
+        "--qi-strategy",
+        type=str,
+        default="mbqi",
+        help="Quantifier instantiation strategy (mbqi, ematching, combined, auto)",
+    )
 
     # Abduction-based verification options
-    abduction_group = parser.add_argument_group('Abduction-based verification options')
-    abduction_group.add_argument('--abduction-timeout', type=int, default=10000,
-                                help='Timeout in milliseconds for abduction solver queries')
-    abduction_group.add_argument('--abduction-max-iterations', type=int, default=300,
-                                help='Maximum number of strengthening iterations for abduction')
+    abduction_group = parser.add_argument_group("Abduction-based verification options")
+    abduction_group.add_argument(
+        "--abduction-timeout",
+        type=int,
+        default=10000,
+        help="Timeout in milliseconds for abduction solver queries",
+    )
+    abduction_group.add_argument(
+        "--abduction-max-iterations",
+        type=int,
+        default=300,
+        help="Maximum number of strengthening iterations for abduction",
+    )
 
     # BDD-based verification options
-    bdd_group = parser.add_argument_group('BDD-based verification options')
-    bdd_group.add_argument('--bdd-backward', action='store_true',
-                          help='Use backward reachability analysis instead of forward')
-    bdd_group.add_argument('--bdd-max-iterations', type=int, default=1000,
-                          help='Maximum number of iterations for fixed-point computation')
+    bdd_group = parser.add_argument_group("BDD-based verification options")
+    bdd_group.add_argument(
+        "--bdd-backward",
+        action="store_true",
+        help="Use backward reachability analysis instead of forward",
+    )
+    bdd_group.add_argument(
+        "--bdd-max-iterations",
+        type=int,
+        default=1000,
+        help="Maximum number of iterations for fixed-point computation",
+    )
 
     # Predicate abstraction options
-    predabs_group = parser.add_argument_group('Predicate abstraction options')
-    predabs_group.add_argument('--predabs-predicates', type=str, nargs='+',
-                              help='List of predicates to use for predicate abstraction')
+    predabs_group = parser.add_argument_group("Predicate abstraction options")
+    predabs_group.add_argument(
+        "--predabs-predicates",
+        type=str,
+        nargs="+",
+        help="List of predicates to use for predicate abstraction",
+    )
 
     # Symbolic abstraction options
-    symabs_group = parser.add_argument_group('Symbolic abstraction options')
-    symabs_group.add_argument('--symabs-domain', type=str, default='interval',
-                             choices=['interval', 'bits', 'known_bits'],
-                             help='Abstract domain to use for symbolic abstraction')
+    symabs_group = parser.add_argument_group("Symbolic abstraction options")
+    symabs_group.add_argument(
+        "--symabs-domain",
+        type=str,
+        default="interval",
+        choices=["interval", "bits", "known_bits"],
+        help="Abstract domain to use for symbolic abstraction",
+    )
 
     # PDR engine options: Allow for parsing options to Z3's PDR engine (named Spacer)
     # FIXME: refer to the Z3 documentation for the options
@@ -503,7 +706,7 @@ def main():
     # Configure logging based on the specified log level
     logging.basicConfig(
         level=getattr(logging, g_verifier_args.log_level),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     runner = EFMCRunner()
@@ -518,17 +721,19 @@ def main():
         runner.verify_c(g_verifier_args.file)
     else:  # the default value is "auto"
         file_extension = os.path.splitext(g_verifier_args.file)[1].lower()
-        if file_extension == '.smt2':
+        if file_extension == ".smt2":
             runner.verify_chc(g_verifier_args.file)
-        elif file_extension == '.sy' or file_extension == '.sl':
+        elif file_extension == ".sy" or file_extension == ".sl":
             runner.verify_sygus(g_verifier_args.file)
-        elif file_extension == '.bpl':
+        elif file_extension == ".bpl":
             runner.verify_boogie(g_verifier_args.file)
-        elif file_extension == '.c':
+        elif file_extension == ".c":
             runner.verify_c(g_verifier_args.file)
         else:
             logging.error(f"Unsupported file extension: {file_extension}")
-            logging.info("Supported extensions: .smt2 (CHC), .sy/sl (SyGuS), .bpl (Boogie)")
+            logging.info(
+                "Supported extensions: .smt2 (CHC), .sy/sl (SyGuS), .bpl (Boogie)"
+            )
             sys.exit(1)
 
 

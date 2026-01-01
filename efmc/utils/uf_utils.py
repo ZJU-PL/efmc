@@ -1,6 +1,7 @@
 """
 Utilities for Z3 uninterpreted functions (UF).
 """
+
 from __future__ import print_function
 from typing import Callable, Optional, Dict
 import z3
@@ -18,9 +19,13 @@ def visitor(exp: z3.ExprRef, seen: Dict[z3.ExprRef, bool]):
     elif z3.is_quantifier(exp):
         yield from visitor(exp.body(), seen)
 
-def modify(expression: z3.ExprRef, fn: Callable[[z3.ExprRef], Optional[z3.ExprRef]]) -> z3.ExprRef:
+
+def modify(
+    expression: z3.ExprRef, fn: Callable[[z3.ExprRef], Optional[z3.ExprRef]]
+) -> z3.ExprRef:
     """Apply fn to each subexpression of a Z3 expression."""
     seen = {}
+
     def visit(exp):
         if exp in seen:
             pass
@@ -47,25 +52,39 @@ def modify(expression: z3.ExprRef, fn: Callable[[z3.ExprRef], Optional[z3.ExprRe
                 names[i] = z3.to_symbol(exp.var_name(i), exp.ctx)
             r = z3.QuantifierRef(
                 z3.Z3_mk_quantifier(
-                    exp.ctx_ref(), is_forall, exp.weight(),
-                    num_pats, pats, num_decls, sorts, names, body.ast
+                    exp.ctx_ref(),
+                    is_forall,
+                    exp.weight(),
+                    num_pats,
+                    pats,
+                    num_decls,
+                    sorts,
+                    names,
+                    body.ast,
                 ),
-                exp.ctx
+                exp.ctx,
             )
             seen[exp] = r
         else:
             seen[exp] = exp
         return seen[exp]
+
     return visit(expression)
 
-def replace_func_with_template(formula: z3.ExprRef, func: z3.FuncDeclRef, template: z3.ExprRef) -> z3.ExprRef:
+
+def replace_func_with_template(
+    formula: z3.ExprRef, func: z3.FuncDeclRef, template: z3.ExprRef
+) -> z3.ExprRef:
     """Replace UF func in formula with template."""
+
     def update(expression):
         if z3.is_app(expression) and z3.eq(expression.decl(), func):
             args = [expression.arg(i) for i in range(expression.num_args())]
             return z3.substitute_vars(template, *args)
         return None
+
     return modify(formula, update)
+
 
 def instiatiate_func_with_axioms(
     formula: z3.ExprRef, func: z3.FuncDeclRef, axiom: z3.ExprRef
@@ -91,8 +110,10 @@ def instiatiate_func_with_axioms(
         instantiated_axioms.append(instantiated)
     return z3.And(formula, *instantiated_axioms) if instantiated_axioms else formula
 
+
 def purify(formula: z3.ExprRef) -> z3.ExprRef:
     """Purify formula: introduce fresh vars for mixed-theory terms (no quantifiers)."""
+
     def contains_quantifier(expr, seen=None):
         if seen is None:
             seen = {}
@@ -108,11 +129,14 @@ def purify(formula: z3.ExprRef) -> z3.ExprRef:
                     return True
         seen[expr] = False
         return False
+
     if contains_quantifier(formula):
         raise ValueError("Quantified formulas not supported")
     processed, fresh_vars, equalities = {}, {}, []
+
     def is_uf_term(expr):
         return z3.is_app(expr) and expr.decl().kind() == z3.Z3_OP_UNINTERPRETED
+
     def is_arith(expr):
         if z3.is_int(expr) or z3.is_real(expr):
             return True
@@ -122,18 +146,31 @@ def purify(formula: z3.ExprRef) -> z3.ExprRef:
             return True
         if z3.is_app(expr):
             return expr.decl().kind() in [
-                z3.Z3_OP_ADD, z3.Z3_OP_SUB, z3.Z3_OP_MUL, z3.Z3_OP_DIV,
-                z3.Z3_OP_IDIV, z3.Z3_OP_MOD, z3.Z3_OP_REM, z3.Z3_OP_POWER,
-                z3.Z3_OP_LT, z3.Z3_OP_LE, z3.Z3_OP_GT, z3.Z3_OP_GE
+                z3.Z3_OP_ADD,
+                z3.Z3_OP_SUB,
+                z3.Z3_OP_MUL,
+                z3.Z3_OP_DIV,
+                z3.Z3_OP_IDIV,
+                z3.Z3_OP_MOD,
+                z3.Z3_OP_REM,
+                z3.Z3_OP_POWER,
+                z3.Z3_OP_LT,
+                z3.Z3_OP_LE,
+                z3.Z3_OP_GT,
+                z3.Z3_OP_GE,
             ]
         return False
+
     def is_mixed(expr):
         if z3.is_const(expr) or z3.is_var(expr):
             return False
         if z3.is_app(expr):
             if expr.decl().kind() in [
-                z3.Z3_OP_EQ, z3.Z3_OP_LT, z3.Z3_OP_LE,
-                z3.Z3_OP_GT, z3.Z3_OP_GE
+                z3.Z3_OP_EQ,
+                z3.Z3_OP_LT,
+                z3.Z3_OP_LE,
+                z3.Z3_OP_GT,
+                z3.Z3_OP_GE,
             ]:
                 if expr.num_args() == 2:
                     l, r = expr.arg(0), expr.arg(1)
@@ -151,10 +188,9 @@ def purify(formula: z3.ExprRef) -> z3.ExprRef:
                     is_arith(expr.arg(i)) or is_mixed(expr.arg(i))
                     for i in range(expr.num_args())
                 )
-            return any(
-                is_mixed(expr.arg(i)) for i in range(expr.num_args())
-            )
+            return any(is_mixed(expr.arg(i)) for i in range(expr.num_args()))
         return False
+
     def purify_term(expr):
         if expr in processed:
             return processed[expr]
@@ -180,12 +216,14 @@ def purify(formula: z3.ExprRef) -> z3.ExprRef:
             return result
         processed[expr] = expr
         return expr
+
     purified_formula = purify_term(formula)
     return z3.And(purified_formula, *equalities) if equalities else purified_formula
 
+
 def test_replace():  # pylint: disable=too-many-locals
     """Test function for replace_func_with_template."""
-    x, y = z3.Ints('x y')
+    x, y = z3.Ints("x y")
     fml = x + x + y > 2
     seen = {}
     for exp in visitor(fml, seen):
@@ -194,43 +232,45 @@ def test_replace():  # pylint: disable=too-many-locals
         else:
             print(exp)
     s = z3.SolverFor("HORN")
-    inv = z3.Function('inv', z3.IntSort(), z3.IntSort(), z3.BoolSort())
-    i, ip, j, jp = z3.Ints('i ip j jp')
+    inv = z3.Function("inv", z3.IntSort(), z3.IntSort(), z3.BoolSort())
+    i, ip, j, jp = z3.Ints("i ip j jp")
     s.add(z3.ForAll([i, j], z3.Implies(i == 0, inv(i, j))))
-    s.add(z3.ForAll(
-        [i, ip, j, jp],
-        z3.Implies(
-            z3.And(inv(i, j), i < 10, ip == i + 1), inv(ip, jp)
+    s.add(
+        z3.ForAll(
+            [i, ip, j, jp],
+            z3.Implies(z3.And(inv(i, j), i < 10, ip == i + 1), inv(ip, jp)),
         )
-    ))
+    )
     s.add(z3.ForAll([i, j], z3.Implies(z3.And(inv(i, j), i >= 10), i == 10)))
-    a0, a1, a2 = z3.Ints('a0 a1 a2')
-    b0, b1, b2 = z3.Ints('b0 b1 b2')
+    a0, a1, a2 = z3.Ints("a0 a1 a2")
+    b0, b1, b2 = z3.Ints("b0 b1 b2")
     x = z3.Var(0, z3.IntSort())
     y = z3.Var(1, z3.IntSort())
     template = z3.And(a0 + a1 * x + a2 * y >= 0, b0 + b1 * x + b2 * y >= 0)
     chc = z3.And(s.assertions())
     print(replace_func_with_template(chc, inv, template))
 
+
 def test_instiatiate():
     """Test function for instiatiate_func_with_axioms."""
-    x, y = z3.Ints('x y')
-    f = z3.Function('f', z3.IntSort(), z3.IntSort(), z3.BoolSort())
+    x, y = z3.Ints("x y")
+    f = z3.Function("f", z3.IntSort(), z3.IntSort(), z3.BoolSort())
     axiom = z3.ForAll([x, y], z3.Implies(f(x, y), x + y > 0))
-    a, b, c = z3.Ints('a b c')
+    a, b, c = z3.Ints("a b c")
     formula = z3.And(
         f(x, y),
         f(y, x),
         z3.Implies(f(a, b), f(b, c)),
         z3.Or(f(x + 1, y - 1), f(x * 2, y / 2)),
-        z3.Not(f(0, 0))
+        z3.Not(f(0, 0)),
     )
     print(instiatiate_func_with_axioms(formula, f, axiom))
 
+
 def test_purify():
     """Test function for purify."""
-    x, y, z = z3.Ints('x y z')
-    f = z3.Function('f', z3.IntSort(), z3.IntSort())
+    x, y, z = z3.Ints("x y z")
+    f = z3.Function("f", z3.IntSort(), z3.IntSort())
     mixed_formula = z3.And(f(x + y) > z, f(x) + f(y) == 10, z > 0)
     print("Original:", mixed_formula)
     purified = purify(mixed_formula)
@@ -244,11 +284,9 @@ def test_purify():
         print("Original model:", s1.model())
         print("Purified model:", s2.model())
     print("--- Quantifier test ---")
-    a, b = z3.Ints('a b')
-    g = z3.Function('g', z3.IntSort(), z3.IntSort(), z3.IntSort())
-    quantified_formula = z3.ForAll(
-        [a, b], z3.Implies(a > b, g(a + b, a - b) > g(a, b))
-    )
+    a, b = z3.Ints("a b")
+    g = z3.Function("g", z3.IntSort(), z3.IntSort(), z3.IntSort())
+    quantified_formula = z3.ForAll([a, b], z3.Implies(a > b, g(a + b, a - b) > g(a, b)))
     print("Quantified:", quantified_formula)
     try:
         purified_quantified = purify(quantified_formula)
@@ -256,6 +294,7 @@ def test_purify():
     except ValueError as e:
         print("Error:", e)
         print("Quantified formulas are rejected.")
+
 
 if __name__ == "__main__":
     test_replace()

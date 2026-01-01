@@ -1,6 +1,7 @@
 """
 This module contains the code for the CEGIS-based algorithm for EFSMT.
 """
+
 from typing import List
 import logging
 import z3
@@ -11,8 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 def simple_cegis_efsmt(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    logic: str, x: List[z3.ExprRef], y: List[z3.ExprRef], phi: z3.ExprRef,
-    maxloops=None, pysmt_solver="z3", timeout=None
+    logic: str,
+    x: List[z3.ExprRef],
+    y: List[z3.ExprRef],
+    phi: z3.ExprRef,
+    maxloops=None,
+    pysmt_solver="z3",
+    timeout=None,
 ):
     """
     A function to solve EFSMT using the CEGIS algorithm
@@ -38,8 +44,12 @@ def simple_cegis_efsmt(  # pylint: disable=too-many-arguments,too-many-positiona
     # CVC5, and MathSAT5, so that the users can choose the solver for
     # existential and universal quantifiers
     return sol.efsmt(
-        evars=x, uvars=y, z3fml=phi,
-        logic=qf_logic, maxloops=maxloops,
-        esolver_name=pysmt_solver, fsolver_name=pysmt_solver,
-        timeout=timeout
+        evars=x,
+        uvars=y,
+        z3fml=phi,
+        logic=qf_logic,
+        maxloops=maxloops,
+        esolver_name=pysmt_solver,
+        fsolver_name=pysmt_solver,
+        timeout=timeout,
     )

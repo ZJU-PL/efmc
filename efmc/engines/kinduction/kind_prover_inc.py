@@ -1,6 +1,7 @@
 """
 Incremental k-induction prover using two solvers for efficient incremental solving.
 """
+
 import logging
 import time
 from typing import Optional
@@ -30,14 +31,16 @@ class KInductionProverInc:
 
         # Determine variable type and size
         self.var_types = {
-            'bv': system.has_bv,
-            'int': system.has_int,
-            'real': system.has_real,
-            'bool': system.has_bool,
-            'fp': system.has_fp
+            "bv": system.has_bv,
+            "int": system.has_int,
+            "real": system.has_real,
+            "bool": system.has_bool,
+            "fp": system.has_fp,
         }
-        self.bv_size = system.variables[0].sort().size() if self.var_types['bv'] else None
-        self.fp_sort = system.variables[0].sort() if self.var_types['fp'] else None
+        self.bv_size = (
+            system.variables[0].sort().size() if self.var_types["bv"] else None
+        )
+        self.fp_sort = system.variables[0].sort() if self.var_types["fp"] else None
 
         # Create solvers
         self.solver_bmc = z3.Solver()
@@ -53,15 +56,15 @@ class KInductionProverInc:
 
     def _create_var(self, name: str):
         """Create variable based on system type"""
-        if self.var_types['bv']:
+        if self.var_types["bv"]:
             return z3.BitVec(name, self.bv_size)
-        if self.var_types['int']:
+        if self.var_types["int"]:
             return z3.Int(name)
-        if self.var_types['real']:
+        if self.var_types["real"]:
             return z3.Real(name)
-        if self.var_types['bool']:
+        if self.var_types["bool"]:
             return z3.Bool(name)
-        if self.var_types['fp']:
+        if self.var_types["fp"]:
             return z3.FP(name, self.fp_sort)
         raise NotImplementedError("Unsupported variable type")
 
@@ -78,10 +81,12 @@ class KInductionProverInc:
         if i not in self._sub_cache:
             subs = []
             for j, var in enumerate(self.sts.variables):
-                subs.extend([
-                    (var, self.at_time(var, i)),
-                    (self.sts.prime_variables[j], self.at_time(var, i + 1))
-                ])
+                subs.extend(
+                    [
+                        (var, self.at_time(var, i)),
+                        (self.sts.prime_variables[j], self.at_time(var, i + 1)),
+                    ]
+                )
             self._sub_cache[i] = subs
         return self._sub_cache[i]
 
@@ -100,8 +105,10 @@ class KInductionProverInc:
         constraints = []
         for i in range(k):
             for j in range(i + 1, k):
-                state_diff = [self.at_time(var, i) != self.at_time(var, j)
-                              for var in self.sts.variables]
+                state_diff = [
+                    self.at_time(var, i) != self.at_time(var, j)
+                    for var in self.sts.variables
+                ]
                 constraints.append(z3.Or(*state_diff))
         return z3.And(*constraints) if constraints else z3.BoolVal(True)
 
@@ -117,8 +124,9 @@ class KInductionProverInc:
         if not self.use_aux_invariant or self.aux_invariant is None:
             return z3.BoolVal(True)
 
-        aux_invs = [z3.substitute(self.aux_invariant, self.get_subs(i))
-                    for i in range(k + 1)]
+        aux_invs = [
+            z3.substitute(self.aux_invariant, self.get_subs(i)) for i in range(k + 1)
+        ]
         return z3.And(*aux_invs)
 
     def get_k_induction_formula(self, k: int):
@@ -126,8 +134,7 @@ class KInductionProverInc:
         if k == 0:
             # Base case: init ∧ ¬P(0)
             return z3.And(
-                self.init_0,
-                z3.Not(z3.substitute(self.sts.post, self.get_subs(k)))
+                self.init_0, z3.Not(z3.substitute(self.sts.post, self.get_subs(k)))
             )
         # Inductive case: P(0) ∧ ... ∧ P(k-1) ∧ T(0,1) ∧ ... ∧ T(k-1,k) ∧ ¬P(k)
         return z3.And(
@@ -135,7 +142,7 @@ class KInductionProverInc:
             self.get_unrolling(k),
             z3.Not(z3.substitute(self.sts.post, self.get_subs(k))),
             self.get_simple_path(k + 1),
-            self.get_aux_invariants(k + 1)
+            self.get_aux_invariants(k + 1),
         )
 
     def _setup_aux_invariant(self):
@@ -212,16 +219,21 @@ class KInductionProverInc:
             # Check timeout
             if timeout and time.time() - start_time > timeout:
                 logger.info("Timeout reached after %d seconds", timeout)
-                return VerificationResult(is_safe=False, invariant=None,
-                                          counterexample=None, is_unknown=True,
-                                          timed_out=True)
+                return VerificationResult(
+                    is_safe=False,
+                    invariant=None,
+                    counterexample=None,
+                    is_unknown=True,
+                    timed_out=True,
+                )
 
             # BMC check
             if self._check_bmc(b):
                 logger.info("unsafe")
                 model = self.solver_bmc.model()
-                return VerificationResult(is_safe=False, invariant=None,
-                                          counterexample=model, is_unsafe=True)
+                return VerificationResult(
+                    is_safe=False, invariant=None, counterexample=model, is_unsafe=True
+                )
 
             # K-induction check (only for b > 0)
             if b > 0:
@@ -237,15 +249,19 @@ class KInductionProverInc:
                 self.unrolled_system.append(trans_k)
 
         logger.info("unknown")
-        return VerificationResult(is_safe=False, invariant=None, counterexample=None, is_unknown=True)
+        return VerificationResult(
+            is_safe=False, invariant=None, counterexample=None, is_unknown=True
+        )
 
 
 def main():
     """Example usage of the incremental k-induction prover"""
-    x, y, _p_x, _p_y = z3.Reals('x y x! y!')
+    x, y, _p_x, _p_y = z3.Reals("x y x! y!")
     init = z3.And(x == 0, y == 8)
-    trans = z3.Or(z3.And(x < 8, y <= 8, _p_x == x + 2, _p_y == y - 2),
-                  z3.And(x == 8, _p_x == 0, y == 0, _p_y == 8))
+    trans = z3.Or(
+        z3.And(x < 8, y <= 8, _p_x == x + 2, _p_y == y - 2),
+        z3.And(x == 8, _p_x == 0, y == 0, _p_y == 8),
+    )
     post = z3.Not(z3.And(x == 0, y == 0))
 
     sts = TransitionSystem()
@@ -256,5 +272,5 @@ def main():
     print(f"Result: {result}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

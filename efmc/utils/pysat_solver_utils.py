@@ -1,5 +1,5 @@
 """
-This module contains the code for the SAT solver 
+This module contains the code for the SAT solver
 
 
 Currently, it is used to solve EFSMT problems with the SAT solver "directly".
@@ -14,6 +14,7 @@ See the implementation in the `efbv_to_bool.py` file.
 """
 
 import logging
+
 # import sys
 from pysat.formula import CNF
 from pysat.solvers import Solver
@@ -36,14 +37,25 @@ logger = logging.getLogger(__name__)
     minisat22   = ('m22', 'msat22', 'minisat22')
     minisatgh   = ('mgh', 'msat-gh', 'minisat-gh')
 """
-sat_solvers_in_pysat = ['cd', 'cd15', 'gc3', 'gc4', 'g3',
-                        'g4', 'lgl', 'mcb', 'mpl', 'mg3',
-                        'mc', 'm22', 'mgh']
+sat_solvers_in_pysat = [
+    "cd",
+    "cd15",
+    "gc3",
+    "gc4",
+    "g3",
+    "g4",
+    "lgl",
+    "mcb",
+    "mpl",
+    "mg3",
+    "mc",
+    "m22",
+    "mgh",
+]
 
 
 def solve_with_sat_solver(dimacs_str: str, solver_name: str) -> str:
-    """Solve a given DIMACS CNF formula using a SAT solver.
-    """
+    """Solve a given DIMACS CNF formula using a SAT solver."""
     assert solver_name in sat_solvers_in_pysat
     # print(dimacs_str)
     print(f"Calling SAT solver {solver_name}")

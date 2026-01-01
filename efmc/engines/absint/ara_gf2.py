@@ -9,12 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
-import numpy as np      # 0/1 matrices, XOR → addition modulo-2
+import numpy as np  # 0/1 matrices, XOR → addition modulo-2
 
 
 # ---------------------------------------------------------------------------
 # 低层工具
 # ---------------------------------------------------------------------------
+
 
 def row_reduce(mat: np.ndarray) -> np.ndarray:
     """
@@ -22,8 +23,8 @@ def row_reduce(mat: np.ndarray) -> np.ndarray:
     mat 只能包含 0/1，shape = (m, n)；该函数就地修改并返回引用。
     """
     m, num_cols = mat.shape
-    r = 0                                         # 当前 pivot 行
-    for c in range(num_cols - 1):                 # 最后一列是常数项，也可参与
+    r = 0  # 当前 pivot 行
+    for c in range(num_cols - 1):  # 最后一列是常数项，也可参与
         # 1) 选 pivot
         pivot = None
         for i in range(r, m):
@@ -40,7 +41,7 @@ def row_reduce(mat: np.ndarray) -> np.ndarray:
         # 3) 消元
         for i in range(m):
             if i != r and mat[i, c]:
-                mat[i] ^= mat[r]                  # GF(2) 下减法就是 XOR
+                mat[i] ^= mat[r]  # GF(2) 下减法就是 XOR
 
         r += 1
         if r == m:
@@ -67,11 +68,11 @@ def project_cols(mat: np.ndarray, rng: Tuple[int, int]) -> np.ndarray:
     if not 0 <= i <= j <= mat.shape[1] - 1:
         raise ValueError("invalid range")
 
-    keep_mask = (mat[:, i:j].sum(axis=1) == 0)    # 那段全 0 才留
-    kept      = mat[keep_mask]
+    keep_mask = mat[:, i:j].sum(axis=1) == 0  # 那段全 0 才留
+    kept = mat[keep_mask]
 
     # 实际删除列
-    cols      = list(range(0, i)) + list(range(j, mat.shape[1]))
+    cols = list(range(0, i)) + list(range(j, mat.shape[1]))
     return kept[:, cols]
 
 
@@ -79,23 +80,25 @@ def project_cols(mat: np.ndarray, rng: Tuple[int, int]) -> np.ndarray:
 # 抽象域数据结构
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AffineRelation:
     """
     行向量 r = [a₀ … aₙ-₁ | c]  代表方程  ∑ aᵢ·xᵢ  =  c   (mod 2)
     self.mat.shape = (m, n+1)
     """
-    mat: np.ndarray                     # dtype uint8 / bool
+
+    mat: np.ndarray  # dtype uint8 / bool
 
     # ------------------------- 基本信息 -------------------------
 
     @property
-    def m(self) -> int:                 # 约束行数
+    def m(self) -> int:  # 约束行数
         """Number of constraint rows."""
         return self.mat.shape[0]
 
     @property
-    def n(self) -> int:                 # 变量个数
+    def n(self) -> int:  # 变量个数
         """Number of variables."""
         return self.mat.shape[1] - 1
 
@@ -103,7 +106,7 @@ class AffineRelation:
 
     def __str__(self) -> str:
         if self.m == 0:
-            return "⊤"                              # top
+            return "⊤"  # top
         rows = []
         for r in self.mat:
             left = "".join(str(int(b)) for b in r[:-1])
@@ -148,7 +151,7 @@ class AffineRelation:
 
     def add_vars(self, k: int) -> "AffineRelation":
         """在末尾再引入 k 个自由变量；添上恒等行"""
-        m, n1 = self.mat.shape               # n1 = n+1
+        m, n1 = self.mat.shape  # n1 = n+1
         num_vars = n1 - 1
         new_n = num_vars + k
         new_mat = np.zeros((m + k, new_n + 1), dtype=np.uint8)
@@ -198,7 +201,7 @@ class AffineRelation:
         """
         Nelson–Oppen trick：加入一个布尔 guard 列，随后存在量化消去。
         """
-        if self.m == 0:           # ⊤ ∪ anything = ⊤
+        if self.m == 0:  # ⊤ ∪ anything = ⊤
             return self
         if other.m == 0:
             return other
@@ -217,7 +220,7 @@ class AffineRelation:
 
     # ------------------------- 顺序合成 compose -------------------------
 
-# ------------------------- 顺序合成 compose -------------------------
+    # ------------------------- 顺序合成 compose -------------------------
 
     def compose(self, other: "AffineRelation") -> "AffineRelation":
         """
@@ -234,20 +237,20 @@ class AffineRelation:
         v = num_vars // 2
 
         # ---------- 生成 ar2 的行 :  [ c | 0^v | A_x ]
-        c2     = other.mat[:, -1:]              # (m2,1)
+        c2 = other.mat[:, -1:]  # (m2,1)
         zeros2 = np.zeros((other.m, v), dtype=np.uint8)
-        ax2    = other.mat[:, : 2*v]            # 去掉常数列
-        rows2  = np.hstack((c2, zeros2, ax2))   # (m2, 3v+1)
+        ax2 = other.mat[:, : 2 * v]  # 去掉常数列
+        rows2 = np.hstack((c2, zeros2, ax2))  # (m2, 3v+1)
 
         # ---------- 生成 ar1 的行 :  [ A | c | 0^v ]
-        a1c1   = self.mat                       # (m1, 2v+1)
+        a1c1 = self.mat  # (m1, 2v+1)
         zeros1 = np.zeros((self.m, v), dtype=np.uint8)
-        rows1  = np.hstack((a1c1, zeros1))      # (m1, 3v+1)
+        rows1 = np.hstack((a1c1, zeros1))  # (m1, 3v+1)
 
-        tmp = np.vstack((rows2, rows1))         # (m1+m2, 3v+1)
+        tmp = np.vstack((rows2, rows1))  # (m1+m2, 3v+1)
 
         # 删掉中间那 v 列（索引 v .. 2v-1）
-        prj = project_cols(tmp, (2 * v, v))     # 返回仍是 ( ?, 2v+1 )
+        prj = project_cols(tmp, (2 * v, v))  # 返回仍是 ( ?, 2v+1 )
 
         return AffineRelation(prj).canonicalize()
 
@@ -258,7 +261,7 @@ class AffineRelation:
         R* = μX.(I ∪ R∘X)    —— 迭代到不动点即可
         （这里用最朴素的 worklist 算法）
         """
-        cur = AffineRelation.eye(self.n // 2 * 2)   # 保证偶数
+        cur = AffineRelation.eye(self.n // 2 * 2)  # 保证偶数
         nxt = self.join(cur.compose(self))
         while str(nxt.mat.tobytes()) != str(cur.mat.tobytes()):
             cur = nxt
@@ -275,8 +278,7 @@ class AffineRelation:
         """Check equality of two relations."""
         if not isinstance(other, AffineRelation):
             return False
-        return np.array_equal(self.canonicalize().mat,
-                              other.canonicalize().mat)
+        return np.array_equal(self.canonicalize().mat, other.canonicalize().mat)
 
 
 # ---------------------------------------------------------------------------
@@ -285,9 +287,9 @@ class AffineRelation:
 
 if __name__ == "__main__":
     N = 4
-    r1 = AffineRelation.eye(N)                # x' = x
-    r2 = r1.negate_post(0)                    # flip 第 0 位
-    r3 = r2.add_post(1, 0)                    # x'1 += x'0
+    r1 = AffineRelation.eye(N)  # x' = x
+    r2 = r1.negate_post(0)  # flip 第 0 位
+    r3 = r2.add_post(1, 0)  # x'1 += x'0
 
     print("r1 (identity):\n", r1, sep="")
     print("\nr2 (negate bit 0):\n", r2, sep="")
@@ -299,10 +301,10 @@ if __name__ == "__main__":
 
     # composition   (这里把变量看成两半 [X'|X] → 需偶数)
     N2 = 2
-    inc      = AffineRelation.eye(N2)             # 恒等
-    inc      = inc.add_post(0, 1)                 # x'0 += x1
-    swap     = AffineRelation.eye(N2)
-    swap.mat[[0, 1], :N2] = swap.mat[[1, 0], :N2] # 交换 x0 x1
+    inc = AffineRelation.eye(N2)  # 恒等
+    inc = inc.add_post(0, 1)  # x'0 += x1
+    swap = AffineRelation.eye(N2)
+    swap.mat[[0, 1], :N2] = swap.mat[[1, 0], :N2]  # 交换 x0 x1
 
     composed = inc.compose(swap)
     print("\ncompose(inc, swap):\n", composed, sep="")

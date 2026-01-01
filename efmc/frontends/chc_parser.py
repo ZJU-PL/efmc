@@ -4,6 +4,7 @@ Parser for Constraint Horn Clause (CHC) files based on Z3's Python API
 NOTE: this file provides a few other functionalities. For example,
     we also support replacing "inv" by a function body
 """
+
 from __future__ import print_function
 
 import z3
@@ -40,6 +41,7 @@ class CHCParser:
      Instead of
          inv and P => post (this can be transformed to the above form)
     """
+
     fmls = []
 
     def __init__(self, inputs: str, to_real: bool):
@@ -73,7 +75,11 @@ class CHCParser:
         pure_trans = z3.And(trans.children()[0].children()[1:])
         if z3.is_and(post.children()[0]):
             # e.g., in the form of Implies(And(inv(i), i >= 10), i == 10)
-            pure_post = z3.simplify(z3.Implies(z3.And(post.children()[0].children()[1:]), post.children()[1]))
+            pure_post = z3.simplify(
+                z3.Implies(
+                    z3.And(post.children()[0].children()[1:]), post.children()[1]
+                )
+            )
         else:
             # e.g., in the form of Implies(inv(i), i == 10)
             pure_post = z3.simplify(post.children()[1])
@@ -85,18 +91,15 @@ class CHCParser:
 
 def test_parse():
     s = z3.SolverFor("HORN")
-    inv = z3.Function('inv', z3.BitVecSort(8), z3.BoolSort())
-    i, ip = z3.BitVecs('i ip', 8)
+    inv = z3.Function("inv", z3.BitVecSort(8), z3.BoolSort())
+    i, ip = z3.BitVecs("i ip", 8)
     # init
-    s.add(z3.ForAll([i], z3.Implies(i == 0,
-                                    inv(i))))
+    s.add(z3.ForAll([i], z3.Implies(i == 0, inv(i))))
     # inductive
-    s.add(z3.ForAll([i, ip], z3.Implies(z3.And(inv(i), i < 10, ip == i + 1),
-                                        inv(ip))))
+    s.add(z3.ForAll([i, ip], z3.Implies(z3.And(inv(i), i < 10, ip == i + 1), inv(ip))))
     # sufficient
 
-    s.add(z3.ForAll([i], z3.Implies(inv(i),
-                                    z3.Implies(i >= 10, i == 10))))
+    s.add(z3.ForAll([i], z3.Implies(inv(i), z3.Implies(i >= 10, i == 10))))
 
     print(s.to_smt2())
 

@@ -36,7 +36,7 @@ class DifferentialPrivacyProver(BaseKSafetyProver):
         input_vars: List[str],
         output_vars: List[str],
         adjacency_bounds: Dict[str, float],
-        epsilon: float
+        epsilon: float,
     ) -> VerificationResult:
         """
         Check that small changes in inputs lead to bounded changes in outputs.
@@ -59,7 +59,9 @@ class DifferentialPrivacyProver(BaseKSafetyProver):
                 v1 = trace_vars[1][i]
                 bound = adjacency_bounds.get(name, 0.0)
                 if var.sort() == z3.IntSort():
-                    antecedent_terms.append(_abs(z3.ToReal(v0 - v1)) <= z3.RealVal(bound))
+                    antecedent_terms.append(
+                        _abs(z3.ToReal(v0 - v1)) <= z3.RealVal(bound)
+                    )
                 elif var.sort() == z3.RealSort():
                     antecedent_terms.append(_abs(v0 - v1) <= z3.RealVal(bound))
                 else:
@@ -75,11 +77,15 @@ class DifferentialPrivacyProver(BaseKSafetyProver):
                 v0 = trace_vars[0][i]
                 v1 = trace_vars[1][i]
                 if var.sort() == z3.IntSort():
-                    consequent_terms.append(_abs(z3.ToReal(v0 - v1)) <= z3.RealVal(epsilon))
+                    consequent_terms.append(
+                        _abs(z3.ToReal(v0 - v1)) <= z3.RealVal(epsilon)
+                    )
                 elif var.sort() == z3.RealSort():
                     consequent_terms.append(_abs(v0 - v1) <= z3.RealVal(epsilon))
                 else:
-                    raise NotImplementedError("DP prover supports int/real outputs only")
+                    raise NotImplementedError(
+                        "DP prover supports int/real outputs only"
+                    )
 
         consequent = z3.And(*consequent_terms) if consequent_terms else z3.BoolVal(True)
 

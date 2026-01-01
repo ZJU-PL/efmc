@@ -150,17 +150,17 @@ def _to_z3_term(sts, step_vars, var_index_cache: Dict[str, int], term: Term, ste
 def _encode_atom(sts, step_vars, cache, atom: Atom, step: int):
     l = _to_z3_term(sts, step_vars, cache, atom.left, step)
     r = _to_z3_term(sts, step_vars, cache, atom.right, step)
-    if atom.op == '==':
+    if atom.op == "==":
         return l == r
-    if atom.op == '!=':
+    if atom.op == "!=":
         return l != r
-    if atom.op == '<=':
+    if atom.op == "<=":
         return l <= r
-    if atom.op == '<':
+    if atom.op == "<":
         return l < r
-    if atom.op == '>=':
+    if atom.op == ">=":
         return l >= r
-    if atom.op == '>':
+    if atom.op == ">":
         return l > r
     raise NotImplementedError(f"Unsupported atomic op: {atom.op}")
 
@@ -171,25 +171,35 @@ def _encode(sts, step_vars, cache, phi: HProp, step: int, bound: int) -> z3.Expr
     if isinstance(phi, Not):
         return z3.Not(_encode(sts, step_vars, cache, phi.phi, step, bound))
     if isinstance(phi, And):
-        return z3.And(*[_encode(sts, step_vars, cache, c, step, bound) for c in phi.conjuncts])
+        return z3.And(
+            *[_encode(sts, step_vars, cache, c, step, bound) for c in phi.conjuncts]
+        )
     if isinstance(phi, Or):
-        return z3.Or(*[_encode(sts, step_vars, cache, d, step, bound) for d in phi.disjuncts])
+        return z3.Or(
+            *[_encode(sts, step_vars, cache, d, step, bound) for d in phi.disjuncts]
+        )
     if isinstance(phi, Implies):
-        return z3.Implies(_encode(sts, step_vars, cache, phi.left, step, bound),
-                          _encode(sts, step_vars, cache, phi.right, step, bound))
+        return z3.Implies(
+            _encode(sts, step_vars, cache, phi.left, step, bound),
+            _encode(sts, step_vars, cache, phi.right, step, bound),
+        )
     if isinstance(phi, X):
         next_step = min(step + 1, bound)
         return _encode(sts, step_vars, cache, phi.phi, next_step, bound)
     if isinstance(phi, G):
-        return z3.And(*[
-            _encode(sts, step_vars, cache, phi.phi, t, bound)
-            for t in range(step, bound + 1)
-        ])
+        return z3.And(
+            *[
+                _encode(sts, step_vars, cache, phi.phi, t, bound)
+                for t in range(step, bound + 1)
+            ]
+        )
     if isinstance(phi, F):
-        return z3.Or(*[
-            _encode(sts, step_vars, cache, phi.phi, t, bound)
-            for t in range(step, bound + 1)
-        ])
+        return z3.Or(
+            *[
+                _encode(sts, step_vars, cache, phi.phi, t, bound)
+                for t in range(step, bound + 1)
+            ]
+        )
     if isinstance(phi, U):
         ors = []
         for j in range(step, bound + 1):
@@ -197,9 +207,11 @@ def _encode(sts, step_vars, cache, phi: HProp, step: int, bound: int) -> z3.Expr
                 _encode(sts, step_vars, cache, phi.left, i, bound)
                 for i in range(step, j)
             ]
-            ors.append(z3.And(*(left_ands + [
-                _encode(sts, step_vars, cache, phi.right, j, bound)
-            ])))
+            ors.append(
+                z3.And(
+                    *(left_ands + [_encode(sts, step_vars, cache, phi.right, j, bound)])
+                )
+            )
         return z3.Or(*ors) if ors else z3.BoolVal(False)
     raise NotImplementedError(f"Unsupported formula type: {type(phi)}")
 

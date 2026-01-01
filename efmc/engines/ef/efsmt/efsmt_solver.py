@@ -28,12 +28,16 @@ Solver options:
 """
 
 import logging
+
 # from enum import Enum
 # from typing import List
 
 import z3
 
-from efmc.engines.ef.efsmt.efsmt_bin_solvers import solve_with_bin_smt, solve_with_bin_qbf
+from efmc.engines.ef.efsmt.efsmt_bin_solvers import (
+    solve_with_bin_smt,
+    solve_with_bin_qbf,
+)
 from efmc.engines.ef.efsmt.efsmt_cegis_solvers import simple_cegis_efsmt
 from efmc.engines.ef.efsmt.efsmt_cegis_fp_solver import simple_cegis_efsmt_fp
 from efmc.engines.ef.efsmt.efbv_to_bool import EFBVFormulaTranslator
@@ -125,7 +129,7 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
             sol.add(z3.ForAll(self.forall_vars, self.phi))
             fml_str += sol.to_smt2()
 
-        with open(smt2_file_name, "w", encoding='utf-8') as tmp:
+        with open(smt2_file_name, "w", encoding="utf-8") as tmp:
             tmp.write(fml_str)
 
     def dump_qbf_file(self, qdimacs_file_name: str):
@@ -133,10 +137,9 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
         assert self.logic in ("BV", "UFBV")
         fml_manager = EFBVFormulaTranslator()
         qdimacs_str = fml_manager.to_qdimacs_str(
-            self.phi, existential_vars=self.exists_vars,
-            universal_vars=self.forall_vars
+            self.phi, existential_vars=self.exists_vars, universal_vars=self.forall_vars
         )
-        with open(qdimacs_file_name, "w", encoding='utf-8') as tmp:
+        with open(qdimacs_file_name, "w", encoding="utf-8") as tmp:
             tmp.write(qdimacs_str)
 
     def dump_cnf_file(self, dimacs_file_name: str):
@@ -146,10 +149,9 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
         # FIXME: to_cnf_str() is not implemented
         # Using to_dimacs_str instead as workaround
         cnf_str = fml_manager.to_dimacs_str(
-            self.phi, existential_vars=self.exists_vars,
-            universal_vars=self.forall_vars
+            self.phi, existential_vars=self.exists_vars, universal_vars=self.forall_vars
         )
-        with open(dimacs_file_name, "w", encoding='utf-8') as tmp:
+        with open(dimacs_file_name, "w", encoding="utf-8") as tmp:
             tmp.write(cnf_str)
 
     def solve(self):  # pylint: disable=too-many-return-statements,too-many-branches
@@ -163,7 +165,9 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
             # Use z3's Python API to solve the problem
             return self.solve_with_z3_api()
         elif self.solver == "z3":
-            return solve_with_bin_smt(self.logic, self.exists_vars, self.forall_vars, self.phi, "z3")
+            return solve_with_bin_smt(
+                self.logic, self.exists_vars, self.forall_vars, self.phi, "z3"
+            )
         if self.solver == "cvc5":
             return solve_with_bin_smt(
                 self.logic, self.exists_vars, self.forall_vars, self.phi, "cvc5"
@@ -198,9 +202,21 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
         if self.solver == "z3sat":
             return self.solve_with_z3_sat()
         # third-party SAT solves (using pySAT)
-        if self.solver in ['cd', 'cd15', 'gc3', 'gc4', 'g3',
-                           'g4', 'lgl', 'mcb', 'mpl', 'mg3',
-                           'mc', 'm22', 'mgh']:
+        if self.solver in [
+            "cd",
+            "cd15",
+            "gc3",
+            "gc4",
+            "g3",
+            "g4",
+            "lgl",
+            "mcb",
+            "mpl",
+            "mg3",
+            "mc",
+            "m22",
+            "mgh",
+        ]:
             return self.solve_with_third_party_sat(solver_name=self.solver)
 
         # 3. Simple cegis-based approach
@@ -213,11 +229,11 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
     def solve_with_z3_api(self) -> str:
         """
         Solve Exists-Forall SMT problems directly using Z3's Python API.
-        
+
         This method creates a Z3 solver instance and adds the quantified formula
         that represents the Exists-Forall problem. It then checks satisfiability
         and returns the result as a string.
-        
+
         Returns:
             str: "sat" if the formula is satisfiable, "unsat" if unsatisfiable,
             or "unknown" if Z3 cannot determine satisfiability.
@@ -259,16 +275,23 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
         # Use FP-specific CEGIS solver for FP logic
         if self.logic == "FP":
             z3_res = simple_cegis_efsmt_fp(
-                self.logic, self.exists_vars, self.forall_vars, self.phi,
-                maxloops=None, timeout=None,
+                self.logic,
+                self.exists_vars,
+                self.forall_vars,
+                self.phi,
+                maxloops=None,
+                timeout=None,
                 solver_timeout=self.solver_timeout,
                 dump_dir=self.dump_dir,
-                dump_threshold=self.dump_threshold
+                dump_threshold=self.dump_threshold,
             )
             return z3_res[0]  # Return just the result string
         z3_res = simple_cegis_efsmt(
-            self.logic, self.exists_vars, self.forall_vars, self.phi,
-            pysmt_solver=self.pysmt_solver
+            self.logic,
+            self.exists_vars,
+            self.forall_vars,
+            self.phi,
+            pysmt_solver=self.pysmt_solver,
         )
         return z3_res
 
@@ -307,8 +330,7 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
         assert self.logic in ("BV", "UFBV")
         fml_manager = EFBVFormulaTranslator()
         qdimacs = fml_manager.to_qdimacs_str(
-            self.phi, existential_vars=self.exists_vars,
-            universal_vars=self.forall_vars
+            self.phi, existential_vars=self.exists_vars, universal_vars=self.forall_vars
         )
         return solve_with_bin_qbf(qdimacs, solver_name)
 
@@ -327,9 +349,7 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
         assert self.logic in ("BV", "UFBV")
         print("Quantifier elimination + SAT solving")
         fml_manager = EFBVFormulaTranslator()
-        vc = fml_manager.to_dimacs_str(
-            self.phi, self.exists_vars, self.forall_vars
-        )
+        vc = fml_manager.to_dimacs_str(self.phi, self.exists_vars, self.forall_vars)
         res = solve_with_sat_solver(vc, solver_name=solver_name)
         return res
 
@@ -337,6 +357,7 @@ class EFSMTSolver:  # pylint: disable=too-many-instance-attributes
 def demo_efsmt():
     """Demo function for EFSMT solver."""
     import time  # noqa: E402
+
     x, y, _z = z3.BitVecs("x y z", 16)  # z unused in this demo
     # x, y, z = z3.Reals("x y z")
     fmla = z3.Implies(z3.And(y > 0, y < 10), y - 2 * x < 7)
@@ -350,5 +371,5 @@ def demo_efsmt():
     print("time: ", time.time() - start)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     demo_efsmt()

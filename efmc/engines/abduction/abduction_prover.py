@@ -14,8 +14,12 @@ import z3
 
 from efmc.engines.abduction.abductor.abductor import qe_abduce
 from efmc.sts import TransitionSystem
-from efmc.utils.verification_utils import VerificationResult, SolverTimeout, check_entailment, \
-    are_expressions_equivalent
+from efmc.utils.verification_utils import (
+    VerificationResult,
+    SolverTimeout,
+    check_entailment,
+    are_expressions_equivalent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,9 @@ class AbductionProver:
         )
         self.last_cti: Optional[z3.ModelRef] = None
 
-    def check_inductiveness(self, inv: z3.ExprRef) -> Tuple[bool, Optional[z3.ModelRef]]:
+    def check_inductiveness(
+        self, inv: z3.ExprRef
+    ) -> Tuple[bool, Optional[z3.ModelRef]]:
         """Check if the candidate invariant is inductive: I ∧ T → I'"""
         inv_prime = z3.substitute(inv, self.var_map)
         s = z3.Solver()
@@ -50,7 +56,11 @@ class AbductionProver:
         pre_state_constraints: List[z3.ExprRef] = [
             v == cti[v] for v in self.sts.variables if v in cti
         ]
-        pre_state = z3.And(*pre_state_constraints) if pre_state_constraints else z3.BoolVal(True)
+        pre_state = (
+            z3.And(*pre_state_constraints)
+            if pre_state_constraints
+            else z3.BoolVal(True)
+        )
 
         # Set up abduction query
         pre_cond = z3.And(inv, pre_state, self.sts.trans)

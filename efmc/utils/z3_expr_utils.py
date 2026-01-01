@@ -136,13 +136,13 @@ def get_atoms(expr: z3.BoolRef):
         s.add(exp)
 
     # convert to NNF and then look for preds
-    ep = z3.Tactic('nnf')(expr).as_expr()
+    ep = z3.Tactic("nnf")(expr).as_expr()
     get_preds_(ep)
     return s
 
 
 def to_smtlib2(expr: z3.BoolRef) -> str:
-    """"
+    """ "
     To SMT-LIB2 string
     """
     s = z3.Solver()
@@ -162,7 +162,7 @@ def is_function_symbol(s: z3.ExprRef) -> bool:
         # predicate symbol
         return False
 
-    if func.name().lower() == 'if':
+    if func.name().lower() == "if":
         return False
 
     return True
@@ -184,7 +184,7 @@ def skolemize(exp: z3.ExprRef) -> z3.ExprRef:
     """To Skolem normal form? (How about snf)"""
     g = z3.Goal()
     g.add(exp)
-    t = z3.Tactic('snf')
+    t = z3.Tactic("snf")
     res = t(g)
     return res.as_expr()
 
@@ -212,7 +212,7 @@ def negate(f: z3.ExprRef) -> z3.ExprRef:
 
 def ctx_simplify(exp: z3.ExprRef):
     """Perform complex simplifications (can be slow)"""
-    return z3.Tactic('ctx-solver-simplify')(exp).as_expr()
+    return z3.Tactic("ctx-solver-simplify")(exp).as_expr()
 
 
 def is_expr_var(a) -> bool:
@@ -281,8 +281,15 @@ def is_term(a) -> bool:
     return not z3.is_bool(a) and all(is_term(c) for c in a.children())
 
 
-CONNECTIVE_OPS = [z3.Z3_OP_NOT, z3.Z3_OP_AND, z3.Z3_OP_OR, z3.Z3_OP_IMPLIES,
-                  z3.Z3_OP_IFF, z3.Z3_OP_ITE, z3.Z3_OP_XOR]
+CONNECTIVE_OPS = [
+    z3.Z3_OP_NOT,
+    z3.Z3_OP_AND,
+    z3.Z3_OP_OR,
+    z3.Z3_OP_IMPLIES,
+    z3.Z3_OP_IFF,
+    z3.Z3_OP_ITE,
+    z3.Z3_OP_XOR,
+]
 
 
 def is_atom(a) -> bool:
@@ -301,8 +308,11 @@ def is_atom(a) -> bool:
     if is_expr_var(a):
         return True
 
-    return (z3.is_app(a) and a.decl().kind() not in CONNECTIVE_OPS and
-            all(is_term(c) for c in a.children()))
+    return (
+        z3.is_app(a)
+        and a.decl().kind() not in CONNECTIVE_OPS
+        and all(is_term(c) for c in a.children())
+    )
 
 
 def is_pos_lit(a) -> bool:
@@ -408,6 +418,7 @@ def z3_value_to_python(value):
 
 class FormulaInfo:
     """Information about a Z3 formula including quantifiers and logic."""
+
     def __init__(self, fml):
         self.formula = fml
         self.has_quantifier = self._check_has_quantifier()
@@ -422,7 +433,7 @@ class FormulaInfo:
 
     def _check_has_quantifier(self):
         """Check if the formula has quantifiers."""
-        return self.apply_probe('has-quantifiers')
+        return self.apply_probe("has-quantifiers")
 
     def logic_has_bv(self):
         """Check if the logic contains bit-vectors."""
@@ -478,8 +489,7 @@ def get_z3_logic(fml: z3.ExprRef):
 
 
 def eval_predicates(m: z3.ModelRef, predicates: List[z3.BoolRef]):
-    """ Let m be a model of a formula phi, preds be a set of predicates
-    """
+    """Let m be a model of a formula phi, preds be a set of predicates"""
     res = []
     for p in predicates:
         if z3.is_true(m.eval(p)):
@@ -494,10 +504,10 @@ def eval_predicates(m: z3.ModelRef, predicates: List[z3.BoolRef]):
 def extract_all(lst: List[Any]) -> List[Any]:
     """
     Extract all elements from nested lists.
-    
+
     Args:
         lst: A potentially nested list
-        
+
     Returns:
         A flattened list with all elements
     """

@@ -67,8 +67,9 @@ class DangerInvariantProver:  # pylint: disable=too-few-public-methods
 
     def _prime(self, expr: z3.ExprRef) -> z3.ExprRef:
         """Return *expr* with current variables replaced by the primed ones."""
-        return z3.substitute(expr, list(zip(self.sts.variables,
-                                            self.sts.prime_variables)))
+        return z3.substitute(
+            expr, list(zip(self.sts.variables, self.sts.prime_variables))
+        )
 
     def _rank_cmp(self, r_cur: z3.ExprRef, r_nxt: z3.ExprRef) -> z3.ExprRef:
         """Strict order for the ranking sort, handling signed/unsigned BVs."""
@@ -116,55 +117,60 @@ class DangerInvariantProver:  # pylint: disable=too-few-public-methods
         # -------------------------------------------------------------- #
         # sanity checks
         # -------------------------------------------------------------- #
-        if not (self.sts.variables and self.sts.prime_variables and
-                self.sts.init is not None and self.sts.trans is not None and
-                self.sts.post is not None):
-            logger.error("TransitionSystem not fully initialised "
-                         "(vars/trans/init/post required)")
-            return VerificationResult(is_safe=False, invariant=None,
-                                      is_unknown=True)
+        if not (
+            self.sts.variables
+            and self.sts.prime_variables
+            and self.sts.init is not None
+            and self.sts.trans is not None
+            and self.sts.post is not None
+        ):
+            logger.error(
+                "TransitionSystem not fully initialised "
+                "(vars/trans/init/post required)"
+            )
+            return VerificationResult(is_safe=False, invariant=None, is_unknown=True)
 
         # -------------------------------------------------------------- #
         # 1. Base / Reachability
         # -------------------------------------------------------------- #
-        base_formula = z3.Exists(self.sts.variables,
-                                 z3.And(self.sts.init, inv))
+        base_formula = z3.Exists(self.sts.variables, z3.And(self.sts.init, inv))
 
         # -------------------------------------------------------------- #
         # 2. Progress
         # -------------------------------------------------------------- #
-        inv_prime        = self._prime(inv)
+        inv_prime = self._prime(inv)
         rank_cur, rank_nxt = rank, self._prime(rank)
-        rank_decrease    = self._rank_cmp(rank_cur, rank_nxt)
+        rank_decrease = self._rank_cmp(rank_cur, rank_nxt)
 
-        unsigned_bv = self.sts.has_bv and getattr(self.sts, "signedness",
-                                                  "unsigned") == "unsigned"
+        unsigned_bv = (
+            self.sts.has_bv
+            and getattr(self.sts, "signedness", "unsigned") == "unsigned"
+        )
 
         rank_positive_atom = z3.BoolVal(True)
         if require_rank_positive and not unsigned_bv:
             rank_positive_atom = rank_cur > 0
 
         progress_guard = guard if guard is not None else z3.BoolVal(True)
-        progress_ante  = z3.And(inv, progress_guard, self.sts.post)
+        progress_ante = z3.And(inv, progress_guard, self.sts.post)
 
         # ∃x'. Trans ∧ D(x') ∧ R' < R
-        progress_succ  = z3.Exists(self.sts.prime_variables,
-                                   z3.And(self.sts.trans,
-                                          inv_prime,
-                                          rank_decrease))
+        progress_succ = z3.Exists(
+            self.sts.prime_variables, z3.And(self.sts.trans, inv_prime, rank_decrease)
+        )
 
         # Full progress clause: antecedent ⇒ (rank_positive ∧ succ)
         progress_formula = z3.ForAll(
             self.sts.variables,
-            z3.Implies(progress_ante,
-                       z3.And(rank_positive_atom, progress_succ))
+            z3.Implies(progress_ante, z3.And(rank_positive_atom, progress_succ)),
         )
 
         # Optional global positivity:  ∀x. D(x) ⇒ R(x) > 0
         positivity_formula = z3.BoolVal(True)
         if require_rank_positive and not unsigned_bv:
-            positivity_formula = z3.ForAll(self.sts.variables,
-                                           z3.Implies(inv, rank_cur > 0))
+            positivity_formula = z3.ForAll(
+                self.sts.variables, z3.Implies(inv, rank_cur > 0)
+            )
 
         # -------------------------------------------------------------- #
         # 3. Exit-Violation
@@ -173,8 +179,7 @@ class DangerInvariantProver:  # pylint: disable=too-few-public-methods
         if guard is not None:
             exit_formula = z3.ForAll(
                 self.sts.variables,
-                z3.Implies(z3.And(inv, z3.Not(guard)),
-                           z3.Not(self.sts.post))
+                z3.Implies(z3.And(inv, z3.Not(guard)), z3.Not(self.sts.post)),
             )
 
         # -------------------------------------------------------------- #
@@ -189,16 +194,12 @@ class DangerInvariantProver:  # pylint: disable=too-few-public-methods
         res = s.check()
         if res == z3.sat:
             # Witness holds ⇒ program is UNSAFE
-            return VerificationResult(is_safe=False,
-                                      invariant=inv,
-                                      counterexample=s.model())
+            return VerificationResult(
+                is_safe=False, invariant=inv, counterexample=s.model()
+            )
         if res == z3.unknown:
             logger.warning("Danger invariant check: Z3 returned unknown")
-            return VerificationResult(is_safe=False,
-                                      invariant=None,
-                                      is_unknown=True)
+            return VerificationResult(is_safe=False, invariant=None, is_unknown=True)
 
         # UNSAT: witness rejected; we cannot conclude safety
-        return VerificationResult(is_safe=True,
-                                  invariant=None,
-                                  is_unknown=True)
+        return VerificationResult(is_safe=True, invariant=None, is_unknown=True)

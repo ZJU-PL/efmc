@@ -54,7 +54,9 @@ class TerminationProver:
     def set_ranking_template(self, template_name: str, **kwargs):
         """Set the ranking function template to use."""
         if not self.sts.has_bv:
-            raise NotImplementedError("Currently only bit-vector programs are supported")
+            raise NotImplementedError(
+                "Currently only bit-vector programs are supported"
+            )
 
         template_map = {
             "bv_linear_ranking": BitVecLinearRankingTemplate,
@@ -63,34 +65,42 @@ class TerminationProver:
             ),
             "bv_conditional_ranking": lambda sts, **kw: BitVecConditionalRankingTemplate(
                 sts, num_branches=self.num_branches, **kw
-            )
+            ),
         }
 
         if template_name not in template_map:
-            raise NotImplementedError(f"Ranking template '{template_name}' not implemented")
+            raise NotImplementedError(
+                f"Ranking template '{template_name}' not implemented"
+            )
 
         self.ranking_template = template_map[template_name](self.sts, **kwargs)
 
     def set_recurrence_template(self, template_name: str, **kwargs):
         """Set the recurrence set template to use."""
         if not self.sts.has_bv:
-            raise NotImplementedError("Currently only bit-vector programs are supported")
+            raise NotImplementedError(
+                "Currently only bit-vector programs are supported"
+            )
 
         template_map = {
             "bv_linear_recurrence": BitVecLinearRecurrenceTemplate,
             "bv_interval_recurrence": BitVecIntervalRecurrenceTemplate,
-            "bv_disjunctive_recurrence": BitVecDisjunctiveRecurrenceTemplate
+            "bv_disjunctive_recurrence": BitVecDisjunctiveRecurrenceTemplate,
         }
 
         if template_name not in template_map:
-            raise NotImplementedError(f"Recurrence template '{template_name}' not implemented")
+            raise NotImplementedError(
+                f"Recurrence template '{template_name}' not implemented"
+            )
 
         self.recurrence_template = template_map[template_name](self.sts, **kwargs)
 
     def prove_termination(self, timeout: Optional[int] = None) -> TerminationResult:
         """Prove termination by synthesizing a ranking function."""
         if self.ranking_template is None:
-            raise ValueError("No ranking template set. Call set_ranking_template() first.")
+            raise ValueError(
+                "No ranking template set. Call set_ranking_template() first."
+            )
 
         start_time = time.time()
 
@@ -107,11 +117,16 @@ class TerminationProver:
             # Validate if requested and successful
             if result.result and self.validate_ranking_function:
                 ranking_function = self._extract_ranking_function()
-                if ranking_function and not self.ranking_validator.validate_ranking_function(
-                        ranking_function, self.ranking_template.signedness):
+                if (
+                    ranking_function
+                    and not self.ranking_validator.validate_ranking_function(
+                        ranking_function, self.ranking_template.signedness
+                    )
+                ):
                     logger.warning("Synthesized ranking function failed validation")
                     result = TerminationResult(
-                        result=False, error="Ranking function validation failed")
+                        result=False, error="Ranking function validation failed"
+                    )
 
             result.time = time.time() - start_time
             return result
@@ -119,16 +134,17 @@ class TerminationProver:
         except Exception as e:
             logger.error("Error in termination proving: %s", e)
             return TerminationResult(
-                result=False,
-                time=time.time() - start_time,
-                error=str(e)
+                result=False, time=time.time() - start_time, error=str(e)
             )
 
-    def prove_non_termination(self, timeout: Optional[int] = None) -> NonTerminationResult:
+    def prove_non_termination(
+        self, timeout: Optional[int] = None
+    ) -> NonTerminationResult:
         """Prove non-termination by synthesizing a recurrence set."""
         if self.recurrence_template is None:
             raise ValueError(
-                "No recurrence template set. Call set_recurrence_template() first.")
+                "No recurrence template set. Call set_recurrence_template() first."
+            )
 
         start_time = time.time()
 
@@ -145,11 +161,16 @@ class TerminationProver:
             # Validate if requested and successful
             if result.result and self.validate_recurrence_set:
                 recurrence_set = self._extract_recurrence_set()
-                if recurrence_set and not self.recurrence_validator.validate_recurrence_set(
-                        recurrence_set):
+                if (
+                    recurrence_set
+                    and not self.recurrence_validator.validate_recurrence_set(
+                        recurrence_set
+                    )
+                ):
                     logger.warning("Synthesized recurrence set failed validation")
                     result = NonTerminationResult(
-                        result=False, error="Recurrence set validation failed")
+                        result=False, error="Recurrence set validation failed"
+                    )
                 else:
                     result.recurrence_set = recurrence_set
 
@@ -159,27 +180,27 @@ class TerminationProver:
         except Exception as e:
             logger.error("Error in non-termination proving: %s", e)
             return NonTerminationResult(
-                result=False,
-                time=time.time() - start_time,
-                error=str(e)
+                result=False, time=time.time() - start_time, error=str(e)
             )
 
     def _extract_ranking_function(self) -> Optional[z3.ExprRef]:
         """Extract ranking function from template."""
-        if hasattr(self.ranking_template, 'build_invariant_expr'):
+        if hasattr(self.ranking_template, "build_invariant_expr"):
             dummy_model = self._create_dummy_model()
             if dummy_model:
                 return self.ranking_template.build_invariant_expr(
-                    dummy_model, use_prime_variables=False)
+                    dummy_model, use_prime_variables=False
+                )
         return None
 
     def _extract_recurrence_set(self) -> Optional[z3.ExprRef]:
         """Extract recurrence set from template."""
-        if hasattr(self.recurrence_template, 'build_invariant_expr'):
+        if hasattr(self.recurrence_template, "build_invariant_expr"):
             dummy_model = self._create_dummy_model()
             if dummy_model:
                 return self.recurrence_template.build_invariant_expr(
-                    dummy_model, use_prime_variables=False)
+                    dummy_model, use_prime_variables=False
+                )
         return None
 
     def _create_dummy_model(self):

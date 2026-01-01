@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class BaseKSafetyProver:
     """
     Base k-safety verification engine for relational properties.
-    
+
     This prover handles verification of k-safety properties by:
     1. Creating k copies of the transition system
     2. Encoding the relational property as a hyperproperty
@@ -76,7 +76,9 @@ class BaseKSafetyProver:
         self.trace_variables = trace_vars
         return trace_vars
 
-    def _make_step_variables(self, bound: int) -> Dict[int, Dict[int, List[z3.ExprRef]]]:
+    def _make_step_variables(
+        self, bound: int
+    ) -> Dict[int, Dict[int, List[z3.ExprRef]]]:
         """Create variables indexed by trace and time step.
 
         Returns:
@@ -91,7 +93,9 @@ class BaseKSafetyProver:
                     var_name = str(var)
                     var_sort = var.sort()
                     if z3.is_bv_sort(var_sort):
-                        new_var = z3.BitVec(f"{var_name}_{trace_idx}_{step}", var_sort.size())
+                        new_var = z3.BitVec(
+                            f"{var_name}_{trace_idx}_{step}", var_sort.size()
+                        )
                     elif var_sort == z3.RealSort():
                         new_var = z3.Real(f"{var_name}_{trace_idx}_{step}")
                     elif var_sort == z3.IntSort():
@@ -114,7 +118,9 @@ class BaseKSafetyProver:
         subst_pairs = []
         for trace_idx in range(self.k):
             for i, _ in enumerate(self.sts.variables):
-                subst_pairs.append((base_trace_vars[trace_idx][i], step_vars[trace_idx][step][i]))
+                subst_pairs.append(
+                    (base_trace_vars[trace_idx][i], step_vars[trace_idx][step][i])
+                )
         return z3.substitute(self.relational_property, subst_pairs)
 
     def create_k_safety_formula(self) -> z3.ExprRef:
@@ -159,7 +165,9 @@ class BaseKSafetyProver:
             -> relational_property at step = bound
         """
         if self.relational_property is None:
-            raise ValueError("Relational property must be set before creating k-safety formula")
+            raise ValueError(
+                "Relational property must be set before creating k-safety formula"
+            )
 
         # Create per-trace per-step variables
         step_vars = self._make_step_variables(bound)

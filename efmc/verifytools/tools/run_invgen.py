@@ -21,12 +21,18 @@ def parse_invgen_invariant(inv):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="run invgen on a levelset")
-    p.add_argument('--lvlset', type=str,
-                   help='Path to lvlset file', required=True)
-    p.add_argument('--time-limit', type=int,
-                   help='Timeout for any operation involving InvGen or z3')
-    p.add_argument('--csv-table', action="store_true", default=False,
-                   help='Print results as a csv table')
+    p.add_argument("--lvlset", type=str, help="Path to lvlset file", required=True)
+    p.add_argument(
+        "--time-limit",
+        type=int,
+        help="Timeout for any operation involving InvGen or z3",
+    )
+    p.add_argument(
+        "--csv-table",
+        action="store_true",
+        default=False,
+        help="Print results as a csv table",
+    )
     args = p.parse_args()
 
     lvl_set_name, lvls = loadBoogieLvlSet(args.lvlset)
@@ -62,9 +68,17 @@ if __name__ == "__main__":
             bbs = lvl["program"]
             loop = lvl["loop"]
             try:
-                ((overfitted, overfitted2), (nonind, nonind2), sound, violations) =\
-                    tryAndVerifyLvl(lvl, set(boogie_invs), set(), args.time_limit,
-                                    addSPs=True, useSplitters=False, generalizeUserInvs=False)
+                ((overfitted, overfitted2), (nonind, nonind2), sound, violations) = (
+                    tryAndVerifyLvl(
+                        lvl,
+                        set(boogie_invs),
+                        set(),
+                        args.time_limit,
+                        addSPs=True,
+                        useSplitters=False,
+                        generalizeUserInvs=False,
+                    )
+                )
                 assert len(overfitted2) == 0 and len(nonind2) == 0
                 if len(violations) > 0:
                     error("Supposedly sound inv: ", loop_invs)
@@ -83,11 +97,25 @@ if __name__ == "__main__":
             boogie_invs = []
 
         if args.csv_table:
-            print(lvl_name, ",",
-                  ";".join(map(str, loop_invs)), ",",
-                  ";".join(map(str, boogie_invs)), ",",
-                  res[lvl_name][0], ",",
-                  conf_status)
+            print(
+                lvl_name,
+                ",",
+                ";".join(map(str, loop_invs)),
+                ",",
+                ";".join(map(str, boogie_invs)),
+                ",",
+                res[lvl_name][0],
+                ",",
+                conf_status,
+            )
         else:
-            print("Level", lvl_name, "discovered:", loop_invs,
-                  "solved: ", solved, "confirmed?: ", conf_status)
+            print(
+                "Level",
+                lvl_name,
+                "discovered:",
+                loop_invs,
+                "solved: ",
+                solved,
+                "confirmed?: ",
+                conf_status,
+            )

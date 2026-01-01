@@ -43,8 +43,10 @@ class EFBV2BoolAux:
         return bool2id, bool_clauses
 
     def flattening(  # pylint: disable=too-many-locals
-        self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef],
-        universal_vars: List[z3.ExprRef]
+        self,
+        fml: z3.ExprRef,
+        existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef],
     ):
         """
         The flattening function takes a bit-vector formula and translates it to a Boolean formula.
@@ -159,7 +161,7 @@ class EFBV2BoolAux:
             # cnt = z3.ForAll(universal_vars, z3.Exists(aux_bool_vars, simplified_fml))
             cnt = z3.Exists(
                 existential_vars,
-                z3.ForAll(universal_vars, z3.Exists(aux_bool_vars, simplified_fml))
+                z3.ForAll(universal_vars, z3.Exists(aux_bool_vars, simplified_fml)),
             )
         else:
             cnt = z3.ForAll(universal_vars, simplified_fml)
@@ -191,8 +193,9 @@ class EFBV2BoolAux:
                     # create new Boolean vars
                     z3_var = z3.Bool(f"{prefix}{numeric_var}")
                     int2var[numeric_var] = z3_var
-                    if (numeric_var not in self.universal_bools) and \
-                            (numeric_var not in self.existential_bools):
+                    if (numeric_var not in self.universal_bools) and (
+                        numeric_var not in self.existential_bools
+                    ):
                         # should we add the following line to avoid duplicates?
                         if numeric_var not in aux_bool_vars:
                             aux_bool_vars.append(numeric_var)
@@ -209,7 +212,7 @@ class EFBV2BoolAux:
             #  i.e, Exits X . Forall Y. Exists Z . P(X, Y, Z)
             # "e {} 0".format(" ".join([str(v) for v in self.existential_bools])),
             f"a {' '.join([str(v) for v in self.universal_bools])} 0",
-            f"e {' '.join([str(v) for v in aux_bool_vars])} 0"
+            f"e {' '.join([str(v) for v in aux_bool_vars])} 0",
         ]
 
         for cls in self.bool_clauses:
@@ -240,8 +243,12 @@ class EFBVFormulaTranslator:
         self.qe_level = "word"  # { "bool", "word" }
         self.qe_tactic = "qe2"  # {"qe", "qe2"}
 
-    def to_z3_qbf(self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef],
-                  universal_vars: List[z3.ExprRef]) -> z3.ExprRef:
+    def to_z3_qbf(
+        self,
+        fml: z3.ExprRef,
+        existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef],
+    ) -> z3.ExprRef:
         """Translate an EFSMT(BV) formula to a QBF formula (in z3)
         :param fml: a quantifier-free bit-vector formula
         :param existential_vars: the set of existential quantified bit-vector variables
@@ -253,8 +260,10 @@ class EFBVFormulaTranslator:
         return translator.to_qbf_z3expr()
 
     def to_qdimacs_str(
-        self, fml: z3.ExprRef, existential_vars: List[z3.ExprRef],
-        universal_vars: List[z3.ExprRef]
+        self,
+        fml: z3.ExprRef,
+        existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef],
     ):
         """Translate formula to QDIMACS string format."""
         translator = EFBV2BoolAux()
@@ -262,8 +271,10 @@ class EFBVFormulaTranslator:
         return translator.to_qbf_qdimacs()
 
     def to_z3_sat(
-        self, fml: z3.BoolRef, existential_vars: List[z3.ExprRef],
-        universal_vars: List[z3.ExprRef]
+        self,
+        fml: z3.BoolRef,
+        existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef],
     ):
         """Translate an EFSMT(BV) formula to a SAT formula
         :return: a quantifier-free Boolean formula (in z3)
@@ -284,8 +295,10 @@ class EFBVFormulaTranslator:
         return z3.Then("simplify", "bit-blast")(qfbv_fml).as_expr()
 
     def to_dimacs_str(
-        self, fml: z3.BoolRef, existential_vars: List[z3.ExprRef],
-        universal_vars: List[z3.ExprRef]
+        self,
+        fml: z3.BoolRef,
+        existential_vars: List[z3.ExprRef],
+        universal_vars: List[z3.ExprRef],
     ):
         """Translate an EFSMT(BV) formula to a SAT formula
         1. First, perform quantifier elimination (currently, at bit-vector level)
@@ -323,6 +336,6 @@ def demo_efbv2bool():
     return qdimacs
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     RES = demo_efbv2bool()
     print(RES)

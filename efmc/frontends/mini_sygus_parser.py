@@ -11,6 +11,7 @@ This parser handles:
 - Transition system conversion
 - Support for multiple data types (Int, Real, Array, BitVec)
 """
+
 import z3
 from typing import Union, List
 
@@ -23,6 +24,7 @@ Expr = Union[Atom, List]
 
 class SyGuSParsingError(Exception):
     """Custom exception for SyGuS parsing errors"""
+
     pass
 
 
@@ -49,7 +51,7 @@ def input_to_list(string: str) -> List[str]:
 def tokenize(chars: str) -> list:
     """Convert a string of characters into a list of tokens."""
 
-    return chars.replace('(', ' ( ').replace(')', ' ) ').replace('" "', 'space').split()
+    return chars.replace("(", " ( ").replace(")", " ) ").replace('" "', "space").split()
 
 
 def parse_sexpression(program: str) -> Expr:
@@ -63,14 +65,14 @@ def read_from_tokens(tokens: list) -> Expr:
         return
         # raise SyntaxError('unexpected EOF') # is this OK?
     token = tokens.pop(0)
-    if token == '(':
+    if token == "(":
         L = []
-        while tokens and tokens[0] != ')':
+        while tokens and tokens[0] != ")":
             L.append(read_from_tokens(tokens))
         tokens.pop(0)  # pop off ')'
         return L
-    elif token == ')':
-        raise SyntaxError('unexpected )')
+    elif token == ")":
+        raise SyntaxError("unexpected )")
     else:
         return atom(token)
 
@@ -216,8 +218,7 @@ class SyGusInVParser:
         # print(self.post_fun_body)
 
     def process_func(self, slist):
-        """Process a 'define-fun' command to extract function bodies and variables.
-        """
+        """Process a 'define-fun' command to extract function bodies and variables."""
         # print(slist)
         assert len(slist) >= 5  # why?
         func_name = slist[1]
@@ -297,12 +298,12 @@ class SyGusInVParser:
         """
         all_vars = []  # another way for collecting the signature
         for var_sig in self.all_vars:  # ['i', 'Int']
-            if 'Int' in var_sig:
+            if "Int" in var_sig:
                 if self.to_real:
                     all_vars.append(z3.Real(var_sig[0]))
                 else:
                     all_vars.append(z3.Int(var_sig[0]))
-            elif 'Real' in var_sig:
+            elif "Real" in var_sig:
                 all_vars.append(z3.Real(var_sig[0]))
             else:  # TODO: should we just assume the type is bv?
                 # e.g., var_sig is ['x', ['_', 'BitVec', 32]]
@@ -322,8 +323,8 @@ def demo_parser():
         "Bool (and (= x! (+ x y)) (= y! (+ x y))))",
         "(define-fun post_fun ((x Int) (y Int)) Bool (>= y 1))",
         "(inv-constraint inv_fun pre_fun trans_fun post_fun)",
-        "(check-synth)"
-        "; xxx"]
+        "(check-synth)" "; xxx",
+    ]
 
     # ss = SyGusInVParser("\n".join(tt_arr), to_real=False)
     ss = SyGusInVParser(tt, to_real=False)
@@ -332,5 +333,5 @@ def demo_parser():
     # print(input_to_list(tttt))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     demo_parser()

@@ -39,7 +39,7 @@ def compute(operator, A, B, ordering, r_cache):
 
         return BDD_and_BDDsons(operator, A, B, ordering, r_cache)
 
-    if (isinstance(B, BDDTerminalNode) or ordering.in_order(A.var, B.var)):
+    if isinstance(B, BDDTerminalNode) or ordering.in_order(A.var, B.var):
         return BDDsons_and_BDD(operator, A, B, ordering, r_cache)
 
     if A.var == B.var:
@@ -48,7 +48,7 @@ def compute(operator, A, B, ordering, r_cache):
     if ordering.in_order(B.var, A.var):
         return BDD_and_BDDsons(operator, A, B, ordering, r_cache)
 
-    raise RuntimeError('Unsupported configuration %s %s' % A,  B)
+    raise RuntimeError("Unsupported configuration %s %s" % A, B)
 
 
 def descendents(root, checked=None):
@@ -63,7 +63,7 @@ def descendents(root, checked=None):
         if node not in desc and node not in checked:
             desc.add(node)
 
-            if (isinstance(node, BDDNonTerminalNode)):
+            if isinstance(node, BDDNonTerminalNode):
                 stack.append(node.low)
                 stack.append(node.high)
 
@@ -82,15 +82,16 @@ def ancestors(leaf, checked=None):
         if node not in anc and node not in checked:
             anc.add(node)
 
-            stack.extend((node.f_low | node.f_high-checked)-anc)
+            stack.extend((node.f_low | node.f_high - checked) - anc)
 
     return anc
 
 
 class BDDNode(object):
-    r'''
+    r"""
     A class to represent Binary Decision Diagram (BDD) nodes.
-    '''
+    """
+
     def __new__(cls, *data):
         if len(data) == 1:
             return BDDTerminalNode(data[0])
@@ -98,21 +99,23 @@ class BDDNode(object):
         if len(data) == 3:
             return BDDNonTerminalNode(*data)
 
-        raise RuntimeError('passed {} parameters, '.format(len(data)) +
-                           'but only  BDDNode(value) for terminal node and ' +
-                           'BDDNode(var, low, high) for non terminal node ' +
-                           'have been implemented')
+        raise RuntimeError(
+            "passed {} parameters, ".format(len(data))
+            + "but only  BDDNode(value) for terminal node and "
+            + "BDDNode(var, low, high) for non terminal node "
+            + "have been implemented"
+        )
 
     def __hash__(self):
-        r''' Compute a hash for a BDDNode
+        r"""Compute a hash for a BDDNode
 
         :returns: the id of `self`
         :rtype: int
-        '''
+        """
         return id(self)
 
     def restrict(self, var, value):
-        r''' Partially evaluate the binary function encoded by a BDD.
+        r"""Partially evaluate the binary function encoded by a BDD.
 
         :param var: name of the variable to be set
         :type var: str
@@ -122,7 +125,7 @@ class BDDNode(object):
                   :math:`f` with :param var: set to :param value: where
                   :math:`f` is the function encoded by the object
         :rtype: BDDNode
-        '''
+        """
         if isinstance(value, int):
             if value == 1:
                 value = True
@@ -130,9 +133,10 @@ class BDDNode(object):
                 value = False
 
         if not (isinstance(var, str) and isinstance(value, bool)):
-            raise TypeError('expected a pair (str, bool), ' +
-                            'got ({}, {})'.format(var.__class__,
-                                                  value.__class__))
+            raise TypeError(
+                "expected a pair (str, bool), "
+                + "got ({}, {})".format(var.__class__, value.__class__)
+            )
 
         return cache_restrict(self, var, value, dict())
 
@@ -141,38 +145,43 @@ class BDDNode(object):
         self.f_high = WeakSet()
 
     def descendents(self):
-        r''' Computes the descendents of this node.
+        r"""Computes the descendents of this node.
 
         :returns: the set of nodes that have the current object as ancestor
         :rtype: set of :class:`BDDNode`
-        '''
+        """
         return descendents(self, set())
 
     def ancestors(self):
-        r''' Computs the ancestors of this node.
+        r"""Computs the ancestors of this node.
 
         :returns: the set of nodes that have the current object as descendent
         :rtype: set of :class:`BDDNode`
-        '''
+        """
         return ancestors(self, set())
 
     @staticmethod
     def nodes():
-        r''' Return all the BDD nodes stored in memory.
+        r"""Return all the BDD nodes stored in memory.
 
         :returns: all the BDD nodes that are stored in memory
         :rtype: set of `BDDNode`
-        '''
+        """
         return BDDNode(0).ancestors() | BDDNode(1).ancestors()
 
     def variables(self):
-        r''' Return the variables contained into a BDD.
+        r"""Return the variables contained into a BDD.
 
         :returns: all the variable that label some the descendents of this node
         :rtype: set of str
-        '''
-        return set([node.var for node in self.descendents()
-                    if isinstance(node, BDDNonTerminalNode)])
+        """
+        return set(
+            [
+                node.var
+                for node in self.descendents()
+                if isinstance(node, BDDNonTerminalNode)
+            ]
+        )
 
     def __repr__(self):
         return self.__str__()
@@ -181,14 +190,17 @@ class BDDNode(object):
 def find_isomorph(var, low, high):
     if len(low.f_low) < len(high.f_high):
         node_set = low.f_low
-        lh_test = (lambda low, high: high is node.high)
+        lh_test = lambda low, high: high is node.high
     else:
         node_set = high.f_high
-        lh_test = (lambda low, high: low is node.low)
+        lh_test = lambda low, high: low is node.low
 
     for node in node_set:
-        if (isinstance(node, BDDNonTerminalNode) and var == node.var and
-                lh_test(low, high)):
+        if (
+            isinstance(node, BDDNonTerminalNode)
+            and var == node.var
+            and lh_test(low, high)
+        ):
             return node
 
     return None
@@ -223,7 +235,7 @@ class BDDNonTerminalNode(BDDNode):
     def __new__(cls, var, low, high):
         for p in [low, high]:
             if not isinstance(p, BDDNode):
-                raise TypeError('expected an BBD node, got {}'.format(p))
+                raise TypeError("expected an BBD node, got {}".format(p))
 
         if low is high:
             return low
@@ -238,7 +250,7 @@ class BDDNonTerminalNode(BDDNode):
         return node
 
     def respect_ordering(self, O, checked=None):
-        r''' Test whether a BDDNode respects an ordering.
+        r"""Test whether a BDDNode respects an ordering.
 
         :param O: the ordering to be tested
         :type O: Ordering
@@ -248,9 +260,9 @@ class BDDNonTerminalNode(BDDNode):
                   those of `node.low` and `node.high` for any node in the
                   subgraph rooted in this object
         :rtype: bool
-        '''
+        """
         if not isinstance(O, Ordering):
-            TypeError('expected an Ordering, got {}'.format(O))
+            TypeError("expected an Ordering, got {}".format(O))
 
         if checked is None:
             checked = set()
@@ -259,15 +271,17 @@ class BDDNonTerminalNode(BDDNode):
             return True
 
         if self.var not in O:
-            raise RuntimeError('%s in not in %s' % (self.var, O))
+            raise RuntimeError("%s in not in %s" % (self.var, O))
 
         for son in [self.low, self.high]:
-            if (isinstance(son, BDDNonTerminalNode) and
-                    not O.in_order(self.var, son.var)):
+            if isinstance(son, BDDNonTerminalNode) and not O.in_order(
+                self.var, son.var
+            ):
                 return False
 
-        if (self.high.respect_ordering(O, checked) and
-                self.low.respect_ordering(O, checked)):
+        if self.high.respect_ordering(O, checked) and self.low.respect_ordering(
+            O, checked
+        ):
             checked.add(self)
 
             return True
@@ -275,7 +289,7 @@ class BDDNonTerminalNode(BDDNode):
         return False
 
     def __reset__(self, var, low, high):
-        r''' Reset the value of a BDDNonTerminalNode.
+        r"""Reset the value of a BDDNonTerminalNode.
 
         :param var: variable name
         :type var: str
@@ -283,7 +297,7 @@ class BDDNonTerminalNode(BDDNode):
         :type low: BDDNode
         :param high: the high BDDNode
         :type high: BDDNode
-        '''
+        """
         super(BDDNonTerminalNode, self).__reset__()
 
         self.var = var
@@ -294,56 +308,56 @@ class BDDNonTerminalNode(BDDNode):
         self.high.f_high.add(self)
 
     def __invert__(self, r_cache=None):
-        r''' Invert the binary function represented by a BDDNode.
+        r"""Invert the binary function represented by a BDDNode.
 
         :param r_cache: a dictionary that caches already computed results
         :type r_cache: dict or None
         :returns: the BDDNode representing the function `1-f` where `f` is the
                   function depicted by `self`
         :rtype: BDDNode
-        '''
+        """
         if r_cache is None:
             r_cache = dict()
 
         if self in r_cache:
             return r_cache[self]
 
-        r_cache[self] = BDDNonTerminalNode(self.var,
-                                           self.low.__invert__(r_cache),
-                                           self.high.__invert__(r_cache))
+        r_cache[self] = BDDNonTerminalNode(
+            self.var, self.low.__invert__(r_cache), self.high.__invert__(r_cache)
+        )
         return r_cache[self]
 
     def __hash__(self):
         return id(self)
 
     def __eq__(self, O):
-        r''' Test the equivalence of two BDDs.
+        r"""Test the equivalence of two BDDs.
 
         :param O: a BDD node
         :type O: BDDNode
         :returns: `True` if the two BDDs rooted in `self` and `O` are
                   isomorph,  `False`,  otherwise
         :rtype: bool
-        '''
+        """
         return self is O
 
     def __str__(self):
-        r''' Produce a string that represents a BDD.
+        r"""Produce a string that represents a BDD.
 
         :returns: a string that represents the BDD rooted in `self`
         :rtype: str
-        '''
+        """
         repr = []
 
-        for succ,  neg in [(self.low, '~'), (self.high, '')]:
+        for succ, neg in [(self.low, "~"), (self.high, "")]:
             if isinstance(succ, BDDTerminalNode):
                 if succ.value:
-                    repr.append('%s%s' % (neg, self.var))
+                    repr.append("%s%s" % (neg, self.var))
             else:
-                repr.append('%s%s & %s' % (neg, self.var, succ))
+                repr.append("%s%s & %s" % (neg, self.var, succ))
 
         if len(repr) == 2:
-            return '(%s) | (%s)' % (repr[0], repr[1])
+            return "(%s) | (%s)" % (repr[0], repr[1])
 
         return repr[0]
 
@@ -353,8 +367,9 @@ class BDDTerminalNode(BDDNode):
 
     def __new__(cls, value):
         if not (value in set([0, 1, False, True])):
-            raise TypeError('expected a value among [0, 1, False, True], ' +
-                            'got {}'.format(value))
+            raise TypeError(
+                "expected a value among [0, 1, False, True], " + "got {}".format(value)
+            )
 
         if value not in BDDTerminalNode.Tnodes:
             node = super(BDDNode, cls).__new__(cls)
@@ -367,7 +382,7 @@ class BDDTerminalNode(BDDNode):
         return BDDTerminalNode.Tnodes[value]
 
     def respect_ordering(self, O, checked=None):
-        r''' Test whether a BDDNode respects an Ordering or not.
+        r"""Test whether a BDDNode respects an Ordering or not.
 
         :param O: the ordering to be tested
         :type O: Ordering
@@ -375,27 +390,27 @@ class BDDTerminalNode(BDDNode):
         :type checked: set
         :returns: True
         :rtype: bool
-        '''
+        """
         return True
 
     def __reset__(self, value):
-        r''' Reset the value of a BDDTerminalNode.
+        r"""Reset the value of a BDDTerminalNode.
 
         :param value: the new value
         :type value: bool
-        '''
+        """
         super(BDDTerminalNode, self).__reset__()
         self.value = value
 
     def __invert__(self, r_cache=None):
-        r''' Invert the binary function represented by a BDDNode.
+        r"""Invert the binary function represented by a BDDNode.
 
         :param r_cache: a dictionary that caches already computed results
         :type r_cache: dict or None
         :returns: the BDDNode representing the function `1-f` where `f` is the
                   function depicted by `self`
         :rtype: BDDNode
-        '''
+        """
         if r_cache is None:
             r_cache = dict()
 
@@ -410,17 +425,17 @@ class BDDTerminalNode(BDDNode):
         return id(self)
 
     def __eq__(self, O):
-        r''' Test the equivalence of two BDDs.
+        r"""Test the equivalence of two BDDs.
 
         :param O: a BDD node
         :type O: BDDNode
         :returns: `True` if the two BDDs rooted in `self` and `O` are
                   isomorph,  `False`,  otherwise
         :rtype: bool
-        '''
+        """
         return self is O
 
     def __str__(self):
         if self.value:
-            return '1'
-        return '0'
+            return "1"
+        return "0"

@@ -27,28 +27,26 @@ from .bv_polyhedron import BitVecPolyhedronTemplate, DisjunctiveBitVecPolyhedron
 from .bv_bitwise import KnownBitsTemplate, BitPredAbsTemplate
 
 # Bit-level templates
-from .bv_pattern import BitVecPatternTemplate,DisjunctiveBitVecPatternTemplate
-from .bv_rotation import BitVecRotationTemplate,DisjunctiveBitVecRotationTemplate
-from .bv_xor_parity import BitVecXorParityTemplate,DisjunctiveBitVecXorParityTemplate
+from .bv_pattern import BitVecPatternTemplate, DisjunctiveBitVecPatternTemplate
+from .bv_rotation import BitVecRotationTemplate, DisjunctiveBitVecRotationTemplate
+from .bv_xor_parity import BitVecXorParityTemplate, DisjunctiveBitVecXorParityTemplate
 
 # Bit-vector ranking function templates for termination verification
 from .bv_ranking import (
     BitVecLinearRankingTemplate,
     BitVecLexicographicRankingTemplate,
-    BitVecConditionalRankingTemplate
+    BitVecConditionalRankingTemplate,
 )
 
 # Bit-vector recurrence set templates for non-termination verification
 from .bv_recurrence import (
     BitVecLinearRecurrenceTemplate,
     BitVecIntervalRecurrenceTemplate,
-    BitVecDisjunctiveRecurrenceTemplate
+    BitVecDisjunctiveRecurrenceTemplate,
 )
 
 # Hybrid bit-vector templates for combining multiple domains
-from .bv_hybrid import (
-    ConjunctiveBitVecTemplate
-)
+from .bv_hybrid import ConjunctiveBitVecTemplate
 
 # Floating-point templates for QF_FP support
 from .fp_interval import FPIntervalTemplate

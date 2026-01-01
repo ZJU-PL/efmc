@@ -29,9 +29,7 @@ class SymmetryProver(BaseKSafetyProver):
         self.logger.info("Initialized symmetry prover")
 
     def verify_input_permutation_symmetry(
-        self,
-        input_perm: Dict[str, str],
-        output_perm: Dict[str, str]
+        self, input_perm: Dict[str, str], output_perm: Dict[str, str]
     ) -> VerificationResult:
         """
         Check that applying input permutation on trace 1 yields output
@@ -51,9 +49,15 @@ class SymmetryProver(BaseKSafetyProver):
                 # find index of permuted variable
                 perm_name = input_perm[name]
                 try:
-                    j = next(idx for idx, v in enumerate(self.sts.variables) if str(v) == perm_name)
+                    j = next(
+                        idx
+                        for idx, v in enumerate(self.sts.variables)
+                        if str(v) == perm_name
+                    )
                 except StopIteration as exc:
-                    raise ValueError(f"Permutation target '{perm_name}' not found among variables") from exc
+                    raise ValueError(
+                        f"Permutation target '{perm_name}' not found among variables"
+                    ) from exc
                 input_eq_terms.append(trace_vars[0][i] == trace_vars[1][j])
 
         # For outputs, require v_0 equals perm(v)_1
@@ -63,9 +67,15 @@ class SymmetryProver(BaseKSafetyProver):
             if name in output_perm:
                 perm_name = output_perm[name]
                 try:
-                    j = next(idx for idx, v in enumerate(self.sts.variables) if str(v) == perm_name)
+                    j = next(
+                        idx
+                        for idx, v in enumerate(self.sts.variables)
+                        if str(v) == perm_name
+                    )
                 except StopIteration as exc:
-                    raise ValueError(f"Permutation target '{perm_name}' not found among variables") from exc
+                    raise ValueError(
+                        f"Permutation target '{perm_name}' not found among variables"
+                    ) from exc
                 output_eq_terms.append(trace_vars[0][i] == trace_vars[1][j])
 
         antecedent = z3.And(*input_eq_terms) if input_eq_terms else z3.BoolVal(True)

@@ -27,46 +27,52 @@ class VerificationTester:
         test_cases = []
 
         # Simple loop: y = 2x
-        x, y = z3.Ints('x y')
+        x, y = z3.Ints("x y")
         xp, yp = z3.Ints("x! y!")
         system = TransitionSystem(
-            variables=[x, y], prime_variables=[xp, yp],
+            variables=[x, y],
+            prime_variables=[xp, yp],
             init=z3.And(x == 0, y == 0),
             trans=z3.And(xp == x + 1, yp == y + 2),
-            post=y <= 2 * x
+            post=y <= 2 * x,
         )
         test_cases.append(("Simple Loop", system, True, "Loop maintaining y = 2x"))
 
         # Faulty system
-        a, b = z3.Ints('a b')
+        a, b = z3.Ints("a b")
         ap, bp = z3.Ints("a! b!")
         system = TransitionSystem(
-            variables=[a, b], prime_variables=[ap, bp],
+            variables=[a, b],
+            prime_variables=[ap, bp],
             init=z3.And(a == 0, b == 0),
             trans=z3.And(ap == a + 1, bp == b + 1),
-            post=b < a
+            post=b < a,
         )
-        test_cases.append(("Faulty System", system, False, "Parallel increments violating b < a"))
+        test_cases.append(
+            ("Faulty System", system, False, "Parallel increments violating b < a")
+        )
 
         # Bounded loop
-        i = z3.Int('i')
+        i = z3.Int("i")
         ip = z3.Int("i!")
         system = TransitionSystem(
-            variables=[i], prime_variables=[ip],
+            variables=[i],
+            prime_variables=[ip],
             init=i == 0,
             trans=z3.If(i < 10, ip == i + 1, ip == i),
-            post=i <= 10
+            post=i <= 10,
         )
         test_cases.append(("Bounded Loop", system, True, "Counter with upper bound 10"))
 
         # Dependent variables
-        n, m = z3.Ints('n m')
+        n, m = z3.Ints("n m")
         np, mp = z3.Ints("n! m!")
         system = TransitionSystem(
-            variables=[n, m], prime_variables=[np, mp],
+            variables=[n, m],
+            prime_variables=[np, mp],
             init=z3.And(n == 2, m == 1),
             trans=z3.And(np == n + 1, mp == n),
-            post=m <= n / 2
+            post=m <= n / 2,
         )
         test_cases.append(
             ("Dependent Variables", system, False, "m tracking n-1, violating m <= n/2")
@@ -74,7 +80,9 @@ class VerificationTester:
 
         return test_cases
 
-    def verify_system(self, name: str, system: TransitionSystem) -> Tuple[bool, bool, float, str]:
+    def verify_system(
+        self, name: str, system: TransitionSystem
+    ) -> Tuple[bool, bool, float, str]:
         """Verify system with both methods. Returns (kind_result, abd_result, time, invariant)."""
         # K-induction
         kind_prover = KInductionProver(system)
@@ -105,16 +113,25 @@ class VerificationTester:
 
         print("Verification Test Results")
         print("=" * 60)
-        
+
         for name, system, expected_safe, description in test_cases:
-            kind_result, abd_result, exec_time, invariant = self.verify_system(name, system)
-            
+            kind_result, abd_result, exec_time, invariant = self.verify_system(
+                name, system
+            )
+
             # Verify abduction result matches expectation
             success = abd_result == expected_safe
             if not success:
-                logger.error("Test %s failed: expected %s, got %s", name, expected_safe, abd_result)
+                logger.error(
+                    "Test %s failed: expected %s, got %s",
+                    name,
+                    expected_safe,
+                    abd_result,
+                )
 
-            results.append((name, kind_result, abd_result, success, exec_time, invariant))
+            results.append(
+                (name, kind_result, abd_result, success, exec_time, invariant)
+            )
 
             # Print result
             if kind_result is None:
@@ -135,7 +152,9 @@ class VerificationTester:
         total_tests = len(results)
         successful = sum(1 for _, _, _, success, _, _ in results)
         total_time = sum(exec_time for _, _, _, _, exec_time, _ in results)
-        unknown_kind = sum(1 for _, kind_result, _, _, _, _ in results if kind_result is None)
+        unknown_kind = sum(
+            1 for _, kind_result, _, _, _, _ in results if kind_result is None
+        )
 
         print(f"\n{'=' * 60}")
         print(f"Summary: {successful}/{total_tests} tests passed")
@@ -147,7 +166,7 @@ class VerificationTester:
 
 def main():
     """Run verification tests."""
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     try:
         tester = VerificationTester()

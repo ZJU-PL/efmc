@@ -32,6 +32,7 @@ def main():
     print(f"\nResponse:\n{response}")
     print(f"\nTokens - Input: {input_tokens}, Output: {output_tokens}")
 
+
 if __name__ == "__main__":
     # Check if API key is set
     if not os.environ.get("DEEPSEEK_API_KEY"):

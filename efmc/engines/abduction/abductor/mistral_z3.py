@@ -28,7 +28,7 @@ class MSASolver:
         self.fvars = frozenset(get_variables(self.formula))
 
         if self.verb > 2:
-            print(f'c formula: \'{self.formula}\'')
+            print(f"c formula: '{self.formula}'")
 
     def init_from_formula(self, formula: z3.BoolRef) -> None:
         """Initialize solver from a Z3 formula."""
@@ -37,7 +37,7 @@ class MSASolver:
         self.fvars = frozenset(get_variables(self.formula))
 
         if self.verb > 2:
-            print(f'c formula: \'{self.formula}\'')
+            print(f"c formula: '{self.formula}'")
 
     def validate_small_model(self, model: z3.ModelRef) -> bool:
         """Check whether a small model is a 'sufficient condition'"""
@@ -70,7 +70,9 @@ class MSASolver:
         return model
         # return ['{0}={1}'.format(v, model[v]) for v in frozenset(self.fvars) - mus]
 
-    def compute_mus(self, x_set: FrozenSet, fvars: FrozenSet, lb: int):  # pylint: disable=invalid-name
+    def compute_mus(
+        self, x_set: FrozenSet, fvars: FrozenSet, lb: int
+    ):  # pylint: disable=invalid-name
         """
         Algorithm implements find_mus() procedure from Fig. 1
         of the dillig-cav12 paper.
@@ -83,7 +85,7 @@ class MSASolver:
         x_var = frozenset([next(iter(fvars))])  # should choose x in a more clever way
 
         if self.verb > 1:
-            print(f'c state: X = {list(x_set)} + {list(x_var)}, lb = {lb}')
+            print(f"c state: X = {list(x_set)} + {list(x_var)}, lb = {lb}")
 
         if self.get_model_forall(x_set.union(x_var)):
             y_set = self.compute_mus(x_set.union(x_var), fvars - x_var, lb - 1)
@@ -102,10 +104,10 @@ class MSASolver:
     def get_model_forall(self, x_univl):
         """
         Get a model for the formula with the given variables universally quantified.
-        
+
         Args:
             x_univl: List of variables to be universally quantified
-            
+
         Returns:
             Model for the formula, or False if no model is found
         """
@@ -121,7 +123,7 @@ class MSASolver:
 
 
 if __name__ == "__main__":
-    a, b, c, d = z3.Ints('a b c d')
+    a, b, c, d = z3.Ints("a b c d")
     fml = z3.Or(z3.And(a == 3, b == 3), z3.And(a == 1, b == 1, c == 1, d == 1))
     ms = MSASolver()
     ms.init_from_formula(fml)

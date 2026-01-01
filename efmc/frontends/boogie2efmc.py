@@ -9,10 +9,26 @@ from typing import List, Dict, Set, Optional, Tuple
 
 import z3
 from efmc.verifytools.boogie.ast import (
-    AstProgram, AstImplementation, AstLabel, AstAssert, AstAssume,
-    AstAssignment, AstGoto, AstReturn, AstBinExpr, AstId, AstNumber, AstTrue, AstFalse,
-    AstUnExpr, parseAst, stmt_read, stmt_changed, AstHavoc,
-    AstWhile, AstBlock
+    AstProgram,
+    AstImplementation,
+    AstLabel,
+    AstAssert,
+    AstAssume,
+    AstAssignment,
+    AstGoto,
+    AstReturn,
+    AstBinExpr,
+    AstId,
+    AstNumber,
+    AstTrue,
+    AstFalse,
+    AstUnExpr,
+    parseAst,
+    stmt_read,
+    stmt_changed,
+    AstHavoc,
+    AstWhile,
+    AstBlock,
 )
 from efmc.verifytools.boogie.bb import BB
 from efmc.verifytools.tools.boogie_loops import loops, Loop
@@ -33,22 +49,28 @@ class BoogieToEFMCConverter:
         """Initialize the converter."""
         self.logger = logger
         self.variable_mapping = {}  # Maps original variables to Z3 variables
-        self.prime_variable_mapping = {}  # Maps original variables to Z3 prime variables
+        self.prime_variable_mapping = (
+            {}
+        )  # Maps original variables to Z3 prime variables
 
     def parse_boogie_file(self, filename: str) -> AstProgram:
         """Parse a Boogie file and return the AST."""
         try:
-            with open(filename, 'r', encoding="utf-8") as f:
+            with open(filename, "r", encoding="utf-8") as f:
                 content = f.read()
             return parseAst(content)
         except Exception as e:
             self.logger.error("Failed to parse Boogie file %s: %s", filename, e)
             raise
 
-    def extract_loops_from_program(self, ast_program: AstProgram) -> Tuple[List[Loop], Dict[str, BB]]:
+    def extract_loops_from_program(
+        self, ast_program: AstProgram
+    ) -> Tuple[List[Loop], Dict[str, BB]]:
         """Extract loops from a Boogie program AST."""
         # Get the first implementation (assuming single implementation)
-        implementations = [decl for decl in ast_program.decls if isinstance(decl, AstImplementation)]
+        implementations = [
+            decl for decl in ast_program.decls if isinstance(decl, AstImplementation)
+        ]
         if not implementations:
             raise ValueError("No implementation found in Boogie program")
 
@@ -100,7 +122,9 @@ class BoogieToEFMCConverter:
                 while_exit = f"{cur_label}_while_exit"
 
                 # Header block: contains the loop condition
-                bbs[while_header] = BB([cur_label], [AstAssume(stmt.condition)], [while_body, while_exit])
+                bbs[while_header] = BB(
+                    [cur_label], [AstAssume(stmt.condition)], [while_body, while_exit]
+                )
                 bbs[cur_label].successors.append(while_header)
 
                 # Body block: contains the loop body statements
@@ -113,7 +137,9 @@ class BoogieToEFMCConverter:
                 bbs[while_body] = BB([while_header], body_stmts, [while_header])
 
                 # Exit block: for statements after the while loop
-                bbs[while_exit] = BB([while_header], [AstAssume(AstUnExpr("!", stmt.condition))], [])
+                bbs[while_exit] = BB(
+                    [while_header], [AstAssume(AstUnExpr("!", stmt.condition))], []
+                )
 
                 cur_label = while_exit
             elif isinstance(stmt, AstGoto):
@@ -133,8 +159,9 @@ class BoogieToEFMCConverter:
 
         return bbs
 
-    def convert_loop_to_transition_system(self, loop: Loop, bbs: Dict[str, BB],
-                                          variables: Optional[List[str]] = None) -> TransitionSystem:
+    def convert_loop_to_transition_system(
+        self, loop: Loop, bbs: Dict[str, BB], variables: Optional[List[str]] = None
+    ) -> TransitionSystem:
         """Convert a single Boogie loop to an EFMC transition system."""
         self.logger.info("Converting loop with header: %s", loop.header)
 
@@ -172,7 +199,7 @@ class BoogieToEFMCConverter:
             prime_variables=z3_prime_vars,
             init=init_condition,
             trans=trans_condition,
-            post=post_condition
+            post=post_condition,
         )
 
         self.logger.info("Successfully created transition system")
@@ -218,7 +245,7 @@ class BoogieToEFMCConverter:
                 if loop_header in bb.successors and bb_name != loop_header:
                     # Check if this block is part of the loop structure
                     # Loop body blocks typically have names ending with "_while_body"
-                    if not bb_name.endswith('_while_body'):
+                    if not bb_name.endswith("_while_body"):
                         entry_blocks.append(bb_name)
 
             # Process assignments in entry blocks to create initial conditions
@@ -230,7 +257,9 @@ class BoogieToEFMCConverter:
                             # Convert assignment to initial condition: x = value
                             lhs_var = str(stmt.lhs)
                             if lhs_var in self.variable_mapping:
-                                rhs_expr = self._ast_expr_to_z3(stmt.rhs, is_prime=False)
+                                rhs_expr = self._ast_expr_to_z3(
+                                    stmt.rhs, is_prime=False
+                                )
                                 lhs_z3 = self.variable_mapping[lhs_var]
                                 conditions.append(lhs_z3 == rhs_expr)
 
@@ -242,13 +271,17 @@ class BoogieToEFMCConverter:
         else:
             return z3.BoolVal(True)  # No specific entry condition
 
-    def _extract_transition_relation(self, loop: Loop, bbs: Dict[str, BB]) -> z3.ExprRef:
+    def _extract_transition_relation(
+        self, loop: Loop, bbs: Dict[str, BB]
+    ) -> z3.ExprRef:
         """Extract transition relation from loop body."""
         transitions = []
 
         # Process each loop path
         for path in loop.loop_paths:
-            path_condition = self._extract_path_condition(path, bbs, include_guards=True)
+            path_condition = self._extract_path_condition(
+                path, bbs, include_guards=True
+            )
             if path_condition is not None:
                 transitions.append(path_condition)
 
@@ -257,7 +290,9 @@ class BoogieToEFMCConverter:
         else:
             return z3.BoolVal(False)  # No valid transitions
 
-    def _extract_path_condition(self, path: List[str], bbs: Dict[str, BB], include_guards: bool = True) -> Optional[z3.ExprRef]:
+    def _extract_path_condition(
+        self, path: List[str], bbs: Dict[str, BB], include_guards: bool = True
+    ) -> Optional[z3.ExprRef]:
         """Extract condition for a single path through the loop."""
         conditions = []
         assignments = []
@@ -294,16 +329,24 @@ class BoogieToEFMCConverter:
                     if bb_name in bbs:
                         bb = bbs[bb_name]
                         for stmt in bb.stmts:
-                            if isinstance(stmt, AstAssignment) and str(stmt.lhs) == var_name:
+                            if (
+                                isinstance(stmt, AstAssignment)
+                                and str(stmt.lhs) == var_name
+                            ):
                                 modified = True
                                 break
-                            elif isinstance(stmt, AstHavoc) and var_name in [str(id_node.name) for id_node in stmt.ids]:
+                            elif isinstance(stmt, AstHavoc) and var_name in [
+                                str(id_node.name) for id_node in stmt.ids
+                            ]:
                                 modified = True
                                 break
 
                 if not modified:
                     # Variable unchanged: x' = x
-                    assignments.append(self.prime_variable_mapping[var_name] == self.variable_mapping[var_name])
+                    assignments.append(
+                        self.prime_variable_mapping[var_name]
+                        == self.variable_mapping[var_name]
+                    )
 
         all_conditions = conditions + assignments
         if all_conditions:
@@ -333,7 +376,7 @@ class BoogieToEFMCConverter:
         # Also look in blocks that might contain post-loop assertions
         # (blocks with names ending in '_while_exit' or similar)
         for bb_name, bb in bbs.items():
-            if '_while_exit' in bb_name or '_exit' in bb_name:
+            if "_while_exit" in bb_name or "_exit" in bb_name:
                 for stmt in bb.stmts:
                     if isinstance(stmt, AstAssert):
                         # Convert the assertion to Z3
@@ -358,17 +401,26 @@ class BoogieToEFMCConverter:
                             lhs_var = str(stmt.lhs)
                             if lhs_var in self.variable_mapping:
                                 # Check if this is a decrement: x := x - 1
-                                if isinstance(stmt.rhs, AstBinExpr) and stmt.rhs.op == "-":
-                                    if (isinstance(stmt.rhs.lhs, AstId) and
-                                        str(stmt.rhs.lhs.name) == lhs_var and
-                                        isinstance(stmt.rhs.rhs, AstNumber) and
-                                        stmt.rhs.rhs.num == 1):
+                                if (
+                                    isinstance(stmt.rhs, AstBinExpr)
+                                    and stmt.rhs.op == "-"
+                                ):
+                                    if (
+                                        isinstance(stmt.rhs.lhs, AstId)
+                                        and str(stmt.rhs.lhs.name) == lhs_var
+                                        and isinstance(stmt.rhs.rhs, AstNumber)
+                                        and stmt.rhs.rhs.num == 1
+                                    ):
                                         # This is x := x - 1, so x >= 0 is likely a good invariant
                                         var_z3 = self.variable_mapping[lhs_var]
                                         safety_invariants.append(var_z3 >= 0)
 
         if safety_invariants:
-            return z3.And(safety_invariants) if len(safety_invariants) > 1 else safety_invariants[0]
+            return (
+                z3.And(safety_invariants)
+                if len(safety_invariants) > 1
+                else safety_invariants[0]
+            )
         else:
             # Default safety property: true (no specific property to verify)
             return z3.BoolVal(True)
@@ -467,7 +519,7 @@ class BoogieToEFMCConverter:
         self.logger.info("Attempting manual loop creation...")
 
         # Look for while loop structures we created
-        while_headers = [name for name in bbs.keys() if name.endswith('_while_header')]
+        while_headers = [name for name in bbs.keys() if name.endswith("_while_header")]
 
         if while_headers:
             # Use the while loop structure we created
@@ -475,13 +527,13 @@ class BoogieToEFMCConverter:
             self.logger.info("Found while loop header: %s", header)
 
             # Find the corresponding body and exit blocks
-            body_name = header.replace('_while_header', '_while_body')
-            exit_name = header.replace('_while_header', '_while_exit')
+            body_name = header.replace("_while_header", "_while_body")
+            exit_name = header.replace("_while_header", "_while_exit")
 
             if body_name in bbs and exit_name in bbs:
                 # Create proper loop paths
                 loop_paths = [[header, body_name]]  # header -> body -> back to header
-                exit_paths = [[header, exit_name]]   # header -> exit
+                exit_paths = [[header, exit_name]]  # header -> exit
 
                 # Extract the condition from the header block
                 entry_cond = AstTrue()
@@ -493,7 +545,7 @@ class BoogieToEFMCConverter:
                     header=tuple([header]),
                     loop_paths=loop_paths,
                     exit_paths=exit_paths,
-                    entry_cond=entry_cond
+                    entry_cond=entry_cond,
                 )
 
                 return [manual_loop]
@@ -534,12 +586,14 @@ class BoogieToEFMCConverter:
             header=tuple([header]),  # Convert to tuple as expected
             loop_paths=loop_paths,
             exit_paths=exit_paths,
-            entry_cond=entry_cond
+            entry_cond=entry_cond,
         )
 
         return [manual_loop]
 
-    def _can_reach(self, start: str, target: str, bbs: Dict[str, BB], visited: Set[str]) -> bool:
+    def _can_reach(
+        self, start: str, target: str, bbs: Dict[str, BB], visited: Set[str]
+    ) -> bool:
         """Check if start block can reach target block."""
         if start == target:
             return True

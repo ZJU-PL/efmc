@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def eval_preds(m: z3.ModelRef, predicates: List[z3.BoolRef]) -> List:
-    """ Let m be a model of a formula phi. preds be a set of predicates"""
+    """Let m be a model of a formula phi. preds be a set of predicates"""
     res = []
     for p in predicates:
         if z3.is_true(m.eval(p)):
@@ -61,18 +61,24 @@ def strongest_consequence(fml: z3.ExprRef, predicates: List) -> z3.ExprRef:
     return z3.simplify(z3.Or(res))
 
 
-def weakest_sufficient_condition(fml: z3.ExprRef, predicates: List[z3.ExprRef]) -> z3.ExprRef:
+def weakest_sufficient_condition(
+    fml: z3.ExprRef, predicates: List[z3.ExprRef]
+) -> z3.ExprRef:
     """Compute WSC using the duality between SNC(Strongest Necessary Condition)"""
     sc = strongest_consequence(negate(fml), predicates)
     return z3.simplify(z3.Not(sc))
 
 
-def stronget_consequence_simple(phi: z3.ExprRef, predicates: List[z3.ExprRef]) -> z3.ExprRef:
+def stronget_consequence_simple(
+    phi: z3.ExprRef, predicates: List[z3.ExprRef]
+) -> z3.ExprRef:
     """Is this correct?"""
     res = z3.And(False)
     neg_preds = [z3.Not(xx) for xx in predicates]
 
-    for ps in combinations(chain(predicates, neg_preds), len(list(predicates))):  # for py3?
+    for ps in combinations(
+        chain(predicates, neg_preds), len(list(predicates))
+    ):  # for py3?
         if is_sat(z3.And(phi, *ps)):
             res = z3.Or(res, z3.And(*ps))
 
@@ -81,6 +87,7 @@ def stronget_consequence_simple(phi: z3.ExprRef, predicates: List[z3.ExprRef]) -
 
 class PredicateAbstractionProver:
     """Predicate abstraction prover for transition systems."""
+
     def __init__(self, system: TransitionSystem):
         self.sts = system
         self.preds = []
@@ -99,7 +106,9 @@ class PredicateAbstractionProver:
         """The element in the domain is the Boolean combinations of a set of predicates"""
         self.preds = predicates
 
-    def solve(self, timeout: Optional[int] = None) -> VerificationResult:  # pylint: disable=unused-argument
+    def solve(
+        self, timeout: Optional[int] = None
+    ) -> VerificationResult:  # pylint: disable=unused-argument
         """External interface for verifying"""
         preds_prime = []
         for pred in self.preds:

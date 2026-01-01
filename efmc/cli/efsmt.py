@@ -20,6 +20,7 @@ try:
     from pysmt.smtlib.parser import SmtLibParser
     from pysmt.logics import QF_BV
     from pysmt.exceptions import SolverReturnedUnknownResultError
+
     PYSMT_AVAILABLE = True
 except ImportError:
     PYSMT_AVAILABLE = False
@@ -43,9 +44,9 @@ class ParallelEFBVSolver:  # pylint: disable=too-many-instance-attributes,too-fe
         manager = Manager()
         self.loops_lock = manager.Lock()
         self.e_phi_lock = manager.Lock()
-        self.terminate_flag = manager.Value('b', False)
+        self.terminate_flag = manager.Value("b", False)
         self.e_phi = manager.list([Bool(True)])
-        self.loops = manager.Value('i', 0)
+        self.loops = manager.Value("i", 0)
         self.result = manager.dict()
 
     def _convert_z3_to_pysmt(self, z3_expr):
@@ -58,7 +59,7 @@ class ParallelEFBVSolver:  # pylint: disable=too-many-instance-attributes,too-fe
     def solve(self, phi_str, forall_vars):  # pylint: disable=unused-argument
         """Solve exists-forall formula using parallel approach"""
         # Parse with EFSMTParser
-        self.parser.set_logic('BV')
+        self.parser.set_logic("BV")
         _, z3_forall_vars, z3_formula = self.parser.parse_smt2_string(phi_str)
 
         # Convert to pySMT
@@ -78,9 +79,11 @@ class ParallelEFBVSolver:  # pylint: disable=too-many-instance-attributes,too-fe
                     raise SolverReturnedUnknownResultError("Maximum iterations reached")
 
             # Spawn worker process
-            self.pool.apply_async(self._worker_process,
-                                  args=(formula, forall_vars_pysmt),
-                                  callback=self._result_callback)
+            self.pool.apply_async(
+                self._worker_process,
+                args=(formula, forall_vars_pysmt),
+                callback=self._result_callback,
+            )
 
             time.sleep(0.01)
 
@@ -100,7 +103,7 @@ class ParallelEFBVSolver:  # pylint: disable=too-many-instance-attributes,too-fe
             self.loops.value += 1
 
         try:
-            with Solver(logic=QF_BV, name='z3') as esolver:
+            with Solver(logic=QF_BV, name="z3") as esolver:
                 with self.e_phi_lock:
                     for constraint in self.e_phi:
                         esolver.add_assertion(constraint)
@@ -109,7 +112,7 @@ class ParallelEFBVSolver:  # pylint: disable=too-many-instance-attributes,too-fe
                     tau = {v: esolver.get_value(v) for v in exists_vars}
                     sub_phi = formula.substitute(tau).simplify()
 
-                    fmodel = get_model(Not(sub_phi), logic=QF_BV, solver_name='z3')
+                    fmodel = get_model(Not(sub_phi), logic=QF_BV, solver_name="z3")
                     if fmodel is None:
                         self.terminate_flag.value = True
                         return tau
@@ -139,9 +142,17 @@ class EFSMTRunner:  # pylint: disable=too-few-public-methods
         self.logger = logging.getLogger(__name__)
         self.parser = EFSMTParser()
 
-    def solve_efsmt_file(self, file_name: str, solver_name: str, logic: str = "BV",  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments,too-many-return-statements
-                         parallel: bool = False, timeout: int = 30,
-                         dump_smt2: bool = False, dump_qbf: bool = False, dump_cnf: bool = False):
+    def solve_efsmt_file(
+        self,
+        file_name: str,
+        solver_name: str,
+        logic: str = "BV",  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments,too-many-return-statements
+        parallel: bool = False,
+        timeout: int = 30,
+        dump_smt2: bool = False,
+        dump_qbf: bool = False,
+        dump_cnf: bool = False,
+    ):
         """Solve the EFSMT problem from a file"""
         try:
             start_time = time.time()
@@ -151,7 +162,7 @@ class EFSMTRunner:  # pylint: disable=too-few-public-methods
             # Handle parallel solving for BV logic
             if parallel and logic == "BV" and PYSMT_AVAILABLE:
                 self.logger.info("Using parallel solver")
-                with open(file_name, 'r', encoding='utf-8') as f:
+                with open(file_name, "r", encoding="utf-8") as f:
                     phi_str = f.read()
 
                 parallel_solver = ParallelEFBVSolver(timeout=timeout)
@@ -205,37 +216,62 @@ class EFSMTRunner:  # pylint: disable=too-few-public-methods
 def parse_arguments():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description='EFSMT - Exists-Forall SMT Solver',
-        formatter_class=argparse.RawTextHelpFormatter
+        description="EFSMT - Exists-Forall SMT Solver",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
 
     # Input options
-    parser.add_argument('--file', type=str, required=True,
-                        help='Input SMT2 file to solve')
-    parser.add_argument('--logic', type=str, default='BV',
-                        choices=['BV', 'UFBV', 'LIA', 'LRA', 'NIA', 'NRA', 'FP'],
-                        help='Logic to use for solving')
+    parser.add_argument(
+        "--file", type=str, required=True, help="Input SMT2 file to solve"
+    )
+    parser.add_argument(
+        "--logic",
+        type=str,
+        default="BV",
+        choices=["BV", "UFBV", "LIA", "LRA", "NIA", "NRA", "FP"],
+        help="Logic to use for solving",
+    )
 
     # Solver options
-    parser.add_argument('solver', type=str, default='z3',
-                        choices=['z3api', 'z3', 'cvc5', 'btor', 'yices2', 'mathsat', 'bitwuzla'],
-                        help='SMT solver to use')
+    parser.add_argument(
+        "solver",
+        type=str,
+        default="z3",
+        choices=["z3api", "z3", "cvc5", "btor", "yices2", "mathsat", "bitwuzla"],
+        help="SMT solver to use",
+    )
 
     # Parallel solving
-    parser.add_argument('--parallel', action='store_true', default=False,
-                        help='Use parallel solving (BV logic only, requires pySMT)')
-    parser.add_argument('--timeout', type=int, default=30,
-                        help='Timeout in seconds')
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        default=False,
+        help="Use parallel solving (BV logic only, requires pySMT)",
+    )
+    parser.add_argument("--timeout", type=int, default=30, help="Timeout in seconds")
 
     # Output options
-    parser.add_argument('--dump-smt2', action='store_true', default=False,
-                        help='Dump the EFSMT query in SMT2 format')
-    parser.add_argument('--dump-qbf', action='store_true', default=False,
-                        help='Dump the EFSMT query in QBF format')
-    parser.add_argument('--dump-cnf', action='store_true', default=False,
-                        help='Dump the bit-blasted formula in CNF format')
-    parser.add_argument('--verbose', action='store_true', default=False,
-                        help='Enable verbose logging')
+    parser.add_argument(
+        "--dump-smt2",
+        action="store_true",
+        default=False,
+        help="Dump the EFSMT query in SMT2 format",
+    )
+    parser.add_argument(
+        "--dump-qbf",
+        action="store_true",
+        default=False,
+        help="Dump the EFSMT query in QBF format",
+    )
+    parser.add_argument(
+        "--dump-cnf",
+        action="store_true",
+        default=False,
+        help="Dump the bit-blasted formula in CNF format",
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", default=False, help="Enable verbose logging"
+    )
 
     return parser.parse_args()
 
@@ -268,7 +304,7 @@ def main():
         timeout=args.timeout,
         dump_smt2=args.dump_smt2,
         dump_qbf=args.dump_qbf,
-        dump_cnf=args.dump_cnf
+        dump_cnf=args.dump_cnf,
     )
 
 

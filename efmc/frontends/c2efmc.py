@@ -63,7 +63,9 @@ class CToEFMCConverter:
         trans = self._build_transition(loop_node)
 
         # Safety after the loop should only be enforced once the loop exits.
-        loop_guard = self._as_bool(self._c_expr_to_z3(loop_node.cond, self.variable_mapping))
+        loop_guard = self._as_bool(
+            self._c_expr_to_z3(loop_node.cond, self.variable_mapping)
+        )
         post = self._build_post_condition(post_stmts, exit_guard=z3.Not(loop_guard))
 
         ts = TransitionSystem(
@@ -80,7 +82,9 @@ class CToEFMCConverter:
     # ------------------------------------------------------------------ #
     # AST utilities                                                      #
     # ------------------------------------------------------------------ #
-    def _pick_function(self, ast: c_ast.FileAST, target: Optional[str]) -> c_ast.FuncDef:
+    def _pick_function(
+        self, ast: c_ast.FileAST, target: Optional[str]
+    ) -> c_ast.FuncDef:
         """Return the requested function definition or the first one."""
         for ext in ast.ext:
             if isinstance(ext, c_ast.FuncDef):
@@ -107,9 +111,7 @@ class CToEFMCConverter:
 
         return pre, loop_node, post
 
-    def _normalize_loop(
-        self, node: c_ast.Node, pre: List[c_ast.Node]
-    ) -> c_ast.While:
+    def _normalize_loop(self, node: c_ast.Node, pre: List[c_ast.Node]) -> c_ast.While:
         """Convert ``for`` loops to an equivalent ``while`` shape."""
         if isinstance(node, c_ast.While):
             return node
@@ -313,9 +315,7 @@ class CToEFMCConverter:
     # ------------------------------------------------------------------ #
     # Expression translation                                             #
     # ------------------------------------------------------------------ #
-    def _c_expr_to_z3(
-        self, expr: c_ast.Node, env: Dict[str, z3.ExprRef]
-    ) -> z3.ExprRef:
+    def _c_expr_to_z3(self, expr: c_ast.Node, env: Dict[str, z3.ExprRef]) -> z3.ExprRef:
         """Translate a ``pycparser`` expression node to a Z3 expression."""
         if isinstance(expr, c_ast.Constant):
             if expr.type == "int":
@@ -397,7 +397,9 @@ class CToEFMCConverter:
         collected: List[z3.ExprRef] = []
 
         def walk(
-            stmt_list: List[c_ast.Node], guard: z3.ExprRef, cur_env: Dict[str, z3.ExprRef]
+            stmt_list: List[c_ast.Node],
+            guard: z3.ExprRef,
+            cur_env: Dict[str, z3.ExprRef],
         ) -> List[Tuple[z3.ExprRef, Dict[str, z3.ExprRef]]]:
             paths: List[Tuple[z3.ExprRef, Dict[str, z3.ExprRef]]] = [(guard, cur_env)]
 
@@ -452,7 +454,9 @@ class CToEFMCConverter:
     def _is_assert_call(self, call: c_ast.FuncCall) -> bool:
         """Check whether a function call represents an assertion."""
         name = self._func_name(call)
-        return bool(name in ("__VERIFIER_assert", "assert") and call.args and call.args.exprs)
+        return bool(
+            name in ("__VERIFIER_assert", "assert") and call.args and call.args.exprs
+        )
 
 
 def c_to_efmc(filename: str) -> TransitionSystem:

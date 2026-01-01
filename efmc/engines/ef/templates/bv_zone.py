@@ -1,5 +1,5 @@
-"""Bit-vector Zone Domain
-"""
+"""Bit-vector Zone Domain"""
+
 import itertools
 from typing import List, Optional
 
@@ -26,12 +26,14 @@ class BitVecZoneTemplate(Template):
 
         self.sts = sts
         self.arity = len(self.sts.variables)
-        assert (self.arity >= 2)
-        assert (len(self.sts.prime_variables) >= 2)
+        assert self.arity >= 2
+        assert len(self.sts.prime_variables) >= 2
 
         self.zones: List[z3.ExprRef] = []
 
-        self.wrap_around_cnts_vars: List[z3.ExprRef] = []  # for preventing under/under flow in the tempalte exprs
+        self.wrap_around_cnts_vars: List[z3.ExprRef] = (
+            []
+        )  # for preventing under/under flow in the tempalte exprs
         self.wrap_around_cnts_prime_vars: List[z3.ExprRef] = []
         signed = True if self.signedness == Signedness.SIGNED else False
 
@@ -40,7 +42,9 @@ class BitVecZoneTemplate(Template):
             if self.obj_no_overflow:
                 self.wrap_around_cnts_vars.append(z3.BVSubNoOverflow(x, y))
             if self.obj_no_underflow:
-                self.wrap_around_cnts_vars.append(z3.BVSubNoUnderflow(x, y, signed=signed))
+                self.wrap_around_cnts_vars.append(
+                    z3.BVSubNoUnderflow(x, y, signed=signed)
+                )
 
         self.prime_zones: List[z3.ExprRef] = []
         for px, py in list(itertools.combinations(self.sts.prime_variables, 2)):
@@ -49,7 +53,9 @@ class BitVecZoneTemplate(Template):
             if self.obj_no_overflow:
                 self.wrap_around_cnts_prime_vars.append(z3.BVSubNoOverflow(px, py))
             if self.obj_no_underflow:
-                self.wrap_around_cnts_prime_vars.append(z3.BVSubNoUnderflow(px, py, signed=signed))
+                self.wrap_around_cnts_prime_vars.append(
+                    z3.BVSubNoUnderflow(px, py, signed=signed)
+                )
 
         self.template_vars: List[List[z3.ExprRef]] = []  # vector of vector
         self.template_index = 0  # number of templates
@@ -69,8 +75,10 @@ class BitVecZoneTemplate(Template):
             term_vars = get_variables(term)
             term_name = "{}{}".format(term_vars[0], term_vars[1])
             self.template_index += 1
-            tvars = [z3.BitVec("{}_l".format(term_name), term.size()),
-                     z3.BitVec("{}_u".format(term_name), term.size())]
+            tvars = [
+                z3.BitVec("{}_l".format(term_name), term.size()),
+                z3.BitVec("{}_u".format(term_name), term.size()),
+            ]
             self.template_vars.append(tvars)
         # raise NotImplementedError
 
@@ -92,27 +100,31 @@ class BitVecZoneTemplate(Template):
 
             if self.signedness == Signedness.UNSIGNED:
                 cnts.append(z3.And(z3.ULE(term_l, term), z3.UGE(term_u, term)))
-                cnts_prime.append(z3.And(z3.ULE(term_l, term_prime),
-                                         z3.UGE(term_u, term_prime)))
+                cnts_prime.append(
+                    z3.And(z3.ULE(term_l, term_prime), z3.UGE(term_u, term_prime))
+                )
             else:
                 cnts.append(z3.And(term_l <= term, term_u >= term))
-                cnts_prime.append(z3.And(term_l <= term_prime,
-                                         term_u >= term_prime))
+                cnts_prime.append(z3.And(term_l <= term_prime, term_u >= term_prime))
 
         self.template_cnt_init_and_post = big_and(cnts)
         if len(self.wrap_around_cnts_vars) > 0:
             # print(self.wrap_around_cnts_vars)
-            self.template_cnt_init_and_post = z3.And(self.template_cnt_init_and_post,
-                                                     big_and(self.wrap_around_cnts_vars))
+            self.template_cnt_init_and_post = z3.And(
+                self.template_cnt_init_and_post, big_and(self.wrap_around_cnts_vars)
+            )
 
         self.template_cnt_trans = big_and(cnts_prime)
         if len(self.wrap_around_cnts_prime_vars) > 0:
-            self.template_cnt_trans = z3.And(self.template_cnt_trans,
-                                             big_and(self.wrap_around_cnts_prime_vars))
+            self.template_cnt_trans = z3.And(
+                self.template_cnt_trans, big_and(self.wrap_around_cnts_prime_vars)
+            )
 
         # raise NotImplementedError
 
-    def build_invariant_expr(self, model: z3.ModelRef, use_prime_variables: bool = False) -> z3.ExprRef:
+    def build_invariant_expr(
+        self, model: z3.ModelRef, use_prime_variables: bool = False
+    ) -> z3.ExprRef:
         """
         Build the inductive invariant corresponding to a model, which is obtained by
          solving the exists-forall formula encoding the verification condition
@@ -128,7 +140,9 @@ class BitVecZoneTemplate(Template):
             term_u = template_vars_for_term[1]  # upper bound of the term
 
             if self.signedness == Signedness.UNSIGNED:
-                cnts.append(z3.And(z3.ULE(model[term_l], term), z3.UGE(model[term_u], term)))
+                cnts.append(
+                    z3.And(z3.ULE(model[term_l], term), z3.UGE(model[term_u], term))
+                )
             else:
                 cnts.append(z3.And(model[term_l] <= term, model[term_u] >= term))
 
@@ -152,7 +166,9 @@ class DisjunctiveBitVecZoneTemplate(Template):
         self.sts = sts
         self.arity = len(self.sts.variables)
 
-        self.wrap_around_cnts_vars: List[z3.ExprRef] = []  # for preventing under/under flow in the tempalte exprs
+        self.wrap_around_cnts_vars: List[z3.ExprRef] = (
+            []
+        )  # for preventing under/under flow in the tempalte exprs
         self.wrap_around_cnts_prime_vars: List[z3.ExprRef] = []
         signed = True if self.signedness == Signedness.SIGNED else False
 
@@ -162,7 +178,9 @@ class DisjunctiveBitVecZoneTemplate(Template):
             if self.obj_no_overflow:
                 self.wrap_around_cnts_vars.append(z3.BVSubNoOverflow(x, y))
             if self.obj_no_underflow:
-                self.wrap_around_cnts_vars.append(z3.BVSubNoUnderflow(x, y, signed=signed))
+                self.wrap_around_cnts_vars.append(
+                    z3.BVSubNoUnderflow(x, y, signed=signed)
+                )
 
         self.prime_zones: List[z3.ExprRef] = []
         for px, py in list(itertools.combinations(self.sts.prime_variables, 2)):
@@ -170,7 +188,9 @@ class DisjunctiveBitVecZoneTemplate(Template):
             if self.obj_no_overflow:
                 self.wrap_around_cnts_prime_vars.append(z3.BVSubNoOverflow(px, py))
             if self.obj_no_underflow:
-                self.wrap_around_cnts_prime_vars.append(z3.BVSubNoUnderflow(px, py, signed=signed))
+                self.wrap_around_cnts_prime_vars.append(
+                    z3.BVSubNoUnderflow(px, py, signed=signed)
+                )
 
         self.template_vars: List[List[List[z3.ExprRef]]] = []  # vector of vector
         self.template_index = 0  # number of templates
@@ -195,8 +215,10 @@ class DisjunctiveBitVecZoneTemplate(Template):
                 term_vars = get_variables(term)
                 term_name = "{}{}".format(term_vars[0], term_vars[1])
                 self.template_index += 1
-                tvars = [z3.BitVec("d{0}_{1}_l".format(i, term_name), term.size()),
-                         z3.BitVec("d{0}_{1}_u".format(i, term_name), term.size())]
+                tvars = [
+                    z3.BitVec("d{0}_{1}_l".format(i, term_name), term.size()),
+                    z3.BitVec("d{0}_{1}_u".format(i, term_name), term.size()),
+                ]
                 vars_for_dis.append(tvars)
 
             self.template_vars.append(vars_for_dis)
@@ -228,24 +250,28 @@ class DisjunctiveBitVecZoneTemplate(Template):
                 term_u = template_vars_for_term[1]  # upper bound of the term
 
                 if self.signedness == Signedness.UNSIGNED:
-                    cnt_init_post.append(z3.And(z3.ULE(term_l, term), z3.UGE(term_u, term)))
-                    cnt_trans.append(z3.And(z3.ULE(term_l, term_prime),
-                                            z3.UGE(term_u, term_prime)))
+                    cnt_init_post.append(
+                        z3.And(z3.ULE(term_l, term), z3.UGE(term_u, term))
+                    )
+                    cnt_trans.append(
+                        z3.And(z3.ULE(term_l, term_prime), z3.UGE(term_u, term_prime))
+                    )
                 else:
                     cnt_init_post.append(z3.And(term_l <= term, term_u >= term))
-                    cnt_trans.append(z3.And(term_l <= term_prime,
-                                            term_u >= term_prime))
+                    cnt_trans.append(z3.And(term_l <= term_prime, term_u >= term_prime))
 
             ith_cnt_init_post = big_and(cnt_init_post)
             ith_cnt_trans = big_and(cnt_trans)
 
             # for preventing over/under flows in x - y,...
             if len(self.wrap_around_cnts_vars) > 0:
-                ith_cnt_init_post = z3.And(ith_cnt_init_post,
-                                           big_and(self.wrap_around_cnts_vars))
+                ith_cnt_init_post = z3.And(
+                    ith_cnt_init_post, big_and(self.wrap_around_cnts_vars)
+                )
             if len(self.wrap_around_cnts_prime_vars) > 0:
-                ith_cnt_trans = z3.And(ith_cnt_trans,
-                                       big_and(self.wrap_around_cnts_prime_vars))
+                ith_cnt_trans = z3.And(
+                    ith_cnt_trans, big_and(self.wrap_around_cnts_prime_vars)
+                )
 
             cnt_init_and_post_dis.append(ith_cnt_init_post)
             cnt_trans_dis.append(ith_cnt_trans)
@@ -255,7 +281,9 @@ class DisjunctiveBitVecZoneTemplate(Template):
         # print(self.template_cnt_init_and_post)
         # print(self.template_cnt_trans)
 
-    def build_invariant_expr(self, model: z3.ModelRef, use_prime_variables: bool = False) -> z3.ExprRef:
+    def build_invariant_expr(
+        self, model: z3.ModelRef, use_prime_variables: bool = False
+    ) -> z3.ExprRef:
         """
         Build an invariant from a model (fixing the values of the template vars)
         """
@@ -270,7 +298,9 @@ class DisjunctiveBitVecZoneTemplate(Template):
                 term_l = template_vars_for_term[0]  # lower bound of the term
                 term_u = template_vars_for_term[1]  # upper bound of the term
                 if self.signedness == Signedness.UNSIGNED:
-                    cnts.append(z3.And(z3.ULE(model[term_l], term), z3.UGE(model[term_u], term)))
+                    cnts.append(
+                        z3.And(z3.ULE(model[term_l], term), z3.UGE(model[term_u], term))
+                    )
                 else:
                     cnts.append(z3.And(model[term_l] <= term, model[term_u] >= term))
 

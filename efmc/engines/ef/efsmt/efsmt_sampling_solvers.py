@@ -1,6 +1,7 @@
 """
 Sampling-based CEGIS algorithm for EFSMT over QF_BV.
 """
+
 import time
 import logging
 from typing import List
@@ -25,8 +26,11 @@ class SamplingEFSMTSolver:  # pylint: disable=too-few-public-methods
         self.max_samples = kwargs.get("max_samples", 100)
 
     def solve(
-        self, evars: List[z3.ExprRef], uvars: List[z3.ExprRef],
-        z3fml: z3.ExprRef, maxloops=None
+        self,
+        evars: List[z3.ExprRef],
+        uvars: List[z3.ExprRef],
+        z3fml: z3.ExprRef,
+        maxloops=None,
     ):
         """Solves exists x. forall y. phi(x, y) using sampling-based CEGIS
         over QF_BV."""
@@ -81,7 +85,7 @@ class SamplingEFSMTSolver:  # pylint: disable=too-few-public-methods
             for var in y_vars:
                 var_type = var.symbol_type()
                 # Check if it's a BVType (need to import from pysmt.typing)
-                if hasattr(var_type, 'width'):
+                if hasattr(var_type, "width"):
                     width = var_type.width
                     # Start with 0, could be randomized
                     sample[var] = BV(0, width)
@@ -116,9 +120,16 @@ class SamplingEFSMTSolver:  # pylint: disable=too-few-public-methods
 
 
 def sampling_efsmt(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    evars: List[z3.ExprRef], uvars: List[z3.ExprRef], z3fml: z3.ExprRef,
-    maxloops=None, esolver_name="z3", fsolver_name="z3",
-    verbose=False, timeout=None, sample_size=10, max_samples=100
+    evars: List[z3.ExprRef],
+    uvars: List[z3.ExprRef],
+    z3fml: z3.ExprRef,
+    maxloops=None,
+    esolver_name="z3",
+    fsolver_name="z3",
+    verbose=False,
+    timeout=None,
+    sample_size=10,
+    max_samples=100,
 ):
     """Convenience function for sampling-based CEGIS over QF_BV"""
     solver = SamplingEFSMTSolver(
@@ -127,6 +138,6 @@ def sampling_efsmt(  # pylint: disable=too-many-arguments,too-many-positional-ar
         verbose=verbose,
         timeout=timeout,
         sample_size=sample_size,
-        max_samples=max_samples
+        max_samples=max_samples,
     )
     return solver.solve(evars, uvars, z3fml, maxloops)

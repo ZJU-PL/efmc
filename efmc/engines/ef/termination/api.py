@@ -13,14 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 def prove_termination_with_ranking_functions(
-        sts: TransitionSystem,
-        template_names: List[str] = None,
-        timeout: Optional[int] = None,
-        **kwargs) -> Tuple[bool, Optional[z3.ExprRef], str]:
+    sts: TransitionSystem,
+    template_names: List[str] = None,
+    timeout: Optional[int] = None,
+    **kwargs,
+) -> Tuple[bool, Optional[z3.ExprRef], str]:
     """Try to prove termination using various ranking function templates."""
     if template_names is None:
-        template_names = ["bv_linear_ranking", "bv_lexicographic_ranking",
-                         "bv_conditional_ranking"]
+        template_names = [
+            "bv_linear_ranking",
+            "bv_lexicographic_ranking",
+            "bv_conditional_ranking",
+        ]
 
     for template_name in template_names:
         logger.info("Trying ranking template: %s", template_name)
@@ -45,14 +49,18 @@ def prove_termination_with_ranking_functions(
 
 
 def prove_non_termination_with_recurrence_sets(
-        sts: TransitionSystem,
-        template_names: List[str] = None,
-        timeout: Optional[int] = None,
-        **kwargs) -> Tuple[bool, Optional[z3.ExprRef], str]:
+    sts: TransitionSystem,
+    template_names: List[str] = None,
+    timeout: Optional[int] = None,
+    **kwargs,
+) -> Tuple[bool, Optional[z3.ExprRef], str]:
     """Try to prove non-termination using various recurrence set templates."""
     if template_names is None:
-        template_names = ["bv_linear_recurrence", "bv_interval_recurrence",
-                         "bv_disjunctive_recurrence"]
+        template_names = [
+            "bv_linear_recurrence",
+            "bv_interval_recurrence",
+            "bv_disjunctive_recurrence",
+        ]
 
     for template_name in template_names:
         logger.info("Trying recurrence template: %s", template_name)
@@ -76,11 +84,13 @@ def prove_non_termination_with_recurrence_sets(
     return False, None, ""
 
 
-def analyze_termination(sts: TransitionSystem,
-                        ranking_templates: List[str] = None,
-                        recurrence_templates: List[str] = None,
-                        timeout: Optional[int] = None,
-                        **kwargs) -> Dict[str, Any]:
+def analyze_termination(
+    sts: TransitionSystem,
+    ranking_templates: List[str] = None,
+    recurrence_templates: List[str] = None,
+    timeout: Optional[int] = None,
+    **kwargs,
+) -> Dict[str, Any]:
     """Comprehensive termination analysis using ranking functions and recurrence sets."""
     results = {
         "termination_proven": False,
@@ -89,21 +99,25 @@ def analyze_termination(sts: TransitionSystem,
         "recurrence_set": None,
         "ranking_template_used": None,
         "recurrence_template_used": None,
-        "errors": []
+        "errors": [],
     }
 
     # Try to prove termination first
     try:
-        term_success, ranking_func, ranking_template = prove_termination_with_ranking_functions(
-            sts, ranking_templates, timeout, **kwargs
+        term_success, ranking_func, ranking_template = (
+            prove_termination_with_ranking_functions(
+                sts, ranking_templates, timeout, **kwargs
+            )
         )
 
         if term_success:
-            results.update({
-                "termination_proven": True,
-                "ranking_function": ranking_func,
-                "ranking_template_used": ranking_template
-            })
+            results.update(
+                {
+                    "termination_proven": True,
+                    "ranking_function": ranking_func,
+                    "ranking_template_used": ranking_template,
+                }
+            )
             logger.info("Termination proven - skipping non-termination analysis")
             return results
 
@@ -114,17 +128,20 @@ def analyze_termination(sts: TransitionSystem,
 
     # If termination couldn't be proven, try to prove non-termination
     try:
-        non_term_success, recurrence_set, recurrence_template = \
+        non_term_success, recurrence_set, recurrence_template = (
             prove_non_termination_with_recurrence_sets(
                 sts, recurrence_templates, timeout, **kwargs
             )
+        )
 
         if non_term_success:
-            results.update({
-                "non_termination_proven": True,
-                "recurrence_set": recurrence_set,
-                "recurrence_template_used": recurrence_template
-            })
+            results.update(
+                {
+                    "non_termination_proven": True,
+                    "recurrence_set": recurrence_set,
+                    "recurrence_template_used": recurrence_template,
+                }
+            )
 
     except Exception as e:
         error_msg = f"Error in non-termination proving: {e}"

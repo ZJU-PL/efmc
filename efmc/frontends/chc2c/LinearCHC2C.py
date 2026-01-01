@@ -211,4 +211,3 @@ class LinearCHC2C(BaseCHC2C):
         func_body += "  } else {\n    abort();\n  }\n"
         func_body += "}\n\n"
         return func_body
-        

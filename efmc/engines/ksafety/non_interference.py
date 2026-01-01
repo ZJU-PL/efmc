@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class NonInterferenceProver(BaseKSafetyProver):
     """
     Specialized prover for non-interference verification.
-    
+
     Non-interference states that low-security outputs should not depend
     on high-security inputs.
     """
@@ -26,7 +26,7 @@ class NonInterferenceProver(BaseKSafetyProver):
     def __init__(self, sts, **kwargs):
         """
         Initialize non-interference prover.
-        
+
         Args:
             sts: The transition system to verify
             **kwargs: Additional configuration options
@@ -40,14 +40,14 @@ class NonInterferenceProver(BaseKSafetyProver):
     ) -> VerificationResult:
         """
         Verify non-interference property.
-        
+
         Non-interference states that low-security outputs should not depend
         on high-security inputs.
-        
+
         Args:
             high_vars: List of high-security variable names
             low_vars: List of low-security variable names
-            
+
         Returns:
             VerificationResult indicating the verification outcome
         """

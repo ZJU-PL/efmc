@@ -1,11 +1,14 @@
 """
 This is an "old-school" version of symbolic abstraction domain.
 """
+
 import logging
 from typing import Optional
 import z3
 
-from efmc.engines.symabs.bits_symabs import strongest_consequence as bits_strongest_consequence
+from efmc.engines.symabs.bits_symabs import (
+    strongest_consequence as bits_strongest_consequence,
+)
 from efmc.engines.symabs.bv_symabs import BVSymbolicAbstraction
 from efmc.sts import TransitionSystem
 from efmc.utils import is_valid
@@ -15,18 +18,20 @@ logger = logging.getLogger(__name__)
 
 
 ############################
-def strongest_consequence(fml: z3.ExprRef, domain: str, k=None) -> z3.ExprRef:  # pylint: disable=unused-argument
+def strongest_consequence(
+    fml: z3.ExprRef, domain: str, k=None
+) -> z3.ExprRef:  # pylint: disable=unused-argument
     """Compute the strongest consequence of a formula in a given domain.
-    
+
     Args:
         fml: The formula to abstract
         domain: The abstract domain to use ('interval', 'bits', 'known_bits')
         k: Optional parameter for domain-specific configuration (unused)
-        
+
     Returns:
         A formula representing the strongest consequence in the specified domain
     """
-    if domain == 'interval':
+    if domain == "interval":
         # Create a symbolic abstraction object
         symabs = BVSymbolicAbstraction()
 
@@ -48,11 +53,11 @@ def strongest_consequence(fml: z3.ExprRef, domain: str, k=None) -> z3.ExprRef:  
 
         # Return the interval abstraction as a formula
         return symabs.interval_abs_as_fml
-    if domain in ['bits', 'known_bits']:
+    if domain in ["bits", "known_bits"]:
         # Map domain names
         bits_domain = domain
-        if domain == 'bits':
-            bits_domain = 'all'
+        if domain == "bits":
+            bits_domain = "all"
 
         # Compute the strongest consequence using bit-level abstractions
         return bits_strongest_consequence(fml, bits_domain)
@@ -67,7 +72,7 @@ def fixpoint(old_inv: z3.ExprRef, inv: z3.ExprRef) -> bool:
 
 class SymbolicAbstractionProver:
     """Symbolic abstraction prover for verification."""
-    
+
     def __init__(self, system: TransitionSystem):
         self.sts = system
         """
@@ -81,11 +86,13 @@ class SymbolicAbstractionProver:
             self.var_map_rev.append((self.sts.prime_variables[i], var))
 
         # Default domain for symbolic abstraction
-        self.domain = 'interval'
+        self.domain = "interval"
         # Predicates for predicate abstraction
         self.preds = []
 
-    def solve(self, timeout: Optional[int] = None) -> VerificationResult:  # pylint: disable=unused-argument
+    def solve(
+        self, timeout: Optional[int] = None
+    ) -> VerificationResult:  # pylint: disable=unused-argument
         """External interface for verification."""
         preds_prime = []
         for pred in self.preds:
@@ -99,14 +106,14 @@ class SymbolicAbstractionProver:
             i = i + 1
 
             # Compute the strongest consequence in the specified domain
-            if self.sts.has_bv and self.domain in ['bits', 'known_bits']:
+            if self.sts.has_bv and self.domain in ["bits", "known_bits"]:
                 # Use bit-level abstractions for bit-vector formulas
                 onestep = strongest_consequence(
-                    z3.And(inv, self.sts.trans), self.domain)
+                    z3.And(inv, self.sts.trans), self.domain
+                )
             else:
                 # Use interval abstraction by default
-                onestep = strongest_consequence(
-                    z3.And(inv, self.sts.trans), 'interval')
+                onestep = strongest_consequence(z3.And(inv, self.sts.trans), "interval")
 
             # Substitute prime variables back to non-prime variables
             onestep = z3.substitute(onestep, self.var_map_rev)

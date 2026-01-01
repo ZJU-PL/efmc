@@ -2,6 +2,7 @@
 
 It seems that the encoding in this version is not complete (it will miss some states /unsound)
 """
+
 import logging
 
 from efmc.engines.ef.templates.abstract_template import *
@@ -54,9 +55,15 @@ class IntervalTemplateV2(Template):
         """
         for var in self.sts.variables:
             if self.use_real:
-                tvars = [z3.Real("l_{}".format(str(var))), z3.Real("u_{}".format(str(var)))]
+                tvars = [
+                    z3.Real("l_{}".format(str(var))),
+                    z3.Real("u_{}".format(str(var))),
+                ]
             else:
-                tvars = [z3.Int("l_{}".format(str(var))), z3.Int("u_{}".format(str(var)))]
+                tvars = [
+                    z3.Int("l_{}".format(str(var))),
+                    z3.Int("u_{}".format(str(var))),
+                ]
             self.template_vars.append(tvars)
             self.template_index += 1
 
@@ -131,9 +138,15 @@ class DisjunctiveIntervalTemplateV2(Template):
             for j in range(self.arity):
                 var = self.sts.variables[j]
                 if self.use_real:
-                    tvars = [z3.Real("d{}_l_{}".format(i, str(var))), z3.Real("d{}_u_{}".format(i, str(var)))]
+                    tvars = [
+                        z3.Real("d{}_l_{}".format(i, str(var))),
+                        z3.Real("d{}_u_{}".format(i, str(var))),
+                    ]
                 else:
-                    tvars = [z3.Int("d{}_l_{}".format(i, str(var))), z3.Int("d{}_u_{}".format(i, str(var)))]
+                    tvars = [
+                        z3.Int("d{}_l_{}".format(i, str(var))),
+                        z3.Int("d{}_u_{}".format(i, str(var))),
+                    ]
                 vars_for_dis.append(tvars)
                 self.template_index += 1
             self.template_vars.append(vars_for_dis)

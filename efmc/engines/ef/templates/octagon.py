@@ -1,5 +1,5 @@
-"""Octagon template over integer or real variables
-"""
+"""Octagon template over integer or real variables"""
+
 import logging
 
 from efmc.engines.ef.templates.abstract_template import *

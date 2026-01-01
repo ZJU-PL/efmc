@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class VerificationResult:
     """
     Stores the result of the verification process.
-    
+
     Fields:
         is_safe: True if the system is proven safe, False otherwise
         is_unsafe: True if the system is proven unsafe (counterexample exists), False otherwise
@@ -35,9 +35,10 @@ class VerificationResult:
         invariant: The inductive invariant if the system is safe, None otherwise
         counterexample: A counterexample if the system is unsafe, None otherwise
         timed_out: True if the verification process timed out, False otherwise
-        
+
     Note: At most one of is_safe, is_unsafe, and is_unknown should be True.
     """
+
     is_safe: bool
     invariant: Optional[z3.ExprRef]
     counterexample: Optional[z3.ModelRef] = None
@@ -65,7 +66,9 @@ class SolverTimeout(Exception):
     """Raised when the Z3 solver times out."""
 
 
-def check_entailment(expr1: z3.ExprRef, expr2: z3.ExprRef, timeout: int = 10000) -> bool:
+def check_entailment(
+    expr1: z3.ExprRef, expr2: z3.ExprRef, timeout: int = 10000
+) -> bool:
     """
     Check if expr1 entails expr2 using Z3 solver.
     """
@@ -79,7 +82,9 @@ def check_entailment(expr1: z3.ExprRef, expr2: z3.ExprRef, timeout: int = 10000)
     return result == z3.unsat
 
 
-def are_expressions_equivalent(expr1: z3.ExprRef, expr2: z3.ExprRef, timeout: int = 10000) -> bool:
+def are_expressions_equivalent(
+    expr1: z3.ExprRef, expr2: z3.ExprRef, timeout: int = 10000
+) -> bool:
     """
     Check if two Z3 expressions are logically equivalent.
     """
@@ -88,8 +93,7 @@ def are_expressions_equivalent(expr1: z3.ExprRef, expr2: z3.ExprRef, timeout: in
 
     # Check if (expr1 ∧ ¬expr2) ∨ (¬expr1 ∧ expr2) is unsatisfiable
     equivalence_check = z3.Or(
-        z3.And(expr1, z3.Not(expr2)),
-        z3.And(z3.Not(expr1), expr2)
+        z3.And(expr1, z3.Not(expr2)), z3.And(z3.Not(expr1), expr2)
     )
     s.add(equivalence_check)
 
@@ -110,20 +114,22 @@ def get_counterexample(formula: z3.ExprRef):
     return None
 
 
-def check_invariant(sts: Any, inv: z3.ExprRef, inv_in_prime_variables: z3.ExprRef) -> bool:
+def check_invariant(
+    sts: Any, inv: z3.ExprRef, inv_in_prime_variables: z3.ExprRef
+) -> bool:
     """
     Check whether the generated invariant is correct.
-    
+
     Verifies three conditions:
     1. Initiation: init => inv
     2. Inductiveness: inv && trans => inv'
     3. Safety: inv => post
-    
+
     Args:
         sts: The transition system
         inv: The invariant to check
         inv_in_prime_variables: The invariant with variables replaced by primed versions
-        
+
     Returns:
         True if the invariant is correct, False otherwise
     """
@@ -141,7 +147,9 @@ def check_invariant(sts: Any, inv: z3.ExprRef, inv_in_prime_variables: z3.ExprRe
     if not is_entail(z3.And(sts.trans, inv), inv_in_prime_variables):
         correct = False
         logger.error("Inductiveness check failed")
-        model = get_counterexample(z3.And(sts.trans, inv, z3.Not(inv_in_prime_variables)))
+        model = get_counterexample(
+            z3.And(sts.trans, inv, z3.Not(inv_in_prime_variables))
+        )
         if model:
             logger.error("Counterexample: %s", model)
 
@@ -149,8 +157,11 @@ def check_invariant(sts: Any, inv: z3.ExprRef, inv_in_prime_variables: z3.ExprRe
     # NOTICE: here the guard "C" in Hoare logic is "moved" to the
     # transition relation, and we can just check is_entail(inv, sts.post)
     # for correctness.
-    if (hasattr(sts, 'ignore_post_cond') and (not sts.ignore_post_cond) and
-            (not is_entail(inv, sts.post))):
+    if (
+        hasattr(sts, "ignore_post_cond")
+        and (not sts.ignore_post_cond)
+        and (not is_entail(inv, sts.post))
+    ):
         # for some applications, we may ignore the post condition
         correct = False
         logger.error("Safety check failed")
@@ -170,26 +181,29 @@ def check_invariant(sts: Any, inv: z3.ExprRef, inv_in_prime_variables: z3.ExprRe
 
 
 def verify_invariant_with_counterexamples(
-        sts: Any, inv: z3.ExprRef) -> Tuple[bool, List[Tuple[z3.ModelRef, z3.ModelRef]]]:
+    sts: Any, inv: z3.ExprRef
+) -> Tuple[bool, List[Tuple[z3.ModelRef, z3.ModelRef]]]:
     """
     Unified function for invariant verification and counterexample extraction.
-    
+
     Verifies three conditions:
     1. Initiation: init => inv
     2. Inductiveness: inv && trans => inv'
     3. Safety: inv => post (if not ignored)
-    
+
     Args:
         sts: The transition system
         inv: The invariant to check
-        
+
     Returns:
         Tuple of (is_correct, counterexamples) where:
         - is_correct: True if the invariant is correct, False otherwise
         - counterexamples: List of (pre_state, post_state) model pairs for failed conditions
     """
+
     def extract_state_from_model(
-            model: z3.ModelRef, use_prime: bool = False) -> Dict[z3.ExprRef, Any]:
+        model: z3.ModelRef, use_prime: bool = False
+    ) -> Dict[z3.ExprRef, Any]:
         """Extract state dictionary from model, optionally using primed variables."""
         state = {}
         for i, var in enumerate(sts.variables):
@@ -201,9 +215,12 @@ def verify_invariant_with_counterexamples(
                 state[var] = model[target_var.decl()]
         return state
 
-    def check_condition(condition: z3.ExprRef, error_msg: str,
-                        counterexample_formula: z3.ExprRef,
-                        use_prime: bool = False) -> bool:
+    def check_condition(
+        condition: z3.ExprRef,
+        error_msg: str,
+        counterexample_formula: z3.ExprRef,
+        use_prime: bool = False,
+    ) -> bool:
         """Check a condition and extract counterexample if it fails."""
         if not is_entail(condition, inv if not use_prime else primed_invariant):
             logger.error(error_msg)
@@ -226,21 +243,29 @@ def verify_invariant_with_counterexamples(
     correct = True
 
     # Create primed version of invariant for inductiveness check
-    substitution_map = [(var, sts.prime_variables[i])
-                        for i, var in enumerate(sts.variables)
-                        if i < len(sts.prime_variables)]
+    substitution_map = [
+        (var, sts.prime_variables[i])
+        for i, var in enumerate(sts.variables)
+        if i < len(sts.prime_variables)
+    ]
     primed_invariant = z3.substitute(inv, substitution_map)
 
     # Check all three conditions
     checks = [
         (sts.init, "Initiation check failed", z3.And(sts.init, z3.Not(inv)), False),
-        (z3.And(sts.trans, inv), "Inductiveness check failed",
-         z3.And(sts.trans, inv, z3.Not(primed_invariant)), True),
+        (
+            z3.And(sts.trans, inv),
+            "Inductiveness check failed",
+            z3.And(sts.trans, inv, z3.Not(primed_invariant)),
+            True,
+        ),
     ]
 
     # Add safety check if not ignored
-    if not (hasattr(sts, 'ignore_post_cond') and sts.ignore_post_cond):
-        checks.append((inv, "Safety check failed", z3.And(inv, z3.Not(sts.post)), False))
+    if not (hasattr(sts, "ignore_post_cond") and sts.ignore_post_cond):
+        checks.append(
+            (inv, "Safety check failed", z3.And(inv, z3.Not(sts.post)), False)
+        )
 
     for condition, error_msg, counterexample_formula, use_prime in checks:
         if not check_condition(condition, error_msg, counterexample_formula, use_prime):
@@ -248,8 +273,9 @@ def verify_invariant_with_counterexamples(
 
     # Log results
     if not correct:
-        logger.debug("Init: %s\nTrans: %s\nPost: %s\nInv: %s",
-                     sts.init, sts.trans, sts.post, inv)
+        logger.debug(
+            "Init: %s\nTrans: %s\nPost: %s\nInv: %s", sts.init, sts.trans, sts.post, inv
+        )
     else:
         logger.info("Invariant verification successful")
 

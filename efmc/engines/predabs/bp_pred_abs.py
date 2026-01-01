@@ -4,6 +4,7 @@ Verifying Boolean Programs using "Predicate abstraction"
  Given a set of Boolean variables P and a transition system S,
  it finds the strongest inductive invariant expressible as the Boolean combination of P.
 """
+
 from typing import List, Optional
 
 import z3
@@ -33,7 +34,9 @@ def strongest_consequence(fml: z3.ExprRef, predicates: List[z3.ExprRef]):
     return z3.simplify(z3.Or(res))
 
 
-def weakest_sufficient_condition(fml: z3.ExprRef, predicates: List[z3.ExprRef]) -> z3.ExprRef:
+def weakest_sufficient_condition(
+    fml: z3.ExprRef, predicates: List[z3.ExprRef]
+) -> z3.ExprRef:
     """Compute WSC using the duality between SNC(Strongest Necessary Condition)."""
     notfml = z3.Not(fml)
     sc = strongest_consequence(notfml, predicates)
@@ -47,6 +50,7 @@ def fixpoint(old_inv: z3.ExprRef, inv: z3.ExprRef) -> bool:
 
 class PredicateAbstractionProver:
     """Predicate abstraction prover for Boolean programs."""
+
     def __init__(self, system: TransitionSystem):
         self.sts = system
         self.preds = []

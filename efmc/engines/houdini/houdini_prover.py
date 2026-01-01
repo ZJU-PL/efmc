@@ -13,7 +13,10 @@ import z3
 
 from efmc.sts import TransitionSystem
 from efmc.utils.verification_utils import VerificationResult, check_invariant
-from efmc.engines.houdini.houdini_templates import get_selector_var, generate_basic_lemmas
+from efmc.engines.houdini.houdini_templates import (
+    get_selector_var,
+    generate_basic_lemmas,
+)
 
 
 class HoudiniProver:
@@ -23,8 +26,9 @@ class HoudiniProver:
         self.sts = system
         self.logger = logging.getLogger(__name__)
 
-    def houdini(self, lemmas: List[z3.ExprRef],
-                timeout: Optional[int] = None) -> Optional[Dict[int, z3.ExprRef]]:
+    def houdini(
+        self, lemmas: List[z3.ExprRef], timeout: Optional[int] = None
+    ) -> Optional[Dict[int, z3.ExprRef]]:
         """Find the maximal inductive subset for the given lemmas"""
         annotated: List[z3.ExprRef] = []
         annotated_primes: List[z3.ExprRef] = []
@@ -37,7 +41,8 @@ class HoudiniProver:
         # Create primed versions and selector variables
         for i, lemma in enumerate(lemmas):
             primed = z3.substitute(
-                lemma, list(zip(self.sts.variables, self.sts.prime_variables)))
+                lemma, list(zip(self.sts.variables, self.sts.prime_variables))
+            )
             annotated.append(z3.Or(lemma, get_selector_var(i)))
             annotated_primes.append(z3.Or(primed, get_selector_var(i)))
             indexed[i] = lemma
@@ -65,12 +70,21 @@ class HoudiniProver:
                     del indexed[i]
                     removed += 1
 
-            self.logger.info("Iteration %d: Removed %d, %d/%d remaining",
-                            iteration, removed, len(indexed), initial_count)
+            self.logger.info(
+                "Iteration %d: Removed %d, %d/%d remaining",
+                iteration,
+                removed,
+                len(indexed),
+                initial_count,
+            )
 
         elapsed = time.time() - start_time
-        self.logger.info("Houdini completed in %.2fs with %d/%d lemmas",
-                         elapsed, len(indexed), initial_count)
+        self.logger.info(
+            "Houdini completed in %.2fs with %d/%d lemmas",
+            elapsed,
+            len(indexed),
+            initial_count,
+        )
         return indexed
 
     def solve(self, timeout: Optional[int] = None) -> VerificationResult:
@@ -79,7 +93,8 @@ class HoudiniProver:
 
         # Check if post-condition is already inductive
         post_primed = z3.substitute(
-            self.sts.post, list(zip(self.sts.variables, self.sts.prime_variables)))
+            self.sts.post, list(zip(self.sts.variables, self.sts.prime_variables))
+        )
         if check_invariant(self.sts, self.sts.post, post_primed):
             self.logger.info("Post-condition is already inductive")
             return VerificationResult(True, self.sts.post)
@@ -95,7 +110,9 @@ class HoudiniProver:
 
         if result:
             inv = z3.And(*result.values())
-            inv_primed = z3.substitute(inv, list(zip(self.sts.variables, self.sts.prime_variables)))
+            inv_primed = z3.substitute(
+                inv, list(zip(self.sts.variables, self.sts.prime_variables))
+            )
             if check_invariant(self.sts, inv, inv_primed):
                 self.logger.info("Found inductive invariant")
                 return VerificationResult(True, inv)
@@ -107,14 +124,12 @@ class HoudiniProver:
         """Generate candidate lemmas for invariant inference"""
         # Get existing invariants if available
         existing_invariants = None
-        if hasattr(self.sts, 'invariants') and self.sts.invariants:
+        if hasattr(self.sts, "invariants") and self.sts.invariants:
             existing_invariants = self.sts.invariants
 
         # Use the centralized lemma generation function
         lemmas = generate_basic_lemmas(
-            self.sts.variables,
-            self.sts.post,
-            existing_invariants
+            self.sts.variables, self.sts.post, existing_invariants
         )
 
         self.logger.info("Generated %d candidate lemmas", len(lemmas))

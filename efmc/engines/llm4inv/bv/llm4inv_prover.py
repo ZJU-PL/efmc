@@ -23,16 +23,16 @@ class LLM4InvProver:
 
     def __init__(self, sts: TransitionSystem, **kwargs):
         self.sts = sts
-        
+
         # Store configuration
-        self.timeout = kwargs.get('timeout', 600)
-        self.max_iterations = kwargs.get('max_iterations', 10)
-        self.bit_width = kwargs.get('bit_width') or extract_bit_width_from_sts(sts)
-        self.llm_model = kwargs.get('llm_model', 'deepseek-v3')
-        
+        self.timeout = kwargs.get("timeout", 600)
+        self.max_iterations = kwargs.get("max_iterations", 10)
+        self.bit_width = kwargs.get("bit_width") or extract_bit_width_from_sts(sts)
+        self.llm_model = kwargs.get("llm_model", "deepseek-v3")
+
         # Initialize the CEGIS loop with the same configuration
         self.cegis = LLMInvariantCEGIS(sts, **kwargs)
-        
+
         # Results
         self.result: Optional[VerificationResult] = None
         self.solve_time = 0.0
@@ -68,7 +68,7 @@ class LLM4InvProver:
             logger.warning("LLM4Inv synthesis failed")
 
         # Get timing from CEGIS loop
-        self.solve_time = self.cegis.stats.get('total_time', 0.0)
+        self.solve_time = self.cegis.stats.get("total_time", 0.0)
 
         return self.result
 
@@ -95,12 +95,12 @@ class LLM4InvProver:
         """Get comprehensive prover statistics"""
         # Get base statistics
         stats = {
-            'solve_time': self.solve_time,
-            'timeout': self.timeout,
-            'max_iterations': self.max_iterations,
-            'bit_width': self.bit_width,
-            'llm_model': self.llm_model,
-            'success': self.result.is_safe if self.result else False,
+            "solve_time": self.solve_time,
+            "timeout": self.timeout,
+            "max_iterations": self.max_iterations,
+            "bit_width": self.bit_width,
+            "llm_model": self.llm_model,
+            "success": self.result.is_safe if self.result else False,
         }
 
         # Add CEGIS loop statistics
@@ -119,10 +119,10 @@ class LLM4InvProver:
         self.llm_model = model_name
         # Recreate CEGIS loop with new model
         kwargs = {
-            'timeout': self.timeout,
-            'max_iterations': self.max_iterations,
-            'bit_width': self.bit_width,
-            'llm_model': model_name
+            "timeout": self.timeout,
+            "max_iterations": self.max_iterations,
+            "bit_width": self.bit_width,
+            "llm_model": model_name,
         }
         self.cegis = LLMInvariantCEGIS(self.sts, **kwargs)
 

@@ -22,13 +22,14 @@ p.add_argument("out_file", type=str, help="output file")
 
 MYDIR = dirname(abspath(realpath(__file__)))
 BOOGIE_PATH = MYDIR + "/../env/third_party/boogie/Binaries/Boogie.exe"
-#Z3_PATH = "E:\Gamification\inv-gen-game\env\third_party\z3\build\z3"
+# Z3_PATH = "E:\Gamification\inv-gen-game\env\third_party\z3\build\z3"
 
 
 def desugar(fname):
     """Desugar a Boogie file and return desugared code."""
     output = subprocess.check_output(
-            [BOOGIE_PATH, "/nologo", "/noinfer", "/traceverify", fname])
+        [BOOGIE_PATH, "/nologo", "/noinfer", "/traceverify", fname]
+    )
     if output.find("\r") >= 0:
         lines = list(output.split("\r\n"))
     else:
@@ -38,9 +39,14 @@ def desugar(fname):
     r = re.compile(r"implementation (?P<name>[^(]*)\(", re.MULTILINE)
     while True:
         try:
-            code = "\n".join(lines[
-                    lines.index("after desugaring sugared commands like procedure calls", start)+1:
-                    lines.index("after conversion into a DAG", start)])
+            code = "\n".join(
+                lines[
+                    lines.index(
+                        "after desugaring sugared commands like procedure calls", start
+                    )
+                    + 1 : lines.index("after conversion into a DAG", start)
+                ]
+            )
             name = r.findall(code)[0]
             desugared_f[name] = code
             start = lines.index("after conversion into a DAG", start) + 1
@@ -48,6 +54,7 @@ def desugar(fname):
             break
 
     return desugared_f
+
 
 if __name__ == "__main__":
     args = p.parse_args()

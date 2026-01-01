@@ -20,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 class QuantifierInstantiationProver:
     """Quantifier Instantiation based prover for verification."""
+
     def __init__(self, system: TransitionSystem, **kwargs):
         self.sts = system
-        self.timeout = kwargs.get('timeout', None)
-        self.qi_strategy = kwargs.get('qi_strategy', 'auto')
-        self.solver_name = kwargs.get('solver', 'z3api')
-        self.verbose = kwargs.get('verbose', False)
-        self.dump_file = kwargs.get('dump_file', None)
+        self.timeout = kwargs.get("timeout", None)
+        self.qi_strategy = kwargs.get("qi_strategy", "auto")
+        self.solver_name = kwargs.get("solver", "z3api")
+        self.verbose = kwargs.get("verbose", False)
+        self.dump_file = kwargs.get("dump_file", None)
         self.invariant: Optional[z3.ExprRef] = None
 
     def _get_logic(self) -> str:
@@ -53,27 +54,27 @@ class QuantifierInstantiationProver:
         else:
             raise NotImplementedError("Unsupported variable types")
 
-        return z3.Function('inv', *(arg_sorts + [z3.BoolSort()]))
+        return z3.Function("inv", *(arg_sorts + [z3.BoolSort()]))
 
     def _configure_z3_solver(self) -> z3.Solver:
         """Configure Z3 solver with QI strategy."""
         s = z3.SolverFor(self._get_logic())
 
-        if self.qi_strategy == 'mbqi':
-            s.set('auto_config', False)
-            s.set('smt.ematching', False)
-            s.set('smt.mbqi', True)
-        elif self.qi_strategy == 'ematching':
-            s.set('auto_config', False)
-            s.set('smt.mbqi', False)
-            s.set('smt.ematching', True)
-        elif self.qi_strategy == 'combined':
-            s.set('auto_config', False)
-            s.set('smt.mbqi', True)
-            s.set('smt.ematching', True)
+        if self.qi_strategy == "mbqi":
+            s.set("auto_config", False)
+            s.set("smt.ematching", False)
+            s.set("smt.mbqi", True)
+        elif self.qi_strategy == "ematching":
+            s.set("auto_config", False)
+            s.set("smt.mbqi", False)
+            s.set("smt.ematching", True)
+        elif self.qi_strategy == "combined":
+            s.set("auto_config", False)
+            s.set("smt.mbqi", True)
+            s.set("smt.ematching", True)
 
         if self.timeout:
-            s.set('timeout', self.timeout * 1000)
+            s.set("timeout", self.timeout * 1000)
 
         return s
 
@@ -81,13 +82,21 @@ class QuantifierInstantiationProver:
         """Build verification conditions: initiation, consecution, and safety."""
         return [
             # Initiation: init(X) => inv(X)
-            z3.ForAll(self.sts.variables, z3.Implies(self.sts.init, inv(*self.sts.variables))),
+            z3.ForAll(
+                self.sts.variables, z3.Implies(self.sts.init, inv(*self.sts.variables))
+            ),
             # Consecution: inv(X) ∧ trans(X,X') => inv(X')
-            z3.ForAll(self.sts.all_variables,
-                     z3.Implies(z3.And(inv(*self.sts.variables), self.sts.trans),
-                               inv(*self.sts.prime_variables))),
+            z3.ForAll(
+                self.sts.all_variables,
+                z3.Implies(
+                    z3.And(inv(*self.sts.variables), self.sts.trans),
+                    inv(*self.sts.prime_variables),
+                ),
+            ),
             # Safety: inv(X) => post(X)
-            z3.ForAll(self.sts.variables, z3.Implies(inv(*self.sts.variables), self.sts.post))
+            z3.ForAll(
+                self.sts.variables, z3.Implies(inv(*self.sts.variables), self.sts.post)
+            ),
         ]
 
     def _generate_smtlib2(self, verification_conditions: List[z3.ExprRef]) -> str:
@@ -108,15 +117,15 @@ class QuantifierInstantiationProver:
 
     def _call_external_solver(self, smt2_content: str) -> str:
         """Call external SMT solver (CVC5, Z3, etc.)"""
-        if self.solver_name == 'cvc5':
-            solver_cmd = ['cvc5', '--lang=smt2']
-        elif self.solver_name == 'z3':
-            solver_cmd = ['z3', '-smt2']
+        if self.solver_name == "cvc5":
+            solver_cmd = ["cvc5", "--lang=smt2"]
+        elif self.solver_name == "z3":
+            solver_cmd = ["z3", "-smt2"]
         else:
             raise ValueError(f"Unsupported external solver: {self.solver_name}")
-        
+
         # Write SMT2 content to temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.smt2', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".smt2", delete=False) as f:
             f.write(smt2_content)
             temp_file = f.name
 
@@ -127,7 +136,7 @@ class QuantifierInstantiationProver:
                 capture_output=True,
                 text=True,
                 timeout=self.timeout if self.timeout else 60,
-                check=False
+                check=False,
             )
 
             if result.returncode == 0:
@@ -163,7 +172,7 @@ class QuantifierInstantiationProver:
             # Build verification conditions
             vcs = self._build_verification_conditions(inv)
 
-            if self.solver_name == 'z3api':
+            if self.solver_name == "z3api":
                 # Use Z3 API
                 s = self._configure_z3_solver()
                 for vc in vcs:
@@ -189,7 +198,7 @@ class QuantifierInstantiationProver:
             smt2_content = self._generate_smtlib2(vcs)
 
             if self.dump_file:
-                with open(self.dump_file, 'w', encoding='utf-8') as f:
+                with open(self.dump_file, "w", encoding="utf-8") as f:
                     f.write(smt2_content)
 
             result = self._call_external_solver(smt2_content)
@@ -200,7 +209,9 @@ class QuantifierInstantiationProver:
                 return VerificationResult(False, None, is_unsafe=True)
             if result == "unsat":
                 logger.info("Property proven safe")
-                return VerificationResult(True, None)  # External solver doesn't provide model
+                return VerificationResult(
+                    True, None
+                )  # External solver doesn't provide model
             logger.info("Solver returned unknown")
             return VerificationResult(False, None, is_unknown=True)
 
@@ -210,7 +221,7 @@ class QuantifierInstantiationProver:
 
     def try_multiple_strategies(self) -> VerificationResult:
         """Try multiple QI strategies if current one fails."""
-        strategies = ['mbqi', 'ematching', 'combined']
+        strategies = ["mbqi", "ematching", "combined"]
 
         for strategy in strategies:
             if strategy == self.qi_strategy:
@@ -227,9 +238,11 @@ class QuantifierInstantiationProver:
 
     def set_strategy(self, strategy: str) -> None:
         """Set QI strategy."""
-        valid_strategies = ['auto', 'mbqi', 'ematching', 'combined']
+        valid_strategies = ["auto", "mbqi", "ematching", "combined"]
         if strategy not in valid_strategies:
-            raise ValueError(f"Invalid strategy: {strategy}. Valid strategies: {valid_strategies}")
+            raise ValueError(
+                f"Invalid strategy: {strategy}. Valid strategies: {valid_strategies}"
+            )
         self.qi_strategy = strategy
 
     def get_invariant(self) -> Optional[z3.ExprRef]:

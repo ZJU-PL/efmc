@@ -22,10 +22,12 @@ import z3
 # ---------------------------------------------------------------------------#
 # Helpers for linearisation                                                  #
 # ---------------------------------------------------------------------------#
-Num = z3.ArithRef           # either IntVal or RatNumRef
+Num = z3.ArithRef  # either IntVal or RatNumRef
+
 
 def _is_numeric(e: z3.ExprRef) -> bool:
     return z3.is_int_value(e) or z3.is_rational_value(e)
+
 
 def _to_float(e: Num) -> float:
     if z3.is_int_value(e):
@@ -34,15 +36,15 @@ def _to_float(e: Num) -> float:
     den = float(e.denominator_as_long())
     return num / den
 
-def _merge_coeff_dict(a: Dict[z3.ExprRef, float],
-                      b: Mapping[z3.ExprRef, float],
-                      sign: float = 1.) -> None:
+
+def _merge_coeff_dict(
+    a: Dict[z3.ExprRef, float], b: Mapping[z3.ExprRef, float], sign: float = 1.0
+) -> None:
     for v, c in b.items():
         a[v] = a.get(v, 0.0) + sign * c
 
 
-def _linearise(expr: z3.ArithRef
-               ) -> Tuple[Dict[z3.ExprRef, float], float]:
+def _linearise(expr: z3.ArithRef) -> Tuple[Dict[z3.ExprRef, float], float]:
     """
     Return (coeff_dict, constant) s.t.
 
@@ -95,8 +97,8 @@ def _linearise(expr: z3.ArithRef
         # If one is a simple variable and the other might be an expression,
         # treat the whole product as a single "variable" for Farkas purposes
         if expr.decl().kind() == z3.Z3_OP_UNINTERPRETED or (
-            a.decl().kind() == z3.Z3_OP_UNINTERPRETED or
-            b.decl().kind() == z3.Z3_OP_UNINTERPRETED
+            a.decl().kind() == z3.Z3_OP_UNINTERPRETED
+            or b.decl().kind() == z3.Z3_OP_UNINTERPRETED
         ):
             # Treat the entire multiplication as a composite term
             return {expr: 1.0}, 0.0
@@ -154,8 +156,7 @@ class FarkasSystem:
         return self._solver.model() if self.is_sat else None
 
     @property
-    def certificate(self
-                    ) -> Dict[str, float] | None:
+    def certificate(self) -> Dict[str, float] | None:
         """
         Returns a dictionary λᵢ (as floats) satisfying Farkas’ conditions if
         the system is UNSAT.  Otherwise returns None.
@@ -167,8 +168,7 @@ class FarkasSystem:
     # -----------------------------------------------------------------------
     # internals                                                              #
     # -----------------------------------------------------------------------
-    def _normalise(self
-                   ) -> Tuple[List[Dict[z3.ExprRef, float]], List[float]]:
+    def _normalise(self) -> Tuple[List[Dict[z3.ExprRef, float]], List[float]]:
         """
         Turn every input constraint into the shape   a·x  ≤  b   and return
         parallel lists of coefficients  and  constants  (b).
@@ -179,17 +179,17 @@ class FarkasSystem:
         bs: List[float] = []
 
         for c in self._orig:
-            if z3.is_le(c):        # lhs ≤ rhs   ⇒ lhs − rhs ≤ 0
+            if z3.is_le(c):  # lhs ≤ rhs   ⇒ lhs − rhs ≤ 0
                 lhs, rhs = c.arg(0), c.arg(1)
                 coeff, k = _linearise(lhs - rhs)
                 as_list.append(coeff)
                 bs.append(-k)
-            elif z3.is_ge(c):      # lhs ≥ rhs   ⇒ rhs − lhs ≤ 0
+            elif z3.is_ge(c):  # lhs ≥ rhs   ⇒ rhs − lhs ≤ 0
                 lhs, rhs = c.arg(0), c.arg(1)
                 coeff, k = _linearise(rhs - lhs)
                 as_list.append(coeff)
                 bs.append(-k)
-            elif z3.is_eq(c):      # lhs == rhs  ⇒ two inequalities
+            elif z3.is_eq(c):  # lhs == rhs  ⇒ two inequalities
                 lhs, rhs = c.arg(0), c.arg(1)
                 coeff, k = _linearise(lhs - rhs)
                 as_list.append(coeff)
@@ -217,31 +217,34 @@ class FarkasSystem:
 
         # Σ λᵢ aᵢⱼ = 0   for every variable xⱼ appearing anywhere
         vars_: List[z3.ExprRef] = sorted(
-            {v for row in a_list for v in row},
-            key=lambda v: v.decl().name()
+            {v for row in a_list for v in row}, key=lambda v: v.decl().name()
         )
         for v in vars_:
-            solver.add(z3.Sum([
-                lambdas[i] * z3.RealVal(a_list[i].get(v, 0.0))
-                for i in range(m)
-            ]) == 0)
+            solver.add(
+                z3.Sum(
+                    [lambdas[i] * z3.RealVal(a_list[i].get(v, 0.0)) for i in range(m)]
+                )
+                == 0
+            )
 
         # Σ λᵢ bᵢ  <  0
-        solver.add(z3.Sum([
-            lambdas[i] * z3.RealVal(b[i]) for i in range(m)
-        ]) < 0)
+        solver.add(z3.Sum([lambdas[i] * z3.RealVal(b[i]) for i in range(m)]) < 0)
 
         # avoid the trivial all-zero assignment (redundant, but good practice)
         solver.add(z3.Or([l > 0 for l in lambdas]))
 
         if solver.check() != z3.sat:
-            raise RuntimeError("linearisation incomplete – "
-                               "failed to produce certificate "
-                               "although original system is UNSAT")
+            raise RuntimeError(
+                "linearisation incomplete – "
+                "failed to produce certificate "
+                "although original system is UNSAT"
+            )
 
         mdl = solver.model()
-        return {str(l): _to_float(mdl.eval(l).as_fraction())  # type: ignore
-                for l in lambdas}
+        return {
+            str(l): _to_float(mdl.eval(l).as_fraction())  # type: ignore
+            for l in lambdas
+        }
 
 
 # ---------------------------------------------------------------------------#
@@ -264,8 +267,9 @@ class FarkasLemma:
         self._constraints: List[z3.BoolRef] = []
         self._lambda_counter = 0
 
-    def apply_farkas_lemma_symbolic(self,
-                                    program_vars: Sequence[z3.ArithRef]) -> List[z3.BoolRef]:
+    def apply_farkas_lemma_symbolic(
+        self, program_vars: Sequence[z3.ArithRef]
+    ) -> List[z3.BoolRef]:
         """
         Apply Farkas' lemma symbolically for template synthesis.
 
@@ -346,7 +350,10 @@ class FarkasLemma:
                 continue
 
             # Evaluate at program_vars = 0 to get constant term
-            subst = [(v, z3.IntVal(0) if z3.is_int(v) else z3.RealVal(0)) for v in program_vars]
+            subst = [
+                (v, z3.IntVal(0) if z3.is_int(v) else z3.RealVal(0))
+                for v in program_vars
+            ]
             const_term = z3.substitute(lhs_minus_rhs, subst)
             terms.append(lambdas[i] * const_term)
 
@@ -359,8 +366,7 @@ class FarkasLemma:
         """Add a constraint to the system."""
         self._constraints.append(c)
 
-    def apply_farkas_lemma(self,
-                          _variables: Sequence[z3.ArithRef]) -> List[z3.BoolRef]:
+    def apply_farkas_lemma(self, _variables: Sequence[z3.ArithRef]) -> List[z3.BoolRef]:
         """
         Apply Farkas' lemma to encode that the constraint system is UNSAT.
 
@@ -446,10 +452,7 @@ class FarkasLemma:
 
         # 2. λᵀA = 0  (for each variable)
         # Collect all variables that appear in any constraint
-        all_vars = sorted(
-            {v for row in a_list for v in row},
-            key=str
-        )
+        all_vars = sorted({v for row in a_list for v in row}, key=str)
 
         for v in all_vars:
             # Sum over all constraints: Σᵢ λᵢ * aᵢⱼ = 0

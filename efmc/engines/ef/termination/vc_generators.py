@@ -41,14 +41,17 @@ class RankingVCGenerator:
         constraints.append(decrease_constraint)
 
         # Initial state constraint
-        if self.sts.init is not None and ranking_template.signedness != Signedness.UNSIGNED:
+        if (
+            self.sts.init is not None
+            and ranking_template.signedness != Signedness.UNSIGNED
+        ):
             constraints.append(z3.Implies(self.sts.init, rank_current >= 0))
 
         # Combine constraints
         vc = big_and(constraints)
 
         # Add template-specific constraints
-        for attr in ['template_cnt_init_and_post', 'template_cnt_trans']:
+        for attr in ["template_cnt_init_and_post", "template_cnt_trans"]:
             if hasattr(ranking_template, attr):
                 vc = z3.And(vc, getattr(ranking_template, attr))
 
@@ -57,14 +60,16 @@ class RankingVCGenerator:
     def _build_expressions(self, template) -> Tuple[z3.ExprRef, z3.ExprRef]:
         """Build ranking function expressions for current and next states."""
         # Try different methods to build expressions
-        for method_name in ['_build_ranking_expr', 'build_invariant_expr']:
+        for method_name in ["_build_ranking_expr", "build_invariant_expr"]:
             if hasattr(template, method_name):
                 method = getattr(template, method_name)
-                if method_name == 'build_invariant_expr':
+                if method_name == "build_invariant_expr":
                     dummy_model = self._create_dummy_model()
                     if dummy_model:
-                        return (method(dummy_model, use_prime_variables=False),
-                               method(dummy_model, use_prime_variables=True))
+                        return (
+                            method(dummy_model, use_prime_variables=False),
+                            method(dummy_model, use_prime_variables=True),
+                        )
                 else:
                     return method(self.sts.variables), method(self.sts.prime_variables)
 
@@ -76,7 +81,6 @@ class RankingVCGenerator:
         solver = z3.Solver()
         solver.add(z3.BoolVal(True))
         return solver.model() if solver.check() == z3.sat else None
-
 
 
 class RecurrenceVCGenerator:
@@ -91,7 +95,9 @@ class RecurrenceVCGenerator:
 
         # Build recurrence set expressions
         recur_current = self._build_expression(recurrence_template, self.sts.variables)
-        recur_next = self._build_expression(recurrence_template, self.sts.prime_variables)
+        recur_next = self._build_expression(
+            recurrence_template, self.sts.prime_variables
+        )
 
         guard = self.sts.trans if self.sts.trans is not None else z3.BoolVal(True)
 
@@ -111,7 +117,7 @@ class RecurrenceVCGenerator:
         vc = big_and(constraints)
 
         # Add template-specific constraints
-        for attr in ['template_cnt_init_and_post', 'template_cnt_trans']:
+        for attr in ["template_cnt_init_and_post", "template_cnt_trans"]:
             if hasattr(recurrence_template, attr):
                 vc = z3.And(vc, getattr(recurrence_template, attr))
 
@@ -119,14 +125,16 @@ class RecurrenceVCGenerator:
 
     def _build_expression(self, template, variables: List[z3.ExprRef]) -> z3.ExprRef:
         """Build recurrence set expression for given variables."""
-        if hasattr(template, '_build_recurrence_expr'):
+        if hasattr(template, "_build_recurrence_expr"):
             # pylint: disable=protected-access
             return template._build_recurrence_expr(variables)
-        if hasattr(template, 'build_invariant_expr'):
+        if hasattr(template, "build_invariant_expr"):
             dummy_model = self._create_dummy_model()
             if dummy_model:
                 use_prime = variables == self.sts.prime_variables
-                return template.build_invariant_expr(dummy_model, use_prime_variables=use_prime)
+                return template.build_invariant_expr(
+                    dummy_model, use_prime_variables=use_prime
+                )
         return z3.BoolVal(True)
 
     def _create_dummy_model(self):

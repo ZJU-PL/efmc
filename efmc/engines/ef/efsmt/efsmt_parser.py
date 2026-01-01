@@ -1,6 +1,6 @@
 """
 Parser for EFSMT (Exists-Forall SMT) formulas in SMT-LIB2 format
-We assume that the formula is of the form 
+We assume that the formula is of the form
     forall Y. Phi(X, Y), where X is the set of existentially quantified
     variables, and Y is the set of universally quantified variables.
 """
@@ -19,7 +19,7 @@ class EFSMTParser:
 
     def __init__(self):
         self.logic = None
-        self.supported_logics = ['BV', 'LIA', 'LRA', 'BIA', 'NRA']
+        self.supported_logics = ["BV", "LIA", "LRA", "BIA", "NRA"]
 
     def set_logic(self, logic: str) -> None:
         """Set the SMT logic to use for parsing

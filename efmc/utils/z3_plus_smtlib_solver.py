@@ -53,7 +53,7 @@ def solve_with_bin_solver(cmd, timeout=300):
         timer = Timer(timeout, terminate, args=[p, is_timeout])
         timer.start()
         out = p.stdout.readlines()
-        out = ' '.join([str(element.decode('UTF-8')) for element in out])
+        out = " ".join([str(element.decode("UTF-8")) for element in out])
         timer.cancel()
         if p.poll() is None:
             p.terminate()
@@ -64,6 +64,7 @@ def solve_with_bin_solver(cmd, timeout=300):
 
 class BinaryInterpolSolver(Enum):
     """Enumeration of binary interpolation solvers."""
+
     CVC5 = 0
     MATHSAT5 = 1
     SMTINTERPOL = 2
@@ -71,11 +72,13 @@ class BinaryInterpolSolver(Enum):
 
 class SequenceInterpolSolver(Enum):
     """Enumeration of sequence interpolation solvers."""
+
     MATHSAT = 0
 
 
 class OMTSolver(Enum):
     """Enumeration of OMT (Optimization Modulo Theories) solvers."""
+
     CVC5 = 0
     OPTIMATHSAT = 1
 
@@ -233,8 +236,14 @@ class Z3SolverPlus(z3.Solver):
         smtlib.stop()
         return ret
 
-    def sygus(self, funcs: List[z3.FuncDeclRef], cnts: List[z3.BoolRef],
-              all_vars: List[z3.ExprRef], logic=None, pbe=False):
+    def sygus(
+        self,
+        funcs: List[z3.FuncDeclRef],
+        cnts: List[z3.BoolRef],
+        all_vars: List[z3.ExprRef],
+        logic=None,
+        pbe=False,
+    ):
         """
         SyGuS with CVC5.
 
@@ -318,7 +327,9 @@ class Z3SolverPlus(z3.Solver):
         # print(z3.And(z3.parse_smt2_string("\n".join(signature_vec) + cnt)))
         return z3.And(z3.parse_smt2_string("\n".join(signature_vec) + cnt))
 
-    def compute_min_max(self, fml: z3.ExprRef, minimize: List, maximize: List, logic=None):
+    def compute_min_max(
+        self, fml: z3.ExprRef, minimize: List, maximize: List, logic=None
+    ):
         """
         Compute min/max for multiple objectives.
 
@@ -377,7 +388,9 @@ class Z3SolverPlus(z3.Solver):
             else:
                 asserts.append(f"(assert (<= {res_val[2:-1]}))")
         # print(asserts)
-        return z3.And(z3.parse_smt2_string("\n".join(signature_vec) + "\n".join(asserts)))
+        return z3.And(
+            z3.parse_smt2_string("\n".join(signature_vec) + "\n".join(asserts))
+        )
 
     def all_sat(self, fml: z3.ExprRef, bools: List[z3.ExprRef]):
         """

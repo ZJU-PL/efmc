@@ -1,9 +1,13 @@
 """Daikon invariant detection integration."""
+
 from os.path import basename
 from subprocess import call, check_output
 from tempfile import NamedTemporaryFile
 
-from efmc.verifytools.common.util import error, flattenList  # pylint: disable=no-name-in-module
+from efmc.verifytools.common.util import (
+    error,
+    flattenList,
+)  # pylint: disable=no-name-in-module
 from efmc.verifytools.daikon.inv_ast import parse_expr_ast
 
 
@@ -207,21 +211,28 @@ def run_daikon(varz, trace, nosuppress=False):
         args = ["java", "daikon.Daikon"]
         if nosuppress:
             # Lets disable all filters and enable all invariants
-            args = args + \
-                flattenList([["--config_option", x + "=false"]
-                             for x in filter_opts]) + \
-                flattenList([["--config_option", x + "=true"]
-                             for x in inv_enable_opts])
+            args = (
+                args
+                + flattenList([["--config_option", x + "=false"] for x in filter_opts])
+                + flattenList(
+                    [["--config_option", x + "=true"] for x in inv_enable_opts]
+                )
+            )
         args.append(dtrace_f.name)
         raw = check_output(args)
-        call(["rm", basename(dtrace_f.name)[:-len(".dtrace")] + ".inv.gz"])
+        call(["rm", basename(dtrace_f.name)[: -len(".dtrace")] + ".inv.gz"])
         start = raw.index("LoopEntry:::") + len("LoopEntry:::")
         end = raw.index("Exiting Daikon.", start)
-        invs = filter(lambda x: x != "",
-                      map(lambda x: x.strip(), raw[start:end].split("\n")))
+        invs = filter(
+            lambda x: x != "", map(lambda x: x.strip(), raw[start:end].split("\n"))
+        )
         # I don't understand how LinearTeranry invariants without justification are
         # displayed... Also getting lazy to fix the long line..
-        invs = filter(lambda x: "warning: too few samples for daikon.inv.ternary.threeScalar.LinearTernary invariant" not in x, invs)  # pylint: disable=line-too-long
+        invs = filter(
+            lambda x: "warning: too few samples for daikon.inv.ternary.threeScalar.LinearTernary invariant"
+            not in x,
+            invs,
+        )  # pylint: disable=line-too-long
         invs = filter(lambda x: "(mod 0)" not in x, invs)
         parsable = []
         for i in invs:

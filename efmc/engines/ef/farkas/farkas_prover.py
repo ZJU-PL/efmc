@@ -63,10 +63,11 @@ def _timer() -> Any:  # returns elapsed seconds as float
 @dataclass
 class FarkasProverConfig:
     """Configuration for FarkasProver."""
+
     num_templates: int = 3
-    solver: str = "z3"                 # placeholder for future external support
+    solver: str = "z3"  # placeholder for future external support
     validate_invariant: bool = True
-    timeout: Optional[int] = None      # seconds
+    timeout: Optional[int] = None  # seconds
     verbose: bool = False
     z3_params: Dict[str, Any] = field(default_factory=dict)
 
@@ -183,7 +184,9 @@ class FarkasProver:
 
                 if res != z3.sat:
                     if self.cfg.verbose:
-                        logger.info("Synthesis returned %s after %.2fs", res, self._solve_time)
+                        logger.info(
+                            "Synthesis returned %s after %.2fs", res, self._solve_time
+                        )
                     return VerificationResult(
                         is_safe=False, invariant=None, is_unknown=True
                     )

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class QuantifierEliminationProver:
     """Prover using quantifier elimination to compute inductive invariants."""
+
     def __init__(self, system: TransitionSystem, timeout=None, verbose=True):
         self.sts = system
         self.timeout = timeout  # Timeout in seconds
@@ -35,10 +36,12 @@ class QuantifierEliminationProver:
             self.var_map.append((var, self.sts.prime_variables[i]))
             self.var_map_rev.append((self.sts.prime_variables[i], var))
 
-    def solve(self, timeout: Optional[int] = None) -> VerificationResult:  # pylint: disable=unused-argument
+    def solve(
+        self, timeout: Optional[int] = None
+    ) -> VerificationResult:  # pylint: disable=unused-argument
         """
         Verify the system using quantifier elimination.
-        
+
         Returns:
             VerificationResult: Object containing verification result and related data
         """
@@ -66,11 +69,11 @@ class QuantifierEliminationProver:
             # Try different QE tactics if one fails
             try:
                 # compute the best abstract transformer
-                onestep = z3.Tactic('qe2')(qfml).as_expr()
+                onestep = z3.Tactic("qe2")(qfml).as_expr()
             except z3.Z3Exception:
                 try:
                     # Fall back to regular qe if qe2 fails
-                    onestep = z3.Tactic('qe')(qfml).as_expr()
+                    onestep = z3.Tactic("qe")(qfml).as_expr()
                 except z3.Z3Exception:
                     print("QE tactics failed, using default simplification")
                     onestep = z3.simplify(qfml)
@@ -93,7 +96,7 @@ class QuantifierEliminationProver:
         return VerificationResult(False, None, is_unknown=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     x, y, z, xp, yp, zp = z3.Reals("x y z x! y! z!")
 
     init = x == 0

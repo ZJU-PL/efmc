@@ -79,8 +79,12 @@ class AffineTemplate(Template):
         cnts_init_post = []  # For sts.variables
         cnts_trans = []  # For sts.prime_variables
         for i in range(self.template_index):  # num. of templates
-            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
-            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
+            term_init_post = self._build_linear_term(
+                self.template_vars[i], self.sts.variables
+            )
+            term_trans = self._build_linear_term(
+                self.template_vars[i], self.sts.prime_variables
+            )
 
             cnts_init_post.append(term_init_post == 0)
             cnts_trans.append(term_trans == 0)
@@ -123,7 +127,9 @@ class DisjunctiveAffineTemplate(Template):
 
         #  number of linear inequalities (NOTE: interval, zone, and octagon domains do not need this)
         #  thus, the following field is polyhedron/affine-specific
-        self.num_templates = 1  # (a1 AND a2 ..)  NOTE: now use for now. We always use 1.
+        self.num_templates = (
+            1  # (a1 AND a2 ..)  NOTE: now use for now. We always use 1.
+        )
 
         self.num_disjunctions = kwargs.get("num_disjunctions", 2)
 
@@ -179,8 +185,12 @@ class DisjunctiveAffineTemplate(Template):
         cnts_init_post = []  # For sts.variables
         cnts_trans = []  # For sts.prime_variables
         for i in range(self.template_index):  # num. of templates
-            term_init_post = self._build_linear_term(self.template_vars[i], self.sts.variables)
-            term_trans = self._build_linear_term(self.template_vars[i], self.sts.prime_variables)
+            term_init_post = self._build_linear_term(
+                self.template_vars[i], self.sts.variables
+            )
+            term_trans = self._build_linear_term(
+                self.template_vars[i], self.sts.prime_variables
+            )
 
             cnts_init_post.append(term_init_post == 0)
             cnts_trans.append(term_trans == 0)

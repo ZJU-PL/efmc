@@ -1,5 +1,5 @@
-"""Zone domain over integer or real variables
-"""
+"""Zone domain over integer or real variables"""
+
 import itertools
 import logging
 
@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class ZoneTemplate(Template):
-    """ NOTE: the constraints may look a bit strange, as we borrow the implementation for
-     the interval one (which uses FOUR template variables for each program variable, but NOT TWO)
+    """NOTE: the constraints may look a bit strange, as we borrow the implementation for
+    the interval one (which uses FOUR template variables for each program variable, but NOT TWO)
     """
 
     def __init__(self, sts: TransitionSystem, **kwargs):
@@ -26,8 +26,8 @@ class ZoneTemplate(Template):
 
         self.sts = sts
         self.arity = len(self.sts.variables)
-        assert (self.arity >= 2)
-        assert (len(self.sts.prime_variables) >= 2)
+        assert self.arity >= 2
+        assert len(self.sts.prime_variables) >= 2
         self.zones = []
         for x, y in list(itertools.combinations(self.sts.variables, 2)):
             self.zones.append(x - y)
@@ -53,11 +53,19 @@ class ZoneTemplate(Template):
             term_name = "{}{}".format(term_vars[0], term_vars[1])
             self.template_index += 1
             if self.use_real:
-                tvars = [z3.Real("i{}0".format(term_name)), z3.Real("i{}1".format(term_name)),
-                         z3.Real("i{}2".format(term_name)), z3.Real("i{}3".format(term_name))]
+                tvars = [
+                    z3.Real("i{}0".format(term_name)),
+                    z3.Real("i{}1".format(term_name)),
+                    z3.Real("i{}2".format(term_name)),
+                    z3.Real("i{}3".format(term_name)),
+                ]
             else:
-                tvars = [z3.Int("i{}0".format(term_name)), z3.Int("i{}1".format(term_name)),
-                         z3.Int("i{}2".format(term_name)), z3.Int("i{}3".format(term_name))]
+                tvars = [
+                    z3.Int("i{}0".format(term_name)),
+                    z3.Int("i{}1".format(term_name)),
+                    z3.Int("i{}2".format(term_name)),
+                    z3.Int("i{}3".format(term_name)),
+                ]
             self.template_vars.append(tvars)
         # print(self.template_vars)
 
@@ -162,11 +170,15 @@ class DisjunctiveZoneTemplate(Template):
                 term_name = "{}{}".format(term_vars[0], term_vars[1])
                 self.template_index += 1
                 if self.use_real:
-                    tvars = [z3.Real("d{0}_{1}_l".format(i, term_name)),
-                             z3.Real("d{0}_{1}_u".format(i, term_name))]
+                    tvars = [
+                        z3.Real("d{0}_{1}_l".format(i, term_name)),
+                        z3.Real("d{0}_{1}_u".format(i, term_name)),
+                    ]
                 else:
-                    tvars = [z3.BitVec("d{0}_{1}_l".format(i, term_name)),
-                             z3.BitVec("d{0}_{1}_u".format(i, term_name))]
+                    tvars = [
+                        z3.BitVec("d{0}_{1}_l".format(i, term_name)),
+                        z3.BitVec("d{0}_{1}_u".format(i, term_name)),
+                    ]
                 vars_for_dis.append(tvars)
 
             self.template_vars.append(vars_for_dis)

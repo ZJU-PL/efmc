@@ -30,7 +30,7 @@ def get_bv_size(x: z3.ExprRef) -> int:
 class BitSymbolicAbstraction:
     """
     Symbolic abstraction for bit-level properties of bit-vector formulas.
-    
+
     This class implements:
     1. Known bits: For each bit position, track if it must be 0, must be 1, or unknown
     """
@@ -210,11 +210,11 @@ class BitSymbolicAbstraction:
 def strongest_consequence(fml: z3.ExprRef, domain: str = "known_bits") -> z3.ExprRef:
     """
     Compute the strongest consequence of a formula in the bit-level domain.
-    
+
     Args:
         fml: The formula to abstract
         domain: The abstract domain to use ("known_bits")
-        
+
     Returns:
         A formula representing the strongest consequence in the specified domain
     """
@@ -234,8 +234,8 @@ def strongest_consequence(fml: z3.ExprRef, domain: str = "known_bits") -> z3.Exp
 def test():
     """Test the bit-level symbolic abstraction"""
     # Create a simple formula
-    x = z3.BitVec('x', 8)
-    y = z3.BitVec('y', 8)
+    x = z3.BitVec("x", 8)
+    y = z3.BitVec("y", 8)
 
     # x & 0x0F == 0x0A
     fml = z3.And(x & 0x0F == 0x0A, y == x + 1)

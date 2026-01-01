@@ -22,22 +22,24 @@ logger = logging.getLogger(__name__)
 class BDDProver:  # pylint: disable=too-many-instance-attributes
     """
     BDD-based symbolic model checker for Boolean programs.
-    
+
     This prover uses Z3's Boolean reasoning capabilities to implement BDD-like
     symbolic model checking for Boolean programs. It implements both forward and backward
     reachability analysis to verify safety properties.
     """
 
     def __init__(
-        self, system: TransitionSystem, use_forward: bool = True,
-        max_iterations: int = 1000
+        self,
+        system: TransitionSystem,
+        use_forward: bool = True,
+        max_iterations: int = 1000,
     ):
         """
         Initialize the BDD prover with a transition system.
-        
+
         Args:
             system: The transition system to verify
-            use_forward: Whether to use forward reachability analysis (True) or 
+            use_forward: Whether to use forward reachability analysis (True) or
                          backward reachability analysis (False)
             max_iterations: Maximum number of iterations for fixed-point computation
         """
@@ -72,10 +74,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _substitute_prime_with_current(self, formula: z3.ExprRef) -> z3.ExprRef:
         """
         Substitute prime variables with current variables in a formula.
-        
+
         Args:
             formula: The formula to perform substitution on
-            
+
         Returns:
             A new formula with prime variables replaced by current variables
         """
@@ -85,10 +87,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _substitute_current_with_prime(self, formula: z3.ExprRef) -> z3.ExprRef:
         """
         Substitute current variables with prime variables in a formula.
-        
+
         Args:
             formula: The formula to perform substitution on
-            
+
         Returns:
             A new formula with current variables replaced by prime variables
         """
@@ -98,10 +100,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _image(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
         Compute the image (successor states) of a set of states.
-        
+
         Args:
             states_formula: Formula representing the set of states
-            
+
         Returns:
             Formula representing the successor states
         """
@@ -113,10 +115,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _image_bool(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
         Compute the image for Boolean systems.
-        
+
         Args:
             states_formula: Formula representing the set of states
-            
+
         Returns:
             Formula representing the successor states
         """
@@ -172,10 +174,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _image_bv(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
         Compute the image for bit-vector systems.
-        
+
         Args:
             states_formula: Formula representing the set of states
-            
+
         Returns:
             Formula representing the successor states
         """
@@ -231,10 +233,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _pre_image(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
         Compute the pre-image (predecessor states) of a set of states.
-        
+
         Args:
             states_formula: Formula representing the set of states
-            
+
         Returns:
             Formula representing the predecessor states
         """
@@ -246,10 +248,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _pre_image_bool(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
         Compute the pre-image for Boolean systems.
-        
+
         Args:
             states_formula: Formula representing the set of states
-            
+
         Returns:
             Formula representing the predecessor states
         """
@@ -306,10 +308,10 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _pre_image_bv(self, states_formula: z3.ExprRef) -> z3.ExprRef:
         """
         Compute the pre-image for bit-vector systems.
-        
+
         Args:
             states_formula: Formula representing the set of states
-            
+
         Returns:
             Formula representing the predecessor states
         """
@@ -366,11 +368,11 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _is_contained(self, formula1: z3.ExprRef, formula2: z3.ExprRef) -> bool:
         """
         Check if formula1 implies formula2 (formula1 ⊆ formula2).
-        
+
         Args:
             formula1: First formula
             formula2: Second formula
-            
+
         Returns:
             True if formula1 implies formula2, False otherwise
         """
@@ -382,27 +384,29 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def _is_equal(self, formula1: z3.ExprRef, formula2: z3.ExprRef) -> bool:
         """
         Check if formula1 is equivalent to formula2.
-        
+
         Args:
             formula1: First formula
             formula2: Second formula
-            
+
         Returns:
             True if formula1 is equivalent to formula2, False otherwise
         """
         # formula1 = formula2 iff (formula1 ⊆ formula2) and (formula2 ⊆ formula1)
         contained_1_in_2 = self._is_contained(formula1, formula2)
         # We intentionally swap arguments to check formula2 ⊆ formula1
-        contained_2_in_1 = self._is_contained(formula2, formula1)  # pylint: disable=arguments-out-of-order
+        contained_2_in_1 = self._is_contained(
+            formula2, formula1
+        )  # pylint: disable=arguments-out-of-order
         return contained_1_in_2 and contained_2_in_1
 
     def _is_sat(self, formula: z3.ExprRef) -> bool:
         """
         Check if a formula is satisfiable.
-        
+
         Args:
             formula: Formula to check
-            
+
         Returns:
             True if formula is satisfiable, False otherwise
         """
@@ -413,7 +417,7 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def forward_analysis(self) -> Tuple[bool, Optional[z3.ExprRef]]:
         """
         Perform forward reachability analysis.
-        
+
         Returns:
             Tuple[bool, Optional[z3.ExprRef]]: (is_safe, invariant)
                 is_safe: True if the system is safe, False otherwise
@@ -460,7 +464,7 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
             if step > self.max_iterations:
                 logger.warning(
                     "Reached maximum number of iterations (%s), stopping",
-                    self.max_iterations
+                    self.max_iterations,
                 )
                 # For safety, we assume the system is safe if we've reached the
                 # maximum number of iterations and haven't found a property violation
@@ -469,7 +473,7 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def backward_analysis(self) -> Tuple[bool, Optional[z3.ExprRef]]:
         """
         Perform backward reachability analysis.
-        
+
         Returns:
             Tuple[bool, Optional[z3.ExprRef]]: (is_safe, invariant)
                 is_safe: True if the system is safe, False otherwise
@@ -516,7 +520,7 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
             if step > self.max_iterations:
                 logger.warning(
                     "Reached maximum number of iterations (%s), stopping",
-                    self.max_iterations
+                    self.max_iterations,
                 )
                 # For safety, we assume the system is safe if we've reached the
                 # maximum number of iterations and haven't found a property violation
@@ -525,7 +529,7 @@ class BDDProver:  # pylint: disable=too-many-instance-attributes
     def solve(self) -> VerificationResult:
         """
         Verify the safety property of the transition system.
-        
+
         Returns:
             VerificationResult: The result of the verification
         """

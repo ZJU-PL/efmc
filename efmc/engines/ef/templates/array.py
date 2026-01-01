@@ -1,6 +1,7 @@
 """
 FIXME: this file is not used yet
 """
+
 import logging
 from typing import Optional, Any
 
@@ -34,7 +35,9 @@ class ArrayTemplate(Template):
     def add_template_cnts(self) -> None:
         raise NotImplementedError
 
-    def build_invariant_expr(self, model: z3.ModelRef, use_prime_variables: bool) -> z3.ExprRef:
+    def build_invariant_expr(
+        self, model: z3.ModelRef, use_prime_variables: bool
+    ) -> z3.ExprRef:
         raise NotImplementedError
 
 
@@ -61,5 +64,7 @@ class UFTemplate(Template):
     def add_template_cnts(self) -> None:
         raise NotImplementedError
 
-    def build_invariant_expr(self, model: z3.ModelRef, use_prime_variables: bool) -> z3.ExprRef:
+    def build_invariant_expr(
+        self, model: z3.ModelRef, use_prime_variables: bool
+    ) -> z3.ExprRef:
         raise NotImplementedError

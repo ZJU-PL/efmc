@@ -19,12 +19,12 @@ from .refinement import RefinementProver
 from .hyperltl import HyperLTLProver
 
 __all__ = [
-    'BaseKSafetyProver',
-    'NonInterferenceProver',
-    'DeterminismProver',
-    'SymmetryProver',
-    'DifferentialPrivacyProver',
-    'EquivalenceProver',
-    'RefinementProver',
-    'HyperLTLProver'
+    "BaseKSafetyProver",
+    "NonInterferenceProver",
+    "DeterminismProver",
+    "SymmetryProver",
+    "DifferentialPrivacyProver",
+    "EquivalenceProver",
+    "RefinementProver",
+    "HyperLTLProver",
 ]

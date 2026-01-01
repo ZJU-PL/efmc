@@ -17,8 +17,9 @@ class RankingFunctionValidator:
     def __init__(self, sts: TransitionSystem):
         self.sts = sts
 
-    def validate_ranking_function(self, ranking_function: z3.ExprRef,
-                                 signedness: Signedness) -> bool:
+    def validate_ranking_function(
+        self, ranking_function: z3.ExprRef, signedness: Signedness
+    ) -> bool:
         """
         Validate that the synthesized ranking function is correct.
 
@@ -49,15 +50,18 @@ class RankingFunctionValidator:
 
         # Check decrease property
         rank_next = z3.substitute(
-            ranking_function,
-            list(zip(self.sts.variables, self.sts.prime_variables))
+            ranking_function, list(zip(self.sts.variables, self.sts.prime_variables))
         )
 
         if self.sts.trans:
             if signedness == Signedness.UNSIGNED:
-                decrease_check = z3.Implies(self.sts.trans, z3.UGT(ranking_function, rank_next))
+                decrease_check = z3.Implies(
+                    self.sts.trans, z3.UGT(ranking_function, rank_next)
+                )
             else:
-                decrease_check = z3.Implies(self.sts.trans, ranking_function > rank_next)
+                decrease_check = z3.Implies(
+                    self.sts.trans, ranking_function > rank_next
+                )
         else:
             if signedness == Signedness.UNSIGNED:
                 decrease_check = z3.UGT(ranking_function, rank_next)
@@ -107,14 +111,12 @@ class RecurrenceSetValidator:
 
         # Check closure: ∀x,x'. S(x) ∧ guard(x) ∧ trans(x,x') ⇒ S(x')
         recur_next = z3.substitute(
-            recurrence_set,
-            list(zip(self.sts.variables, self.sts.prime_variables))
+            recurrence_set, list(zip(self.sts.variables, self.sts.prime_variables))
         )
 
         if self.sts.trans:
             closure_check = z3.Implies(
-                z3.And(recurrence_set, self.sts.trans),
-                recur_next
+                z3.And(recurrence_set, self.sts.trans), recur_next
             )
         else:
             closure_check = z3.Implies(recurrence_set, recur_next)

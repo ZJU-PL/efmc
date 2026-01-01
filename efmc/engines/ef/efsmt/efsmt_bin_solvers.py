@@ -16,9 +16,17 @@ from threading import Timer
 
 import z3
 
-from efmc.efmc_config import \
-    z3_exec, cvc5_exec, g_bin_solver_timeout, caqe_exec, \
-    btor_exec, bitwuzla_exec, yices_exec, math_exec, q3b_exec
+from efmc.efmc_config import (
+    z3_exec,
+    cvc5_exec,
+    g_bin_solver_timeout,
+    caqe_exec,
+    btor_exec,
+    bitwuzla_exec,
+    yices_exec,
+    math_exec,
+    q3b_exec,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +66,16 @@ def terminate(process, is_timeout_flag: List):
 def _run_solver_with_timeout(cmd, timeout=g_bin_solver_timeout):
     """Run solver command with timeout and return output."""
     # Using Popen directly due to timer-based termination logic
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # pylint: disable=consider-using-with
+    p = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )  # pylint: disable=consider-using-with
     is_timeout_flag = [False]
     timer = Timer(timeout, terminate, args=[p, is_timeout_flag])
     timer.start()
 
     try:
         out_lines = p.stdout.readlines()
-        out_str = ' '.join([element.decode('UTF-8') for element in out_lines])
+        out_str = " ".join([element.decode("UTF-8") for element in out_lines])
     finally:
         p.stdout.close()
         timer.cancel()
@@ -81,7 +91,7 @@ def solve_with_bin_qbf(fml_str: str, solver_name: str):
     tmp_filename = f"/tmp/{uuid.uuid1()}_temp.qdimacs"
 
     try:
-        with open(tmp_filename, "w", encoding='utf-8') as tmp:
+        with open(tmp_filename, "w", encoding="utf-8") as tmp:
             tmp.write(fml_str)
 
         cmd = [caqe_exec, tmp_filename]  # Default to caqe for all QBF solvers
@@ -101,8 +111,11 @@ def solve_with_bin_qbf(fml_str: str, solver_name: str):
 
 
 def solve_with_bin_smt(  # pylint: disable=too-many-locals
-    logic: str, x: List[z3.ExprRef], y: List[z3.ExprRef],
-    phi: z3.ExprRef, solver_name: str
+    logic: str,
+    x: List[z3.ExprRef],
+    y: List[z3.ExprRef],
+    phi: z3.ExprRef,
+    solver_name: str,
 ):
     """Call bin SMT solvers to solve exists forall"""
     logger.debug("Solving EFSMT(BV) via %s", solver_name)
@@ -134,14 +147,14 @@ def solve_with_bin_smt(  # pylint: disable=too-many-locals
         "yices2": [yices_exec],
         "mathsat": [math_exec],
         "bitwuzla": [bitwuzla_exec],
-        "q3b": [q3b_exec]
+        "q3b": [q3b_exec],
     }
     cmd = solver_cmds.get(solver_name, [z3_exec])
 
     tmp_filename = f"/tmp/{uuid.uuid1()}_temp.smt2"
 
     try:
-        with open(tmp_filename, "w", encoding='utf-8') as tmp:
+        with open(tmp_filename, "w", encoding="utf-8") as tmp:
             tmp.write(fml_str)
 
         cmd.append(tmp_filename)
@@ -159,9 +172,8 @@ def solve_with_bin_smt(  # pylint: disable=too-many-locals
             os.remove(tmp_filename)
 
 
-
 if __name__ == "__main__":
     # Demo functionality
-    demo_cmd = [cvc5_exec, "-q", "--produce-models", 'tmp.smt2']
+    demo_cmd = [cvc5_exec, "-q", "--produce-models", "tmp.smt2"]
     demo_out, demo_is_timeout = _run_solver_with_timeout(demo_cmd)
     print(demo_out)

@@ -1,6 +1,7 @@
 """
 Auxiliary invariant generation for k-induction using template-based (EF) and Houdini approaches.
 """
+
 import logging
 from typing import Optional
 
@@ -33,11 +34,11 @@ class InvariantGenerator:
             ef_prover.set_template("interval")
 
         if ef_prover.solve():
-            inv = getattr(ef_prover, 'inductive_invaraint', None)
+            inv = getattr(ef_prover, "inductive_invaraint", None)
             if inv and not z3.is_true(z3.simplify(inv)):
                 logger.info("EF generated auxiliary invariant: %s", inv)
                 return inv
-        
+
         logger.debug("EF could not generate useful auxiliary invariant")
         return z3.BoolVal(True)
 
@@ -54,7 +55,7 @@ class InvariantGenerator:
         houdini = HoudiniProver(aux_sts)
 
         # Generate candidate lemmas using templates
-        templates = generate_templates(self.sts.variables, {'bounds', 'ordering'})
+        templates = generate_templates(self.sts.variables, {"bounds", "ordering"})
         result = houdini.houdini(templates, timeout)
 
         if result and len(result) > 0:
@@ -62,14 +63,14 @@ class InvariantGenerator:
             if not z3.is_true(z3.simplify(inv)):
                 logger.info("Houdini generated auxiliary invariant: %s", inv)
                 return inv
-        
+
         logger.debug("Houdini could not generate useful auxiliary invariant")
         return z3.BoolVal(True)
 
     def generate(self, method: str = "ef", timeout: Optional[int] = None) -> z3.ExprRef:
         """
         Generate auxiliary invariant using specified method.
-        
+
         Args:
             method: "ef" for template-based, "houdini" for Houdini approach
             timeout: Timeout in seconds (applies to Houdini)
@@ -79,4 +80,3 @@ class InvariantGenerator:
         if method == "houdini":
             return self.generate_via_houdini(timeout)
         raise ValueError(f"Unknown method: {method}. Use 'ef' or 'houdini'")
-

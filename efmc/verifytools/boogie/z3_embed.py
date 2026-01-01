@@ -16,13 +16,13 @@ ctxHolder = local()
 
 
 def val_to_boogie(v):
-    if (isinstance(v, z3.IntNumRef)):
+    if isinstance(v, z3.IntNumRef):
         return ast.AstNumber(v.as_long())
-    elif (isinstance(v, z3.BoolRef)):
+    elif isinstance(v, z3.BoolRef):
         return ast.AstTrue() if ast.is_true(v) else ast.AstFalse()
-    elif (v == "true"):
+    elif v == "true":
         return ast.AstTrue()
-    elif (v == "false"):
+    elif v == "false":
         return ast.AstFalse()
     else:
         return ast.AstNumber(int(v))
@@ -30,14 +30,17 @@ def val_to_boogie(v):
 
 def env_to_expr(env, suff=""):
     return ast.ast_and(
-        [ast.AstBinExpr(ast.AstId(k + suff), "==", val_to_boogie(v))
-         for (k, v) in env.iteritems()])
+        [
+            ast.AstBinExpr(ast.AstId(k + suff), "==", val_to_boogie(v))
+            for (k, v) in env.iteritems()
+        ]
+    )
 
 
 def getCtx():
     global ctxHolder
     ctx = getattr(ctxHolder, "ctx", None)
-    if (ctx == None):
+    if ctx == None:
         ctx = z3.Context()
         ctxHolder.ctx = ctx
     return ctx
@@ -61,20 +64,20 @@ def wrapZ3Exc(f):
 
 class Z3ServerInstance(object):
     def __init__(s):
-        s._solver = z3.Solver(ctx=getCtx()) 
+        s._solver = z3.Solver(ctx=getCtx())
 
     @Pyro4.expose
     @wrapZ3Exc
     def add(s, sPred):
         pred = z3.parse_smt2_string(sPred, ctx=s._solver.ctx)
         s._solver.add(pred)
-        return 0;
+        return 0
 
     @Pyro4.expose
     @wrapZ3Exc
     def check(s, sComm):
-        sys.stderr.write("check(" + sComm + "):" + s._solver.to_smt2() + "\n");
-        return str(s._solver.check());
+        sys.stderr.write("check(" + sComm + "):" + s._solver.to_smt2() + "\n")
+        return str(s._solver.check())
 
     @Pyro4.expose
     @wrapZ3Exc
@@ -85,8 +88,8 @@ class Z3ServerInstance(object):
     @Pyro4.expose
     @wrapZ3Exc
     def push(s):
-        s._solver.push();
-        return 0;
+        s._solver.push()
+        return 0
 
     @Pyro4.expose
     @wrapZ3Exc
@@ -96,7 +99,7 @@ class Z3ServerInstance(object):
 
 
 def startAndWaitForZ3Instance():
-    q = PQueue()            
+    q = PQueue()
 
     def runDaemon(q):
         import os
@@ -118,7 +121,7 @@ def startAndWaitForZ3Instance():
         sys.stderr.flush()
         q.put(uri)
         # Small window for racing
-        daemon.requestLoop()    
+        daemon.requestLoop()
 
     p = Process(target=runDaemon, args=(q,))
     p.start()
@@ -147,7 +150,7 @@ class Z3ProxySolver:
         dummy = z3.Solver(ctx=getCtx())
         dummy.add(p)
         strP = dummy.to_smt2()
-        strP = strP.replace("(check-sat)\n", "");
+        strP = strP.replace("(check-sat)\n", "")
         s._remote.add(strP)
         return None
 
@@ -165,29 +168,28 @@ class Z3ProxySolver:
         try:
             r = s._remote.check(comm)
         except Pyro4.errors.TimeoutError:
-            sys.stderr.write("Child " + str(s._proc.pid) + \
-                             "Timedout. Restarting.\n")
+            sys.stderr.write("Child " + str(s._proc.pid) + "Timedout. Restarting.\n")
             r = "unknown"
-            s._restartRemote();
+            s._restartRemote()
         except Exception as e:
             sys.stdout.write("Got exception: " + str(e) + "\n")
             ecode = s._proc.exitcode
             s._restartRemote()
 
-            if (ecode == -11):  # Retry Z3 segfaults
+            if ecode == -11:  # Retry Z3 segfaults
                 r = "crashed"
             else:
                 r = "unknown"
         finally:
             s._remote._pyroTimeout = old_timeout
 
-        if (r == "sat"):
+        if r == "sat":
             return z3.sat
-        elif (r == "unsat"):
+        elif r == "unsat":
             return z3.unsat
-        elif (r == "unknown"):
+        elif r == "unknown":
             raise Unknown("storing query NYI in proxy solver")
-        elif (r == "crashed"):
+        elif r == "crashed":
             raise Crashed()
         else:
             raise Exception("bad reply to check: " + str(r))
@@ -201,8 +203,9 @@ class Z3ProxySolver:
         strP = dummy.to_smt2()
         strP = strP.replace("(check-sat)\n", "")
         strP = strP.replace(
-            "; benchmark generated from python API\n" + \
-            "(set-info :status unknown)\n", "")
+            "; benchmark generated from python API\n" + "(set-info :status unknown)\n",
+            "",
+        )
         return strP
 
     def _restartRemote(s):
@@ -228,14 +231,16 @@ def _cleanupChildProcesses():
 
 atexit.register(_cleanupChildProcesses)
 
+
 # atexit handlers don't get called on SIGTERM.
 # cleanup child z3 processes explicitly on SIGTERM
 def handler(signum, frame):
-  _cleanupChildProcesses()
-  sys.exit(-1)
+    _cleanupChildProcesses()
+    sys.exit(-1)
+
 
 for signum in [SIGTERM, SIGINT]:
-  signal(signum, handler)
+    signal(signum, handler)
 
 
 def getSolver():
@@ -245,18 +250,21 @@ def getSolver():
         # If we have none wait on the condition variable for request to
         # finish or processes to timeout and die.
         while True:
-            free = [(proxy, busy) for (proxy, busy) in z3ProcessPool.iteritems()
-                    if (not busy)]
+            free = [
+                (proxy, busy)
+                for (proxy, busy) in z3ProcessPool.iteritems()
+                if (not busy)
+            ]
 
-            if (len(free) == 0 and len(ports) == 0):
+            if len(free) == 0 and len(ports) == 0:
                 print("No free instances and no ports for new instances...")
-                z3ProcessPoolCond.wait();
+                z3ProcessPoolCond.wait()
             else:
-                break;
+                break
 
         # We either have a free z3 solver or a process died and freed
         # up a port for us to launch a new solver with.
-        if (len(free) > 0):
+        if len(free) > 0:
             # print("Assigning existing z3 proxy")
             solver = free[randint(0, len(free) - 1)][0]
         else:
@@ -274,19 +282,19 @@ def getSolver():
 
 
 def releaseSolver(solver):
-    if (solver == None):
-        return;
+    if solver == None:
+        return
     try:
-        z3ProcessPoolCond.acquire();
-        solver.pop();
+        z3ProcessPoolCond.acquire()
+        solver.pop()
         z3ProcessPool[solver] = False
-        z3ProcessPoolCond.notify();
+        z3ProcessPoolCond.notify()
     finally:
-        z3ProcessPoolCond.release();
+        z3ProcessPoolCond.release()
 
 
 def Int(n):
-    return z3.Int(n, ctx=getCtx());
+    return z3.Int(n, ctx=getCtx())
 
 
 def Or(*args):
@@ -304,8 +312,10 @@ def Not(pred):
 def Implies(a, b):
     return z3.Implies(a, b, ctx=getCtx())
 
+
 def Function(name, *params):
     return z3.Function(name, *params)
+
 
 def IntVal(v):
     return z3.IntVal(v, ctx=getCtx())
@@ -325,13 +335,13 @@ def counterex(pred, timeout=None, comm=""):
                 res = s.check(timeout, comm)
                 m = None if res == z3.unsat else s.model()
             except Crashed:
-                continue;
-            break;
+                continue
+            break
 
-        return m;
+        return m
     finally:
-        if (s):
-            releaseSolver(s);
+        if s:
+            releaseSolver(s)
 
 
 def counterexamples(pred, num, timeout=None, comm=""):
@@ -345,7 +355,7 @@ def counterexamples(pred, num, timeout=None, comm=""):
             try:
                 res = s.check(timeout, comm)
                 if res == z3.unsat:
-                    break;
+                    break
 
                 env = s.model()
                 counterexes.append(env)
@@ -363,9 +373,9 @@ def satisfiable(pred, timeout=None):
     s = None
     try:
         s = getSolver()
-        s.add(pred);
+        s.add(pred)
         res = s.check(timeout)
-        return res == z3.sat;
+        return res == z3.sat
     finally:
         releaseSolver(s)
 
@@ -374,9 +384,9 @@ def unsatisfiable(pred, timeout=None):
     s = None
     try:
         s = getSolver()
-        s.add(pred);
+        s.add(pred)
         res = s.check(timeout)
-        return res == z3.unsat;
+        return res == z3.unsat
     finally:
         releaseSolver(s)
 
@@ -384,25 +394,25 @@ def unsatisfiable(pred, timeout=None):
 def model(pred):
     s = None
     try:
-        s = getSolver();
-        s.add(pred);
+        s = getSolver()
+        s.add(pred)
         assert s.check() == z3.sat
-        m = s.model();
-        return m;
+        m = s.model()
+        return m
     finally:
-        releaseSolver(s);
+        releaseSolver(s)
 
 
 def maybeModel(pred):
     s = None
     try:
-        s = getSolver();
-        s.add(pred);
-        res = s.check();
+        s = getSolver()
+        s.add(pred)
+        res = s.check()
         m = s.model() if res == z3.sat else None
         return m
     finally:
-        releaseSolver(s);
+        releaseSolver(s)
 
 
 def simplify(pred, *args, **kwargs):
@@ -433,19 +443,21 @@ def expr_to_z3(expr, typeEnv):
     elif isinstance(expr, ast.AstId):
         return typeEnv[expr.name](expr.name)
     elif isinstance(expr, ast.AstTrue):
-        return BoolVal(True);
+        return BoolVal(True)
     elif isinstance(expr, ast.AstFalse):
-        return BoolVal(False);
+        return BoolVal(False)
     elif isinstance(expr, ast.AstFuncExpr):
-        params = map((lambda p : expr_to_z3(p, typeEnv)), expr.ops)
-        intsort = map((lambda p : z3.IntSort(ctx=getCtx())), expr.ops) + [z3.IntSort(ctx=getCtx())]
+        params = map((lambda p: expr_to_z3(p, typeEnv)), expr.ops)
+        intsort = map((lambda p: z3.IntSort(ctx=getCtx())), expr.ops) + [
+            z3.IntSort(ctx=getCtx())
+        ]
         f = Function(expr.funcName.name, *intsort)
         return f(*params)
     elif isinstance(expr, ast.AstUnExpr):
         z3_inner = expr_to_z3(expr.expr, typeEnv)
-        if expr.op == '-':
+        if expr.op == "-":
             return -z3_inner
-        elif expr.op == '!':
+        elif expr.op == "!":
             return Not(z3_inner)
         else:
             raise Exception("Unknown unary operator " + str(expr.op))
@@ -489,17 +501,17 @@ def expr_to_z3(expr, typeEnv):
 
 
 def stmt_to_z3(stmt, typeEnv):
-    if (isinstance(stmt, ast.AstLabel)):
+    if isinstance(stmt, ast.AstLabel):
         stmt = stmt.stmt
 
-    if (isinstance(stmt, ast.AstAssignment)):
+    if isinstance(stmt, ast.AstAssignment):
         lvalue = typeEnv[stmt.lhs](str(stmt.lhs))
         rhs = expr_to_z3(stmt.rhs, typeEnv)
-        return (lvalue == rhs)
-    elif (isinstance(stmt, ast.AstAssert)):
-        return (expr_to_z3(stmt.expr, typeEnv))
-    elif (isinstance(stmt, ast.AstAssume)):
-        return (expr_to_z3(stmt.expr, typeEnv))
+        return lvalue == rhs
+    elif isinstance(stmt, ast.AstAssert):
+        return expr_to_z3(stmt.expr, typeEnv)
+    elif isinstance(stmt, ast.AstAssume):
+        return expr_to_z3(stmt.expr, typeEnv)
     else:
         raise Exception("Can't convert " + str(stmt))
 
@@ -523,37 +535,38 @@ def ids(z3expr):
 
 def z3_expr_to_boogie(expr):
     d = expr.decl()
-    if (d.arity() == 0):
+    if d.arity() == 0:
         # Literals and Identifiers
-        if (isinstance(expr.sort(), z3.BoolSortRef)):
-            if (z3.is_true(expr)):  # No need for explicit ctx
+        if isinstance(expr.sort(), z3.BoolSortRef):
+            if z3.is_true(expr):  # No need for explicit ctx
                 return ast.AstTrue()
-            elif (z3.is_false(expr)):  # No need for explicit ctx
+            elif z3.is_false(expr):  # No need for explicit ctx
                 return ast.AstFalse()
             else:
                 return ast.AstId(d.name())
         else:
-            assert isinstance(expr.sort(), z3.ArithSortRef), \
-                "For now only handle bools and ints"
-            if (z3.is_int_value(expr)):  # No need for explicit ctx
+            assert isinstance(
+                expr.sort(), z3.ArithSortRef
+            ), "For now only handle bools and ints"
+            if z3.is_int_value(expr):  # No need for explicit ctx
                 return ast.AstNumber(int(str(expr)))
             else:
                 return ast.AstId(d.name())
-    elif (d.arity() == 1):
+    elif d.arity() == 1:
         # Unary operators
         arg = z3_expr_to_boogie(expr.children()[0])
         boogie_op = {
-            '-': '-',
-            'not': '!',
+            "-": "-",
+            "not": "!",
         }[d.name()]
         return ast.AstUnExpr(boogie_op, arg)
-    elif (d.name() == "if" and d.arity() == 2):
+    elif d.name() == "if" and d.arity() == 2:
         # TODO: Check types of branches are bool
-        c = expr.children();
+        c = expr.children()
         cond = z3_expr_to_boogie(c[0])
         thenB = z3_expr_to_boogie(c[1])
         return ast.AstBinExpr(cond, "==>", thenB)
-    elif (d.arity() == 2):
+    elif d.arity() == 2:
         # Binary operators
         try:
             boogie_op, assoc = {
@@ -585,41 +598,53 @@ def z3_expr_to_boogie(expr):
                 error(ex.message)
             return fun
         else:
-            while (len(c) > 2):
-                if (assoc == "none"):
-                    raise Exception("Error: Expression " + str(expr) + " has " + \
-                                    len(c) + " children: " + c + " but root operator " + \
-                                    d.name() + " is non-associative.")
+            while len(c) > 2:
+                if assoc == "none":
+                    raise Exception(
+                        "Error: Expression "
+                        + str(expr)
+                        + " has "
+                        + len(c)
+                        + " children: "
+                        + c
+                        + " but root operator "
+                        + d.name()
+                        + " is non-associative."
+                    )
 
-                if (assoc == "left"):
-                    lhs = z3_expr_to_boogie(c[0]) \
-                        if (not isinstance(c[0], ast.AstNode)) else c[0]
+                if assoc == "left":
+                    lhs = (
+                        z3_expr_to_boogie(c[0])
+                        if (not isinstance(c[0], ast.AstNode))
+                        else c[0]
+                    )
                     rhs = z3_expr_to_boogie(c[1])
                     c[0:2] = [ast.AstBinExpr(lhs, boogie_op, rhs)]
                 else:
                     raise Exception("NYI")
 
-            lhs = z3_expr_to_boogie(c[0]) \
-                if (not isinstance(c[0], ast.AstNode)) else c[0]
+            lhs = (
+                z3_expr_to_boogie(c[0]) if (not isinstance(c[0], ast.AstNode)) else c[0]
+            )
             rhs = z3_expr_to_boogie(c[1])
             return ast.AstBinExpr(lhs, boogie_op, rhs)
-    elif (d.name() == "if"):
+    elif d.name() == "if":
         # TODO: Check types of branches are bool
-        c = expr.children();
+        c = expr.children()
         cond = z3_expr_to_boogie(c[0])
         thenB = z3_expr_to_boogie(c[1])
         elseB = z3_expr_to_boogie(c[2])
         return ast.AstBinExpr(
             ast.AstBinExpr(cond, "==>", thenB),
             "&&",
-            ast.AstBinExpr(ast.AstUnExpr("!", cond), "==>", elseB))
+            ast.AstBinExpr(ast.AstUnExpr("!", cond), "==>", elseB),
+        )
     else:
-        raise Exception("Can't translate z3 expression " + str(expr) +
-                        " to boogie.")
+        raise Exception("Can't translate z3 expression " + str(expr) + " to boogie.")
 
 
 def to_smt2(p):
-    s = getSolver();
+    s = getSolver()
     res = s.to_smt2(p)
-    releaseSolver(s);
+    releaseSolver(s)
     return res

@@ -129,7 +129,7 @@ def prime_implicant(ps: List[z3.ExprRef], expr: z3.ExprRef):
         bs.append(bp)
         s.add(z3.Implies(bp, p))
         i = i + 1
-    assert (s.check(bs) == z3.unsat)
+    assert s.check(bs) == z3.unsat
     # only take predicates in unsat core
     res = [btop[x] for x in s.unsat_core()]
     return res
@@ -264,11 +264,11 @@ def fixpoint(old_inv: z3.ExprRef, inv: z3.ExprRef) -> bool:
     """
     Check if we've reached a fixpoint (inv implies old_inv AND old_inv implies inv).
     This is used in various fixed-point computations for invariant generation.
-    
+
     Args:
         old_inv: The previous invariant
         inv: The current invariant
-        
+
     Returns:
         True if a fixpoint is reached (old_inv and inv are equivalent), False otherwise
     """
@@ -279,4 +279,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod()
-    

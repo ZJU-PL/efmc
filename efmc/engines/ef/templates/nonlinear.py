@@ -22,7 +22,7 @@ class PolynomialTemplate(Template):
         super().__init__(system, **kwargs)
         self.template_type = TemplateType.POLYNOMIAL
         self.sts = system
-        self.degree = kwargs.get('degree', 2)
+        self.degree = kwargs.get("degree", 2)
 
     def add_template_vars(self, **kwargs):
         """
@@ -41,7 +41,7 @@ class PolynomialTemplate(Template):
         self.arity = len(self.sts.variables)
 
         # Number of polynomial terms in the template
-        self.num_templates = kwargs.get('num_templates', 1)
+        self.num_templates = kwargs.get("num_templates", 1)
 
         # Generate template variables for polynomial terms
         for i in range(self.num_templates):
@@ -87,8 +87,15 @@ class PolynomialTemplate(Template):
         # Add constraints for each template
         for template in self.template_vars:
             # Create polynomial expression
-            poly = z3.Sum([coeff * z3.Product([var ** exp for var, exp in zip(self.sts.variables, powers)])
-                           for coeff, powers in zip(template[:self.arity], self.powers)])
+            poly = z3.Sum(
+                [
+                    coeff
+                    * z3.Product(
+                        [var**exp for var, exp in zip(self.sts.variables, powers)]
+                    )
+                    for coeff, powers in zip(template[: self.arity], self.powers)
+                ]
+            )
 
             # Add inequality constraint
             cnts.append(poly >= 0)
@@ -105,7 +112,9 @@ class PolynomialTemplate(Template):
         constraints = []
 
         # Get the appropriate set of variables based on whether we're using primed variables
-        variables = self.sts.prime_variables if use_prime_variables else self.sts.variables
+        variables = (
+            self.sts.prime_variables if use_prime_variables else self.sts.variables
+        )
 
         # For each template (polynomial inequality)
         for template in self.template_vars:
@@ -113,14 +122,20 @@ class PolynomialTemplate(Template):
             terms = []
 
             # Add constant term
-            constant_term = z3.RealVal(model.eval(template[0]).as_decimal(10)) if self.use_real else z3.IntVal(
-                model.eval(template[0]).as_string())
+            constant_term = (
+                z3.RealVal(model.eval(template[0]).as_decimal(10))
+                if self.use_real
+                else z3.IntVal(model.eval(template[0]).as_string())
+            )
             terms.append(constant_term)
 
             # Add linear terms
             for j, var in enumerate(variables.values()):
-                coeff = z3.RealVal(model.eval(template[j + 1]).as_decimal(10)) if self.use_real else z3.IntVal(
-                    model.eval(template[j + 1]).as_string())
+                coeff = (
+                    z3.RealVal(model.eval(template[j + 1]).as_decimal(10))
+                    if self.use_real
+                    else z3.IntVal(model.eval(template[j + 1]).as_string())
+                )
                 if coeff != 0:  # Skip zero coefficients
                     terms.append(coeff * var)
 
@@ -129,12 +144,19 @@ class PolynomialTemplate(Template):
                 term_idx = self.arity + 1
                 for d in range(2, self.degree + 1):
                     for combo in self._get_variable_combinations(d):
-                        coeff = z3.RealVal(
-                            model.eval(template[term_idx]).as_decimal(10)) if self.use_real else z3.IntVal(
-                            model.eval(template[term_idx]).as_string())
+                        coeff = (
+                            z3.RealVal(model.eval(template[term_idx]).as_decimal(10))
+                            if self.use_real
+                            else z3.IntVal(model.eval(template[term_idx]).as_string())
+                        )
                         if coeff != 0:  # Skip zero coefficients
                             # Create the monomial term
-                            monomial = z3.Product([var ** exp for var, exp in zip(variables.values(), combo)])
+                            monomial = z3.Product(
+                                [
+                                    var**exp
+                                    for var, exp in zip(variables.values(), combo)
+                                ]
+                            )
                             terms.append(coeff * monomial)
                         term_idx += 1
 

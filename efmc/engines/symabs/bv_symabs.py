@@ -26,10 +26,10 @@ def get_bv_size(x: z3.ExprRef) -> int:
 
 class BVSymbolicAbstraction:
     """Symbolic abstraction for bit-vector formulas.
-    
+
     Supports interval, zone, and octagon abstractions.
     """
-    
+
     def __init__(self):
         self.initialized = False
         self.formula = z3.BoolVal(True)
@@ -54,7 +54,7 @@ class BVSymbolicAbstraction:
     def do_simplification(self) -> None:
         """
         Simplify the formula using Z3 tactics.
-        If the formula is initialized and simplification is enabled, 
+        If the formula is initialized and simplification is enabled,
         apply a sequence of tactics to simplify it.
         """
 
@@ -69,7 +69,8 @@ class BVSymbolicAbstraction:
             tac = z3.Then(
                 z3.Tactic("simplify"),
                 z3.Tactic("propagate-values"),
-                z3.Tactic("propagate-bv-bounds"))
+                z3.Tactic("propagate-bv-bounds"),
+            )
             simp_formula = tac.apply(self.formula).as_expr()
             simp_end = symabs_timer()
             if simp_end - simp_start > 6:
@@ -142,8 +143,8 @@ class BVSymbolicAbstraction:
         # n_queries = len(multi_queries)
         # timeout = n_queries * self.single_query_timeout * 2 # is this reasonable?
         min_res, max_res = box_optimize(
-            self.formula, minimize=multi_queries,
-            maximize=multi_queries, timeout=30000)
+            self.formula, minimize=multi_queries, maximize=multi_queries, timeout=30000
+        )
         # TODO: the res of handler.xx() is not a BitVec val, but Int?
         # TODO: what if it is a value large than the biggest integer of the
         # size (is it possible? e.g., due to overflow)
@@ -155,11 +156,11 @@ class BVSymbolicAbstraction:
             vmax_bvval = z3.BitVecVal(vmax.as_long(), query.sort().size())
             # print(self.vars[i].sort(), vmin.sort(), vmax.sort())
             if self.signed:
-                cnts.append(z3.And(
-                    query >= vmin_bvval, query <= vmax_bvval))
+                cnts.append(z3.And(query >= vmin_bvval, query <= vmax_bvval))
             else:
-                cnts.append(z3.And(
-                    z3.UGE(query, vmin_bvval), z3.ULE(query, vmax_bvval)))
+                cnts.append(
+                    z3.And(z3.UGE(query, vmin_bvval), z3.ULE(query, vmax_bvval))
+                )
         return z3.And(cnts)
 
     def interval_abs(self) -> None:
@@ -202,7 +203,9 @@ class BVSymbolicAbstraction:
                     if self.obj_no_overflow:
                         wrap_around_cnts.append(z3.BVSubNoOverflow(v1, v2))
                     if self.obj_no_underflow:
-                        wrap_around_cnts.append(z3.BVSubNoUnderflow(v1, v2, signed=self.signed))
+                        wrap_around_cnts.append(
+                            z3.BVSubNoUnderflow(v1, v2, signed=self.signed)
+                        )
 
             if len(wrap_around_cnts) > 1:
                 self.formula = z3.And(self.formula, z3.And(wrap_around_cnts))
@@ -219,7 +222,9 @@ class BVSymbolicAbstraction:
                     if self.obj_no_overflow:
                         wrap_around_cnts.append(z3.BVSubNoOverflow(v1, v2))
                     if self.obj_no_underflow:
-                        wrap_around_cnts.append(z3.BVSubNoUnderflow(v1, v2, signed=self.signed))
+                        wrap_around_cnts.append(
+                            z3.BVSubNoUnderflow(v1, v2, signed=self.signed)
+                        )
 
             if len(wrap_around_cnts) > 1:
                 self.formula = z3.And(self.formula, z3.And(wrap_around_cnts))
@@ -256,9 +261,13 @@ class BVSymbolicAbstraction:
                     multi_queries.append(v1 + v2)
                     if self.obj_no_overflow:
                         wrap_around_cnts.append(z3.BVSubNoOverflow(v1, v2))
-                        wrap_around_cnts.append(z3.BVAddNoOverflow(v1, v2, signed=self.signed))
+                        wrap_around_cnts.append(
+                            z3.BVAddNoOverflow(v1, v2, signed=self.signed)
+                        )
                     if self.obj_no_underflow:
-                        wrap_around_cnts.append(z3.BVSubNoUnderflow(v1, v2, signed=self.signed))
+                        wrap_around_cnts.append(
+                            z3.BVSubNoUnderflow(v1, v2, signed=self.signed)
+                        )
                         wrap_around_cnts.append(z3.BVAddNoUnderflow(v1, v2))
 
             if len(wrap_around_cnts) > 1:
@@ -281,9 +290,13 @@ class BVSymbolicAbstraction:
                     objs.append(v1 + v2)
                     if self.obj_no_overflow:
                         wrap_around_cnts.append(z3.BVSubNoOverflow(v1, v2))
-                        wrap_around_cnts.append(z3.BVAddNoOverflow(v1, v2, signed=self.signed))
+                        wrap_around_cnts.append(
+                            z3.BVAddNoOverflow(v1, v2, signed=self.signed)
+                        )
                     if self.obj_no_underflow:
-                        wrap_around_cnts.append(z3.BVSubNoUnderflow(v1, v2, signed=self.signed))
+                        wrap_around_cnts.append(
+                            z3.BVSubNoUnderflow(v1, v2, signed=self.signed)
+                        )
                         wrap_around_cnts.append(z3.BVAddNoUnderflow(v1, v2))
 
             if len(wrap_around_cnts) > 1:
@@ -359,7 +372,7 @@ def test() -> None:
     feat_test_counting()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     # parser.add_argument('--domain', dest='domain', default='interval',
     #                     type=str, help="domain: interval, octagon, zone")

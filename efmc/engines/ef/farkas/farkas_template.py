@@ -71,8 +71,8 @@ class FarkasTemplate(Template):
         self.sts = sts
         self.num_templates = num_templates
 
-        self._arity = len(self.sts.variables)               # #program vars
-        self._tpl_coeffs: List[List[z3.RealRef]] = []       # pᵢⱼ variables
+        self._arity = len(self.sts.variables)  # #program vars
+        self._tpl_coeffs: List[List[z3.RealRef]] = []  # pᵢⱼ variables
 
         self._cnt_init_post: z3.BoolRef | None = None
         self._cnt_trans: z3.BoolRef | None = None
@@ -101,15 +101,16 @@ class FarkasTemplate(Template):
         index = 0
         for _ in range(self.num_templates):
             coeffs = []
-            for j in range(self._arity + 1):          # +1 for constant term
+            for j in range(self._arity + 1):  # +1 for constant term
                 coeffs.append(z3.Real(f"p{index}_{j}"))
             self._tpl_coeffs.append(coeffs)
             index += 1
 
     # ----------------------------- compose linear expression for *one* set --
     @staticmethod
-    def _affine(coeffs: Sequence[z3.ArithRef],
-                vars_: Sequence[z3.ArithRef]) -> z3.ArithRef:
+    def _affine(
+        coeffs: Sequence[z3.ArithRef], vars_: Sequence[z3.ArithRef]
+    ) -> z3.ArithRef:
         """
         Return  coeffs[0] + Σ coeffs[i+1] * vars_[i]
         """
@@ -119,18 +120,14 @@ class FarkasTemplate(Template):
         return expr
 
     # ----------------------------- build invariant over a given var-vector --
-    def _invariant_formula(self,
-                           vars_: Sequence[z3.ArithRef]) -> z3.BoolRef:
-        conjuncts = [
-            self._affine(coeffs, vars_) >= 0
-            for coeffs in self._tpl_coeffs
-        ]
+    def _invariant_formula(self, vars_: Sequence[z3.ArithRef]) -> z3.BoolRef:
+        conjuncts = [self._affine(coeffs, vars_) >= 0 for coeffs in self._tpl_coeffs]
         return z3.And(conjuncts) if conjuncts else z3.BoolVal(True)
 
     # ----------------------------- Farkas translation premise ⇒ conclusion --
-    def _farkas_implication(self,
-                            premise: z3.BoolRef,
-                            conclusion: z3.BoolRef) -> z3.BoolRef:
+    def _farkas_implication(
+        self, premise: z3.BoolRef, conclusion: z3.BoolRef
+    ) -> z3.BoolRef:
         """
         Return a *quantifier-free* constraint equivalent to
 
@@ -176,7 +173,9 @@ class FarkasTemplate(Template):
             # variables possibly from both current and primed worlds
             universe = list({*self.sts.variables, *self.sts.prime_variables})
             constraints = fl.apply_farkas_lemma_symbolic(universe)
-            logger.debug("Farkas produced %d constraints for one conjunct.", len(constraints))
+            logger.debug(
+                "Farkas produced %d constraints for one conjunct.", len(constraints)
+            )
 
             all_constraints.extend(constraints)
 
@@ -185,16 +184,14 @@ class FarkasTemplate(Template):
     # ----------------------------- assemble the three VCs -------------------
     def add_template_cnts(self) -> None:
         """Add constraints according to the specification of inductive loop invariant."""
-        inv  = self._invariant_formula(self.sts.variables)
+        inv = self._invariant_formula(self.sts.variables)
         inv_ = self._invariant_formula(self.sts.prime_variables)
 
         # 1. Init  ⇒ Inv
         c_init = self._farkas_implication(self.sts.init, inv)
 
         # 2. Inv ∧ Trans ⇒ Inv'
-        c_trans = self._farkas_implication(
-            z3.And(inv, self.sts.trans), inv_
-        )
+        c_trans = self._farkas_implication(z3.And(inv, self.sts.trans), inv_)
 
         # 3. Inv ⇒ Post
         c_post = self._farkas_implication(inv, self.sts.post)
@@ -203,10 +200,9 @@ class FarkasTemplate(Template):
         self._cnt_trans = c_trans
 
     # ----------------------------------------------------------------- model
-    def build_invariant_expr(self,
-                             model: z3.ModelRef,
-                             use_prime_variables: bool = False
-                             ) -> z3.BoolRef:
+    def build_invariant_expr(
+        self, model: z3.ModelRef, use_prime_variables: bool = False
+    ) -> z3.BoolRef:
         """
         Instantiate the learned coefficients in the template and return the
         concrete invariant (optionally over primed variables).
@@ -218,8 +214,9 @@ class FarkasTemplate(Template):
             const_val = model.evaluate(coeffs[0], model_completion=True)
             # Convert to a concrete Z3 value
             if z3.is_rational_value(const_val):
-                aff = z3.RealVal(z3.Q(const_val.numerator_as_long(),
-                                      const_val.denominator_as_long()))
+                aff = z3.RealVal(
+                    z3.Q(const_val.numerator_as_long(), const_val.denominator_as_long())
+                )
             elif z3.is_int_value(const_val):
                 aff = z3.RealVal(const_val.as_long())
             else:
@@ -228,8 +225,11 @@ class FarkasTemplate(Template):
             for i, v in enumerate(vars_):
                 coef_val = model.evaluate(coeffs[i + 1], model_completion=True)
                 if z3.is_rational_value(coef_val):
-                    coef = z3.RealVal(z3.Q(coef_val.numerator_as_long(),
-                                            coef_val.denominator_as_long()))
+                    coef = z3.RealVal(
+                        z3.Q(
+                            coef_val.numerator_as_long(), coef_val.denominator_as_long()
+                        )
+                    )
                 elif z3.is_int_value(coef_val):
                     coef = z3.RealVal(coef_val.as_long())
                 else:

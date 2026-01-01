@@ -3,6 +3,7 @@ Solving Exists-Forall problems over floating-point variables using CEGIS.
 
 As pysmt does not support QF_FP, we only use z3py here.
 """
+
 from typing import List, Optional, Tuple
 import logging
 import os
@@ -13,9 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-locals
-    synthesis_solver: z3.Solver, verification_solver: z3.Solver,
-    phi: z3.ExprRef, x: List[z3.ExprRef], y: List[z3.ExprRef],
-    dump_dir: Optional[str], iteration: int, reason: str
+    synthesis_solver: z3.Solver,
+    verification_solver: z3.Solver,
+    phi: z3.ExprRef,
+    x: List[z3.ExprRef],
+    y: List[z3.ExprRef],
+    dump_dir: Optional[str],
+    iteration: int,
+    reason: str,
 ):
     """Dump a challenging query to SMT2 file for later analysis."""
     if not dump_dir:
@@ -48,6 +54,7 @@ def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-loca
     # to_fp conversions but cvc5 may not accept these formats
     def fix_z3_specific_syntax(content: str) -> str:
         """Fix Z3-specific syntax for cvc5 compatibility."""
+
         # First, handle unary negation in to_fp:
         # ((_ to_fp ...) ... (- number)) -> (fp.neg ((_ to_fp ...) ... number))
         # cvc5 doesn't accept (- number) or -number in to_fp, so we need fp.neg
@@ -57,10 +64,12 @@ def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-loca
                 number = match.group(2)  # The number
                 # Remove any leading negative sign from number if present
                 # (double negation case)
-                if number.startswith('-'):
+                if number.startswith("-"):
                     number = number[1:]
                 # Wrap the to_fp expression with fp.neg
-                return f"(fp.neg ((_ to_fp {fp_params}) roundNearestTiesToEven {number}))"
+                return (
+                    f"(fp.neg ((_ to_fp {fp_params}) roundNearestTiesToEven {number}))"
+                )
             except Exception:  # pylint: disable=broad-exception-caught
                 # Catch any regex processing errors and return original match
                 return match.group(0)
@@ -69,8 +78,8 @@ def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-loca
         # This matches the entire to_fp expression that contains a negated
         # number in parentheses. Make pattern more flexible with whitespace
         to_fp_negation_pattern = (
-            r'\(\(_\s+to_fp\s+(\d+\s+\d+)\)\s+roundNearestTiesToEven\s+'
-            r'\(-\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*\)\)'
+            r"\(\(_\s+to_fp\s+(\d+\s+\d+)\)\s+roundNearestTiesToEven\s+"
+            r"\(-\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*\)\)"
         )
         content = re.sub(to_fp_negation_pattern, fix_negation_in_to_fp, content)
 
@@ -83,18 +92,22 @@ def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-loca
                 # This will be the number (may or may not have negative sign)
                 number = match.group(2)
                 # Remove the leading negative sign if present
-                if number.startswith('-'):
+                if number.startswith("-"):
                     number = number[1:]
-                return f"(fp.neg ((_ to_fp {fp_params}) roundNearestTiesToEven {number}))"
+                return (
+                    f"(fp.neg ((_ to_fp {fp_params}) roundNearestTiesToEven {number}))"
+                )
             except Exception:  # pylint: disable=broad-exception-caught
                 # Catch any regex processing errors and return original match
                 return match.group(0)
 
         to_fp_negation_direct_pattern = (
-            r'\(\(_\s+to_fp\s+(\d+\s+\d+)\)\s+roundNearestTiesToEven\s+'
-            r'-([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\)'
+            r"\(\(_\s+to_fp\s+(\d+\s+\d+)\)\s+roundNearestTiesToEven\s+"
+            r"-([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\)"
         )
-        content = re.sub(to_fp_negation_direct_pattern, fix_negation_in_to_fp_direct, content)
+        content = re.sub(
+            to_fp_negation_direct_pattern, fix_negation_in_to_fp_direct, content
+        )
 
         # Pattern 3: Also handle cases where the expression might be nested
         # differently. Look for any occurrence of (- number) that appears after
@@ -112,9 +125,9 @@ def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-loca
                     # Format as decimal, avoiding scientific notation for
                     # readability. Use enough precision but avoid unnecessary
                     # trailing zeros
-                    formatted = f"{result:.15g}".rstrip('0').rstrip('.')
-                    if not formatted.replace('.', '').replace('-', ''):
-                        formatted = '0.0'
+                    formatted = f"{result:.15g}".rstrip("0").rstrip(".")
+                    if not formatted.replace(".", "").replace("-", ""):
+                        formatted = "0.0"
                     return formatted
                 # Keep original if division by zero
                 return match.group(0)
@@ -127,8 +140,8 @@ def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-loca
         # optional whitespace, another number, and closing paren)
         # Handles integers, decimals, and scientific notation
         division_pattern = (
-            r'\(/\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s+'
-            r'([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*\)'
+            r"\(/\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s+"
+            r"([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*\)"
         )
         content = re.sub(division_pattern, compute_division, content)
         return content
@@ -136,27 +149,33 @@ def _dump_challenging_query(  # pylint: disable=too-many-arguments,too-many-loca
     smt2_content = fix_z3_specific_syntax(smt2_content)
 
     # Write to file, using to_smt2() output but with our logic
-    with open(filepath, 'w', encoding='utf-8') as f:
+    with open(filepath, "w", encoding="utf-8") as f:
         # Use QF_FP if no BitVec, otherwise QF_BVFP (supports both BitVector and FloatingPoint)
         logic = "QF_BVFP" if has_bitvec else "QF_FP"
         f.write(f"(set-logic {logic})\n\n")
 
         # Get lines from to_smt2() output
-        lines = smt2_content.split('\n')
+        lines = smt2_content.split("\n")
 
         # Write all lines except set-logic (we set it manually)
         for line in lines:
             stripped = line.strip()
-            if not stripped.startswith('(set-logic'):
-                f.write(line + '\n')
+            if not stripped.startswith("(set-logic"):
+                f.write(line + "\n")
 
     logger.info("Dumped challenging query to %s", filepath)
 
 
 def simple_cegis_efsmt_fp(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
-    logic: str, x: List[z3.ExprRef], y: List[z3.ExprRef], phi: z3.ExprRef,
-    maxloops=None, timeout=None, solver_timeout: int = 10,  # pylint: disable=unused-argument
-    dump_dir: Optional[str] = None, dump_threshold: int = 5
+    logic: str,
+    x: List[z3.ExprRef],
+    y: List[z3.ExprRef],
+    phi: z3.ExprRef,
+    maxloops=None,
+    timeout=None,
+    solver_timeout: int = 10,  # pylint: disable=unused-argument
+    dump_dir: Optional[str] = None,
+    dump_threshold: int = 5,
 ) -> Tuple[str, Optional[z3.ModelRef]]:
     """
     Solve EFSMT over floating-point using CEGIS.
@@ -179,7 +198,10 @@ def simple_cegis_efsmt_fp(  # pylint: disable=too-many-arguments,too-many-locals
 
     logger.info(
         "Solving EFSMT over floating-point with logic: %s, maxloops: %s, "
-        "solver_timeout: %ss", logic, maxloops, solver_timeout
+        "solver_timeout: %ss",
+        logic,
+        maxloops,
+        solver_timeout,
     )
 
     # Create synthesis solver for existential variables
@@ -217,28 +239,41 @@ def simple_cegis_efsmt_fp(  # pylint: disable=too-many-arguments,too-many-locals
                 timeout_count += 1
                 logger.warning(
                     "Synthesis solver timed out at iteration %s (timeout count: %s)",
-                    loop + 1, timeout_count
+                    loop + 1,
+                    timeout_count,
                 )
 
                 # Dump challenging query if enabled
                 if dump_dir and (timeout_count == 1 or loop + 1 >= dump_threshold):
                     _dump_challenging_query(
-                        synthesis_solver, None, phi, x, y, dump_dir,
-                        loop + 1, "synthesis_timeout"
+                        synthesis_solver,
+                        None,
+                        phi,
+                        x,
+                        y,
+                        dump_dir,
+                        loop + 1,
+                        "synthesis_timeout",
                     )
 
                 # Continue to next iteration (counts towards maxloops)
                 continue
             logger.warning(
                 "Synthesis solver returned UNKNOWN: %s",
-                reason_str if reason_str else 'unknown reason'
+                reason_str if reason_str else "unknown reason",
             )
             # For non-timeout unknowns, we might want to continue or return
             # Let's continue for now to see if we can make progress
             if dump_dir:
                 _dump_challenging_query(
-                    synthesis_solver, None, phi, x, y, dump_dir,
-                    loop + 1, "synthesis_unknown"
+                    synthesis_solver,
+                    None,
+                    phi,
+                    x,
+                    y,
+                    dump_dir,
+                    loop + 1,
+                    "synthesis_unknown",
                 )
             continue
 
@@ -267,7 +302,9 @@ def simple_cegis_efsmt_fp(  # pylint: disable=too-many-arguments,too-many-locals
 
         # Check if Not(phi_substituted) is satisfiable (i.e., if there's a counterexample)
         verification_solver = z3.Solver()
-        verification_solver.set("timeout", solver_timeout * 1000)  # Convert to milliseconds
+        verification_solver.set(
+            "timeout", solver_timeout * 1000
+        )  # Convert to milliseconds
 
         verification_solver.add(z3.Not(phi_substituted))
 
@@ -294,26 +331,39 @@ def simple_cegis_efsmt_fp(  # pylint: disable=too-many-arguments,too-many-locals
                 timeout_count += 1
                 logger.warning(
                     "Verification solver timed out at iteration %s (timeout count: %s)",
-                    loop + 1, timeout_count
+                    loop + 1,
+                    timeout_count,
                 )
 
                 # Dump challenging query if enabled
                 if dump_dir and (timeout_count == 1 or loop + 1 >= dump_threshold):
                     _dump_challenging_query(
-                        synthesis_solver, verification_solver, phi, x, y,
-                        dump_dir, loop + 1, "verification_timeout"
+                        synthesis_solver,
+                        verification_solver,
+                        phi,
+                        x,
+                        y,
+                        dump_dir,
+                        loop + 1,
+                        "verification_timeout",
                     )
 
                 # Continue to next iteration (counts towards maxloops)
                 continue
             logger.warning(
                 "Verification solver returned UNKNOWN: %s",
-                reason_str if reason_str else 'unknown reason'
+                reason_str if reason_str else "unknown reason",
             )
             if dump_dir:
                 _dump_challenging_query(
-                    synthesis_solver, verification_solver, phi, x, y,
-                    dump_dir, loop + 1, "verification_unknown"
+                    synthesis_solver,
+                    verification_solver,
+                    phi,
+                    x,
+                    y,
+                    dump_dir,
+                    loop + 1,
+                    "verification_unknown",
                 )
             continue
 
@@ -330,57 +380,79 @@ def simple_cegis_efsmt_fp(  # pylint: disable=too-many-arguments,too-many-locals
                 pass
 
         # Add counterexample as constraint to synthesis solver
-        phi_with_counterexample = z3.substitute(
-            phi, list(counterexample.items())
-        )
+        phi_with_counterexample = z3.substitute(phi, list(counterexample.items()))
         synthesis_solver.add(phi_with_counterexample)
 
         logger.debug(
             "Added counterexample constraint, synthesis solver now has %s "
-            "constraints", len(synthesis_solver.assertions())
+            "constraints",
+            len(synthesis_solver.assertions()),
         )
 
         # Dump if we've reached many iterations
         if dump_dir and loop + 1 >= dump_threshold:
             _dump_challenging_query(
-                synthesis_solver, verification_solver, phi, x, y, dump_dir,
-                loop + 1, "many_iterations"
+                synthesis_solver,
+                verification_solver,
+                phi,
+                x,
+                y,
+                dump_dir,
+                loop + 1,
+                "many_iterations",
             )
 
     logger.warning(
         "CEGIS reached maximum iterations (%s), total timeouts: %s",
-        maxloops, timeout_count
+        maxloops,
+        timeout_count,
     )
     if dump_dir:
         _dump_challenging_query(
-            synthesis_solver, None, phi, x, y, dump_dir, maxloops,
-            "max_iterations_reached"
+            synthesis_solver,
+            None,
+            phi,
+            x,
+            y,
+            dump_dir,
+            maxloops,
+            "max_iterations_reached",
         )
     return "unknown", None
 
 
 # Keep the old function name for backward compatibility
 def cegis_efsmt_fp(  # pylint: disable=too-many-arguments
-    x: List[z3.ExprRef], y: List[z3.ExprRef], phi: z3.ExprRef,
-    max_loops: Optional[int] = None, timeout: Optional[int] = None,
-    solver_timeout: int = 10, dump_dir: Optional[str] = None,
-    dump_threshold: int = 5
+    x: List[z3.ExprRef],
+    y: List[z3.ExprRef],
+    phi: z3.ExprRef,
+    max_loops: Optional[int] = None,
+    timeout: Optional[int] = None,
+    solver_timeout: int = 10,
+    dump_dir: Optional[str] = None,
+    dump_threshold: int = 5,
 ) -> Tuple[str, Optional[z3.ModelRef]]:
     """
     Legacy function - now just calls simple_cegis_efsmt_fp for backward
     compatibility.
     """
     return simple_cegis_efsmt_fp(
-        "QF_FP", x, y, phi, maxloops=max_loops, timeout=timeout,
-        solver_timeout=solver_timeout, dump_dir=dump_dir,
-        dump_threshold=dump_threshold
+        "QF_FP",
+        x,
+        y,
+        phi,
+        maxloops=max_loops,
+        timeout=timeout,
+        solver_timeout=solver_timeout,
+        dump_dir=dump_dir,
+        dump_threshold=dump_threshold,
     )
 
 
 def test_simple_fp_problem():
     """Test a simple floating-point EFSMT problem."""
     fp_sort = z3.FPSort(8, 24)
-    x, y = z3.FP('x', fp_sort), z3.FP('y', fp_sort)
+    x, y = z3.FP("x", fp_sort), z3.FP("y", fp_sort)
     phi = z3.fpGEQ(z3.fpAdd(z3.RNE(), x, y), z3.FPVal(0.0, fp_sort))
 
     # CEGIS approach
@@ -393,8 +465,9 @@ def test_simple_fp_problem():
     solver.add(z3.ForAll([y], phi))
     direct_result = solver.check()
     direct_result_str = (
-        "sat" if direct_result == z3.sat else
-        ("unsat" if direct_result == z3.unsat else "unknown")
+        "sat"
+        if direct_result == z3.sat
+        else ("unsat" if direct_result == z3.unsat else "unknown")
     )
 
     print(

@@ -17,8 +17,12 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def convert_c_to_chc(c_file_path: str, output_path: Optional[str] = None,
-                     timeout: int = 60, output_format: str = "prolog") -> Tuple[bool, str]:
+def convert_c_to_chc(
+    c_file_path: str,
+    output_path: Optional[str] = None,
+    timeout: int = 60,
+    output_format: str = "prolog",
+) -> Tuple[bool, str]:
     """
     Convert C code to CHC using Eldarica.
 
@@ -44,20 +48,29 @@ def convert_c_to_chc(c_file_path: str, output_path: Optional[str] = None,
         # Setup output path
         temp_file = None
         if output_path is None:
-            suffix = '.pl' if output_format == "prolog" else '.smt2'
-            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, delete=False)
+            suffix = ".pl" if output_format == "prolog" else ".smt2"
+            temp_file = tempfile.NamedTemporaryFile(
+                mode="w", suffix=suffix, delete=False
+            )
             chc_output_path = temp_file.name
             temp_file.close()
         else:
             chc_output_path = output_path
 
         # Build command
-        cmd = [str(eldarica_path), "-p" if output_format == "prolog" else "-sp", "-lbe", c_file_path]
+        cmd = [
+            str(eldarica_path),
+            "-p" if output_format == "prolog" else "-sp",
+            "-lbe",
+            c_file_path,
+        ]
 
-        logger.debug("Running: %s", ' '.join(cmd))
+        logger.debug("Running: %s", " ".join(cmd))
 
         # Run Eldarica
-        process = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        process = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=False
+        )
 
         if process.returncode != 0:
             error_msg = f"Eldarica failed with return code {process.returncode}"
@@ -68,19 +81,25 @@ def convert_c_to_chc(c_file_path: str, output_path: Optional[str] = None,
         stdout = process.stdout
 
         # Handle SMT-LIB format edge cases
-        if output_format == "smtlib" and stdout.strip() in ["SAFE", "UNSAFE", "UNKNOWN"]:
+        if output_format == "smtlib" and stdout.strip() in [
+            "SAFE",
+            "UNSAFE",
+            "UNKNOWN",
+        ]:
             # Try Prolog format and convert to SMT-LIB comments
             cmd_prolog = [str(eldarica_path), "-p", "-lbe", c_file_path]
-            process2 = subprocess.run(cmd_prolog, capture_output=True, text=True, timeout=timeout, check=False)
+            process2 = subprocess.run(
+                cmd_prolog, capture_output=True, text=True, timeout=timeout, check=False
+            )
 
             if process2.returncode == 0 and "System transitions:" in process2.stdout:
                 stdout = f"; CHC from {c_file_path}\n; Result: {stdout.strip()}\n"
-                stdout += "\n".join(f"; {line}" for line in process2.stdout.split('\n'))
+                stdout += "\n".join(f"; {line}" for line in process2.stdout.split("\n"))
             else:
                 stdout = f"; Result: {stdout.strip()}\n; C file: {c_file_path}\n"
 
         # Write output
-        with open(chc_output_path, 'w', encoding="utf-8") as f:
+        with open(chc_output_path, "w", encoding="utf-8") as f:
             f.write(stdout)
 
         if output_path is None:
@@ -102,15 +121,17 @@ def convert_c_to_chc(c_file_path: str, output_path: Optional[str] = None,
                 pass
 
 
-def get_chc_from_c(c_file_path: str, timeout: int = 60, output_format: str = "prolog") -> Optional[str]:
+def get_chc_from_c(
+    c_file_path: str, timeout: int = 60, output_format: str = "prolog"
+) -> Optional[str]:
     """Get CHC content as string from C code."""
     success, result = convert_c_to_chc(c_file_path, None, timeout, output_format)
     return result if success else None
 
 
-
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) > 1:
         chc_content = get_chc_from_c(sys.argv[1])
         print("CHC Content:" if chc_content else "Failed to convert C to CHC")
@@ -118,4 +139,3 @@ if __name__ == "__main__":
             print(chc_content)
     else:
         print("Usage: python c2chc.py <c_file>")
-

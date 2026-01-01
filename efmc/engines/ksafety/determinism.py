@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class DeterminismProver(BaseKSafetyProver):
     """
     Specialized prover for determinism verification.
-    
+
     Determinism states that for the same inputs, the system should
     always produce the same outputs.
     """
@@ -25,7 +25,7 @@ class DeterminismProver(BaseKSafetyProver):
     def __init__(self, sts, **kwargs):
         """
         Initialize determinism prover.
-        
+
         Args:
             sts: The transition system to verify
             **kwargs: Additional configuration options
@@ -34,13 +34,15 @@ class DeterminismProver(BaseKSafetyProver):
         super().__init__(sts, k=2, **kwargs)
         self.logger.info("Initialized determinism prover")
 
-    def verify_determinism(self, input_vars=None, output_vars=None) -> VerificationResult:
+    def verify_determinism(
+        self, input_vars=None, output_vars=None
+    ) -> VerificationResult:
         """
         Verify determinism property.
-        
+
         Determinism states that for the same inputs, the system should
         always produce the same outputs.
-        
+
         Returns:
             VerificationResult indicating the verification outcome
         """
@@ -70,7 +72,9 @@ class DeterminismProver(BaseKSafetyProver):
                 output_eq_terms.append(trace_vars[0][i] == trace_vars[1][i])
 
         input_equality = z3.And(*input_eq_terms) if input_eq_terms else z3.BoolVal(True)
-        output_equality = z3.And(*output_eq_terms) if output_eq_terms else z3.BoolVal(True)
+        output_equality = (
+            z3.And(*output_eq_terms) if output_eq_terms else z3.BoolVal(True)
+        )
 
         determinism_property = z3.Implies(input_equality, output_equality)
 

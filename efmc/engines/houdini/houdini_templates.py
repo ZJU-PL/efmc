@@ -4,6 +4,7 @@ Houdini templates for generating candidate invariants
 This module provides template-based generation of candidate lemmas
 for the Houdini invariant inference algorithm.
 """
+
 from itertools import combinations
 from typing import List, Set
 
@@ -45,16 +46,23 @@ def generate_fp_lemmas(var: z3.ExprRef) -> List[z3.ExprRef]:
     small_val = z3.FPVal(-1e38, sort)
 
     return [
-        z3.fpIsNormal(var), z3.fpIsSubnormal(var), z3.fpIsZero(var),
-        z3.fpIsPositive(var), z3.fpIsNegative(var),
-        var <= large_val, var >= small_val,
+        z3.fpIsNormal(var),
+        z3.fpIsSubnormal(var),
+        z3.fpIsZero(var),
+        z3.fpIsPositive(var),
+        z3.fpIsNegative(var),
+        var <= large_val,
+        var >= small_val,
         z3.fpAbs(var) <= large_val,
-        z3.Or(var >= zero, var <= zero)
+        z3.Or(var >= zero, var <= zero),
     ]
 
 
-def generate_basic_lemmas(vars_list: List[z3.ExprRef], post_condition: z3.ExprRef = None,
-                          existing_invariants: List[z3.ExprRef] = None) -> List[z3.ExprRef]:
+def generate_basic_lemmas(
+    vars_list: List[z3.ExprRef],
+    post_condition: z3.ExprRef = None,
+    existing_invariants: List[z3.ExprRef] = None,
+) -> List[z3.ExprRef]:
     """Generate basic candidate lemmas for invariant inference"""
     lemmas = []
 
@@ -71,7 +79,7 @@ def generate_basic_lemmas(vars_list: List[z3.ExprRef], post_condition: z3.ExprRe
 
     # Add relationships between variables
     for idx, var1 in enumerate(vars_list):
-        for var2 in vars_list[idx + 1:]:
+        for var2 in vars_list[idx + 1 :]:
             if var1.sort() == var2.sort():
                 lemmas.extend([var1 <= var2, var1 >= var2])
 
@@ -80,7 +88,7 @@ def generate_basic_lemmas(vars_list: List[z3.ExprRef], post_condition: z3.ExprRe
 
 class HoudiniTemplates:
     """Template generator for Houdini candidate lemmas"""
-    
+
     def __init__(self, variables: List[z3.ExprRef]):
         self.variables = variables
         self.int_vars = [v for v in variables if v.sort() == z3.IntSort()]
@@ -91,9 +99,14 @@ class HoudiniTemplates:
 
     def generate_all(self) -> List[z3.ExprRef]:
         """Generate all template-based candidate lemmas"""
-        return (self.bounds_templates() + self.ordering_templates() + 
-                self.arithmetic_templates() + self.equality_templates() + 
-                self.sign_templates() + self.floating_point_templates())
+        return (
+            self.bounds_templates()
+            + self.ordering_templates()
+            + self.arithmetic_templates()
+            + self.equality_templates()
+            + self.sign_templates()
+            + self.floating_point_templates()
+        )
 
     def bounds_templates(self) -> List[z3.ExprRef]:
         """Generate bound templates: x >= c, x <= c"""
@@ -210,24 +223,31 @@ class HoudiniTemplates:
         return lemmas
 
 
-def generate_templates(vars_list: List[z3.ExprRef],
-                      template_types: Set[str] = None) -> List[z3.ExprRef]:
+def generate_templates(
+    vars_list: List[z3.ExprRef], template_types: Set[str] = None
+) -> List[z3.ExprRef]:
     """Generate templates for given variables and template types"""
     if template_types is None:
-        template_types = {'bounds', 'ordering', 'arithmetic', 'equality',
-                          'sign', 'floating_point'}
+        template_types = {
+            "bounds",
+            "ordering",
+            "arithmetic",
+            "equality",
+            "sign",
+            "floating_point",
+        }
 
     generator = HoudiniTemplates(vars_list)
     method_map = {
-        'bounds': generator.bounds_templates,
-        'ordering': generator.ordering_templates,
-        'arithmetic': generator.arithmetic_templates,
-        'equality': generator.equality_templates,
-        'sign': generator.sign_templates,
-        'floating_point': generator.floating_point_templates,
-        'modular': generator.modular_templates,
-        'divisibility': generator.divisibility_templates,
-        'boolean': generator.boolean_templates
+        "bounds": generator.bounds_templates,
+        "ordering": generator.ordering_templates,
+        "arithmetic": generator.arithmetic_templates,
+        "equality": generator.equality_templates,
+        "sign": generator.sign_templates,
+        "floating_point": generator.floating_point_templates,
+        "modular": generator.modular_templates,
+        "divisibility": generator.divisibility_templates,
+        "boolean": generator.boolean_templates,
     }
 
     lemmas = []
@@ -243,7 +263,7 @@ if __name__ == "__main__":
     x, y, z = z3.Ints("x y z")
     vars_list = [x, y, z]
 
-    templates = generate_templates(vars_list, {'bounds', 'ordering'})
+    templates = generate_templates(vars_list, {"bounds", "ordering"})
     print(f"Generated {len(templates)} templates for variables {vars_list}")
 
     # Show first few templates
@@ -255,7 +275,7 @@ if __name__ == "__main__":
     b = z3.FP("b", z3.FPSort(8, 24))
     fp_vars_list = [a, b]
 
-    fp_templates = generate_templates(fp_vars_list, {'floating_point'})
+    fp_templates = generate_templates(fp_vars_list, {"floating_point"})
     print(f"\nGenerated {len(fp_templates)} floating point templates")
 
     # Show first few floating point templates

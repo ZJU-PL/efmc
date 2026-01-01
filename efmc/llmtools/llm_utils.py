@@ -1,4 +1,5 @@
 """LLM utilities for online inference using various LLM providers."""
+
 import concurrent.futures
 import os
 import time
@@ -114,9 +115,7 @@ class LLM:
         """
         api_key = os.environ.get("DEEPSEEK_API_KEY")
         if not api_key:
-            self.logger.print_log(
-                "DeepSeek API key not found in environment variables"
-            )
+            self.logger.print_log("DeepSeek API key not found in environment variables")
             return ""
 
         model_input = [

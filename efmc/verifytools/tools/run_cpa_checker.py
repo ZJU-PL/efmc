@@ -14,22 +14,32 @@ from efmc.verifytools.tools.vc_check import tryAndVerifyLvl
 
 def handler():
     """Handle timeout exception."""
-    #def handler(signum):
+    # def handler(signum):
     #  assert (signum == SIGALRM)
     raise Exception("timeout")
-#signal(SIGALRM, handler);
+
+
+# signal(SIGALRM, handler);
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="run CPAChecker on a levelset")
-    p.add_argument('--lvlset', type=str,
-                   help='Path to lvlset file', required=True)
-    p.add_argument('--csv-table', action="store_true",
-                   default=True, help='Print results as a csv table')
-    p.add_argument('--time-limit', type=int, default=300,
-                   help='Time limit for CPAChecker')
-    p.add_argument('--waitEnter', action="store_true",
-                   default=False, help='Wait for user to perss Enter before continuing (great for debug)')
+    p.add_argument("--lvlset", type=str, help="Path to lvlset file", required=True)
+    p.add_argument(
+        "--csv-table",
+        action="store_true",
+        default=True,
+        help="Print results as a csv table",
+    )
+    p.add_argument(
+        "--time-limit", type=int, default=300, help="Time limit for CPAChecker"
+    )
+    p.add_argument(
+        "--waitEnter",
+        action="store_true",
+        default=False,
+        help="Wait for user to perss Enter before continuing (great for debug)",
+    )
     args = p.parse_args()
     if args.waitEnter:
         input("Press Enter to continue...")
@@ -58,7 +68,7 @@ if __name__ == "__main__":
             try:
                 t = Timer(args.time_limit, handler)
                 t.start()
-                #alarm(args.time_limit)
+                # alarm(args.time_limit)
                 # On lvl d-14 for example the invariants explode exponentially due to
                 # inlining of lets. So add timeout. Seems to be the only level with
                 # this problem
@@ -72,12 +82,13 @@ if __name__ == "__main__":
                         error(to_smt2(i))
                     raise
             finally:
-                #alarm(0)
+                # alarm(0)
                 t.cancel()
             if invs is not None:
                 try:
-                    (overfitted, nonind, sound, violations) =\
-                        tryAndVerifyLvl(lvl, set(invs), set(), args.time_limit, addSPs=True)
+                    (overfitted, nonind, sound, violations) = tryAndVerifyLvl(
+                        lvl, set(invs), set(), args.time_limit, addSPs=True
+                    )
 
                     error("Out of ", invs, "sound: ", sound)
 
@@ -99,5 +110,10 @@ if __name__ == "__main__":
     if args.csv_table:
         print("Level,Solved,Confirmed")
         for lvl_name in res:
-            print(lvl_name, ",", res[lvl_name][0], ",",
-                  conf[lvl_name] if lvl_name in conf else "N/A")
+            print(
+                lvl_name,
+                ",",
+                res[lvl_name][0],
+                ",",
+                conf[lvl_name] if lvl_name in conf else "N/A",
+            )

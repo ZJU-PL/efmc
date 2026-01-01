@@ -1,4 +1,5 @@
 """Utility functions for evaluation and result classification."""
+
 import os
 import signal
 import subprocess
@@ -24,7 +25,6 @@ def kill_process_group(process, pgid, logger):
             process.wait(timeout=1)
         except (subprocess.TimeoutExpired, ProcessLookupError, PermissionError) as e2:
             logger.error(f"Failed to kill process: {e2}")
-
 
 
 def classify_result(_config, retcode, stdout):
@@ -63,26 +63,28 @@ def detect_inconsistencies(results: List[tuple]) -> Dict[str, List[Dict]]:
         if basename not in file_results:
             file_results[basename] = []
 
-        file_results[basename].append({
-            'config': config_id,
-            'result': result_class,
-            'stdout': stdout,
-            'stderr': stderr,
-            'elapsed': elapsed
-        })
+        file_results[basename].append(
+            {
+                "config": config_id,
+                "result": result_class,
+                "stdout": stdout,
+                "stderr": stderr,
+                "elapsed": elapsed,
+            }
+        )
 
     # Find inconsistencies
     inconsistencies = {}
 
     for filename, file_data in file_results.items():
         # Get all definitive results (safe/unsafe, excluding timeout/unknown/solved)
-        definitive_results = [r for r in file_data if r['result'] in ['safe', 'unsafe']]
+        definitive_results = [r for r in file_data if r["result"] in ["safe", "unsafe"]]
 
         if len(definitive_results) < 2:
             continue  # Need at least 2 definitive results to detect inconsistency
 
         # Check if there are conflicting definitive results
-        result_types = set(r['result'] for r in definitive_results)
+        result_types = set(r["result"] for r in definitive_results)
         if len(result_types) > 1:  # Inconsistency detected
             inconsistencies[filename] = file_data
 

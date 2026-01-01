@@ -42,12 +42,12 @@ class InvariantPromptManager:
         self.sts = sts
         self.bit_width = bit_width or extract_bit_width_from_sts(sts)
         self.variables = [str(var) for var in self.sts.variables]
-    
+
     def generate_invariant_prompt(
         self,
         program_code: str = "",
         failed_candidates: Optional[List[str]] = None,
-        max_candidates: int = 5
+        max_candidates: int = 5,
     ) -> str:
         """
         Generate a prompt for invariant synthesis.
@@ -63,12 +63,13 @@ class InvariantPromptManager:
         failed_candidates = failed_candidates or []
 
         failed_candidates_section = (
-            'The following candidates failed previously and should be avoided or strengthened:\n' +
-            '\n'.join('- ' + c for c in failed_candidates)
-            if failed_candidates else ''
+            "The following candidates failed previously and should be avoided or strengthened:\n"
+            + "\n".join("- " + c for c in failed_candidates)
+            if failed_candidates
+            else ""
         )
 
-        vars_str = ', '.join(self.variables)
+        vars_str = ", ".join(self.variables)
         prompt = f"""You are an expert in program verification. Propose up to {max_candidates} \
 concrete inductive invariant candidates for the following program. Do NOT use holes or \
 placeholders. Use only variables: {vars_str}.
@@ -101,23 +102,25 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
     def parse_invariant_response(self, response: str) -> List[Tuple[str, z3.ExprRef]]:
         """
         Parse LLM response to extract invariant candidates.
-        
+
         Args:
             response: The raw response from the LLM
-            
+
         Returns:
             List of (original_string, z3_expr) pairs
         """
         try:
             # Extract JSON from response
-            json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+            json_match = re.search(r"```json\s*(\{.*?\})\s*```", response, re.DOTALL)
             if not json_match:
-                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if not json_match:
                 logger.warning("No JSON found in response: %s...", response[:100])
                 return []
 
-            json_str = json_match.group(1) if json_match.group(1) else json_match.group(0)
+            json_str = (
+                json_match.group(1) if json_match.group(1) else json_match.group(0)
+            )
             logger.info("Extracted JSON: %s", json_str)
 
             parsed = json.loads(json_str)
@@ -135,7 +138,7 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
                 pairs.append((s, expr))
 
         return pairs
-    
+
     def _parse_candidate_to_z3(self, s: str) -> Optional[z3.ExprRef]:
         """Parse candidate expressions to Z3 expressions."""
         try:
@@ -145,7 +148,7 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
             # Try Z3 Python API evaluation
             # Note: eval is necessary here to parse Z3 Python expressions from LLM output
             try:
-                safe_globals = {'z3': z3, '__builtins__': {}, **var_map}
+                safe_globals = {"z3": z3, "__builtins__": {}, **var_map}
                 expr = eval(s, safe_globals)  # pylint: disable=eval-used
                 if isinstance(expr, z3.ExprRef):
                     return expr
@@ -154,17 +157,24 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
 
             # Try SMT-LIB parsing
             try:
-                if (s.startswith('(') or s.startswith('=') or s.startswith('#x') or
-                        s.isdigit() or '#' in s):
+                if (
+                    s.startswith("(")
+                    or s.startswith("=")
+                    or s.startswith("#x")
+                    or s.isdigit()
+                    or "#" in s
+                ):
                     decls = [
-                        f"(declare-fun {str(var)} () (_ BitVec {var.sort().size()}))"
-                        if z3.is_bv_sort(var.sort())
-                        else f"(declare-fun {str(var)} () Int)"
+                        (
+                            f"(declare-fun {str(var)} () (_ BitVec {var.sort().size()}))"
+                            if z3.is_bv_sort(var.sort())
+                            else f"(declare-fun {str(var)} () Int)"
+                        )
                         for var in self.sts.variables
                     ]
                     smt = "\n".join(decls) + f"\n(assert {s})\n"
                     expr = z3.parse_smt2_string(smt)
-                    if hasattr(expr, '__len__') and len(expr) > 0:
+                    if hasattr(expr, "__len__") and len(expr) > 0:
                         return expr[0]
             except (z3.Z3Exception, AttributeError, IndexError):
                 pass
@@ -172,12 +182,12 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
             return None
         except Exception:
             return None
-    
+
     def create_prompt_generator(
         self,
         program_code: str = "",
         failed_candidates: Optional[List[str]] = None,
-        max_candidates: int = 5
+        max_candidates: int = 5,
     ):
         """
         Create a prompt generator function for use with the generic LLM interface.
@@ -190,8 +200,11 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
         Returns:
             A function that generates the prompt when called
         """
+
         def prompt_generator():
-            return self.generate_invariant_prompt(program_code, failed_candidates, max_candidates)
+            return self.generate_invariant_prompt(
+                program_code, failed_candidates, max_candidates
+            )
 
         return prompt_generator
 
@@ -202,6 +215,7 @@ Alternative: You can also return S-expressions in SMT-LIB format if Z3 Python fo
         Returns:
             A function that parses LLM responses into candidate pairs
         """
+
         def response_parser(response: str):
             return self.parse_invariant_response(response)
 

@@ -1,6 +1,7 @@
 """
 Test cases for auxiliary invariant generation using EF and Houdini approaches.
 """
+
 import z3
 
 from efmc.tests import TestCase, main
@@ -16,7 +17,7 @@ class TestAuxInvariantGenerator(TestCase):
         super().setUp()
         # Create a simple transition system for testing
         self.simple_sts = TransitionSystem()
-        x, y, xp, yp = z3.Ints('x y x! y!')
+        x, y, xp, yp = z3.Ints("x y x! y!")
         init = z3.And(x >= 0, y >= 0)
         trans = z3.And(xp == x + 1, yp == y + 2)
         post = z3.And(x >= 0, y >= 0)
@@ -93,13 +94,14 @@ class TestAuxInvariantGenerator(TestCase):
             # Test Houdini method
             print(f"  Testing Houdini for {system_name}...")
             result_houdini = generator.generate_via_houdini(timeout=10)
-            self.assertIsInstance(result_houdini, z3.ExprRef,
-                                  f"Houdini failed for {system_name}")
+            self.assertIsInstance(
+                result_houdini, z3.ExprRef, f"Houdini failed for {system_name}"
+            )
             print(f"  Houdini result: {result_houdini}")
 
     def _create_bv_system(self):
         """Create a simple bit-vector system."""
-        x, y, xp, yp = z3.BitVecs('x y x! y!', 8)
+        x, y, xp, yp = z3.BitVecs("x y x! y!", 8)
         init = z3.And(x >= 0, y >= 0)
         trans = z3.And(xp == x + 1, yp == y + 2)
         post = z3.And(x >= 0, y >= 0)
@@ -107,12 +109,12 @@ class TestAuxInvariantGenerator(TestCase):
 
     def _create_bool_system(self):
         """Create a simple boolean system."""
-        x, y, xp, yp = z3.Bools('x y x! y!')
+        x, y, xp, yp = z3.Bools("x y x! y!")
         init = z3.And(x, y)
         trans = z3.And(xp == z3.Not(x), yp == z3.Not(y))
         post = z3.Or(x, y)
         return [x, y, xp, yp], init, trans, post
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

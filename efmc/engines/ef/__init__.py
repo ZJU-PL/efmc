@@ -1,7 +1,8 @@
 """
 Template-based Verification
-- Inductive innvariant 
+- Inductive innvariant
 - Ranking function
 - Recurrence set
 """
+
 from .ef_prover import EFProver

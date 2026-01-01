@@ -1,6 +1,7 @@
 """
 Test cases for Farkas-based invariant inference.
 """
+
 import z3
 from efmc.sts import TransitionSystem
 from efmc.engines.ef.farkas.farkas_prover import FarkasProver
@@ -28,69 +29,66 @@ def create_test_cases():
     test_cases = []
 
     # Simple Counter Program
-    x, x_prime = z3.Int('x'), z3.Int('x_prime')
-    sts1 = create_transition_system(
-        [x], [x_prime],
-        x == 0,
-        x_prime == x + 1,
-        x >= 0
-    )
+    x, x_prime = z3.Int("x"), z3.Int("x_prime")
+    sts1 = create_transition_system([x], [x_prime], x == 0, x_prime == x + 1, x >= 0)
     test_cases.append(("Simple Counter Program", sts1))
 
     # Two-Variable Counter
-    x, y = z3.Int('x'), z3.Int('y')
-    x_prime, y_prime = z3.Int('x_prime'), z3.Int('y_prime')
+    x, y = z3.Int("x"), z3.Int("y")
+    x_prime, y_prime = z3.Int("x_prime"), z3.Int("y_prime")
     sts2 = create_transition_system(
-        [x, y], [x_prime, y_prime],
+        [x, y],
+        [x_prime, y_prime],
         z3.And(x == 0, y == 10),
         z3.And(x_prime == x + 1, y_prime == y),
-        x <= y
+        x <= y,
     )
     test_cases.append(("Two-Variable Counter", sts2))
 
     # Difference Bounds
-    x, y = z3.Int('x'), z3.Int('y')
-    x_prime, y_prime = z3.Int('x_prime'), z3.Int('y_prime')
+    x, y = z3.Int("x"), z3.Int("y")
+    x_prime, y_prime = z3.Int("x_prime"), z3.Int("y_prime")
     sts3 = create_transition_system(
-        [x, y], [x_prime, y_prime],
+        [x, y],
+        [x_prime, y_prime],
         z3.And(x == y, y == 0),
         z3.And(x_prime == x + 1, y_prime == y),
-        x - y <= 5
+        x - y <= 5,
     )
     test_cases.append(("Difference Bounds", sts3))
 
     # Multi-Path Loop
-    x, x_prime = z3.Int('x'), z3.Int('x_prime')
+    x, x_prime = z3.Int("x"), z3.Int("x_prime")
     sts4 = create_transition_system(
-        [x], [x_prime],
+        [x],
+        [x_prime],
         x == 0,
-        z3.Or(
-            z3.And(x < 10, x_prime == x + 1),
-            z3.And(x >= 10, x_prime == x)
-        ),
-        x >= 0
+        z3.Or(z3.And(x < 10, x_prime == x + 1), z3.And(x >= 10, x_prime == x)),
+        x >= 0,
     )
     test_cases.append(("Multi-Path Loop", sts4))
 
     # Array Bounds
-    i, n = z3.Int('i'), z3.Int('n')
-    i_prime, n_prime = z3.Int('i_prime'), z3.Int('n_prime')
+    i, n = z3.Int("i"), z3.Int("n")
+    i_prime, n_prime = z3.Int("i_prime"), z3.Int("n_prime")
     sts5 = create_transition_system(
-        [i, n], [i_prime, n_prime],
+        [i, n],
+        [i_prime, n_prime],
         z3.And(i == 0, n >= 0),
         z3.And(i < n, i_prime == i + 1, n_prime == n),
-        n >= i
+        n >= i,
     )
     test_cases.append(("Array Bounds", sts5))
 
     # Multiple Invariants
-    x, y = z3.Int('x'), z3.Int('y')
-    x_prime, y_prime = z3.Int('x_prime'), z3.Int('y_prime')
+    x, y = z3.Int("x"), z3.Int("y")
+    x_prime, y_prime = z3.Int("x_prime"), z3.Int("y_prime")
     sts6 = create_transition_system(
-        [x, y], [x_prime, y_prime],
+        [x, y],
+        [x_prime, y_prime],
         z3.And(x == 0, y == 0),
         z3.And(x_prime == x + 1, y_prime == y + 2),
-        y == 2 * x
+        y == 2 * x,
     )
     test_cases.append(("Multiple Invariants", sts6))
 
