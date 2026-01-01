@@ -41,14 +41,18 @@ def box_optimize(formula: z3.ExprRef, minimize: List, maximize: List, timeout: i
 
 x, y, xp, yp = z3.Reals("x y x! y!")
 
-fml = z3.And(z3.Or(z3.And(x <= -2, x >= -3),
-                   z3.And(-1 <= x, 2 >= x),
-                   z3.And(-1 <= x, 0 >= x),
-                   z3.And(-1 <= x, 3 >= x),
-                   z3.And(-1 <= x, 4 >= x),
-                   z3.And(-1 <= x, 5 >= x),
-                   z3.And(-1 <= x, 6 >= x)),
-             z3.Or(z3.And(xp == x + 2, x < 1), z3.And(xp == x + 1, x >= 1)))
+fml = z3.And(
+    z3.Or(
+        z3.And(x <= -2, x >= -3),
+        z3.And(-1 <= x, 2 >= x),
+        z3.And(-1 <= x, 0 >= x),
+        z3.And(-1 <= x, 3 >= x),
+        z3.And(-1 <= x, 4 >= x),
+        z3.And(-1 <= x, 5 >= x),
+        z3.And(-1 <= x, 6 >= x),
+    ),
+    z3.Or(z3.And(xp == x + 2, x < 1), z3.And(xp == x + 1, x >= 1)),
+)
 
 """
 Seems to be a bug??
@@ -60,7 +64,7 @@ FIXME: maybe choose the self-compiled python packages for Z3 (then we can use ne
 # print(optimize(fml, xp, minimize=True))
 # print(optimize(fml, xp, minimize=False))
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     a, b = z3.Bools("a b")
     fml_m = z3.Implies(z3.Not(a), b)
     fml_n = z3.Or(a, b)

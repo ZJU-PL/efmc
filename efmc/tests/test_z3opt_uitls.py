@@ -9,8 +9,8 @@ class TestBoxOptimize(unittest.TestCase):
 
     def setUp(self):
         # Common setup for tests
-        self.x = z3.Int('x')
-        self.y = z3.Int('y')
+        self.x = z3.Int("x")
+        self.y = z3.Int("y")
 
     def test_box_optimize_basic(self):
         """Test basic functionality with simple constraints."""
@@ -35,7 +35,7 @@ class TestBoxOptimize(unittest.TestCase):
         max_list = [self.y]
 
         # Call with timeout
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             mock_instance = MagicMock()
             mock_optimize.return_value = mock_instance
 
@@ -59,13 +59,17 @@ class TestBoxOptimize(unittest.TestCase):
     def test_box_optimize_multiple_objectives(self):
         """Test with multiple minimize and maximize objectives."""
         # Create a formula with multiple variables
-        z = z3.Int('z')
-        w = z3.Int('w')
+        z = z3.Int("z")
+        w = z3.Int("w")
         formula = z3.And(
-            self.x >= 0, self.x <= 10,
-            self.y >= 0, self.y <= 10,
-            z >= 0, z <= 10,
-            w >= 0, w <= 10
+            self.x >= 0,
+            self.x <= 10,
+            self.y >= 0,
+            self.y <= 10,
+            z >= 0,
+            z <= 10,
+            w >= 0,
+            w <= 10,
         )
 
         # Multiple objectives
@@ -113,7 +117,7 @@ class TestBoxOptimize(unittest.TestCase):
         self.assertEqual(min_res, [])
         self.assertEqual(max_res, [])
 
-    @patch('z3.Optimize')
+    @patch("z3.Optimize")
     def test_box_optimize_priority_setting(self, mock_optimize):
         """Test that box priority is correctly set."""
         mock_instance = MagicMock()
@@ -145,8 +149,8 @@ class TestParetoOptimize(unittest.TestCase):
 
     def setUp(self):
         # Create some common variables for tests
-        self.x = z3.Int('x')
-        self.y = z3.Int('y')
+        self.x = z3.Int("x")
+        self.y = z3.Int("y")
 
     def test_pareto_optimize_sat_case(self):
         """Test pareto_optimize when the formula is satisfiable"""
@@ -162,7 +166,7 @@ class TestParetoOptimize(unittest.TestCase):
         expected_max = [1]  # Some value for y (will be mocked)
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.sat
@@ -201,7 +205,7 @@ class TestParetoOptimize(unittest.TestCase):
         maximize_list = [self.y]
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.unsat
@@ -231,7 +235,7 @@ class TestParetoOptimize(unittest.TestCase):
         timeout = 1000  # 1 second
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.sat
@@ -258,7 +262,7 @@ class TestParetoOptimize(unittest.TestCase):
         formula = z3.And(self.x > 0, self.y > 0)
 
         # Create a third variable
-        z_var = z3.Int('z')
+        z_var = z3.Int("z")
 
         # We want to minimize x and z, and maximize y
         minimize_list = [self.x, z_var]
@@ -269,7 +273,7 @@ class TestParetoOptimize(unittest.TestCase):
         expected_max = [3]  # Maximum value for y
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.sat
@@ -330,9 +334,9 @@ class TestMaxSMT(unittest.TestCase):
 
     def setUp(self):
         # Create some common variables for tests
-        self.a = z3.Bool('a')
-        self.b = z3.Bool('b')
-        self.c = z3.Bool('c')
+        self.a = z3.Bool("a")
+        self.b = z3.Bool("b")
+        self.c = z3.Bool("c")
 
     def test_maxsmt_all_satisfied(self):
         """Test maxsmt when all soft constraints can be satisfied"""
@@ -344,7 +348,7 @@ class TestMaxSMT(unittest.TestCase):
         weights = [10, 20, 30]
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.sat
@@ -378,7 +382,7 @@ class TestMaxSMT(unittest.TestCase):
         weights = [10, 20, 30]
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.sat
@@ -399,7 +403,9 @@ class TestMaxSMT(unittest.TestCase):
             cost = maxsmt(hard, soft, weights)
 
             # Verify the results
-            self.assertEqual(cost, 40)  # a (10) and c (30) are unsatisfied, so cost is 40
+            self.assertEqual(
+                cost, 40
+            )  # a (10) and c (30) are unsatisfied, so cost is 40
 
             # Verify the mock calls
             mock_instance.add.assert_called_with(hard)
@@ -417,7 +423,7 @@ class TestMaxSMT(unittest.TestCase):
         weights = [10, 20]
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.unsat
@@ -448,7 +454,7 @@ class TestMaxSMT(unittest.TestCase):
         timeout = 1000  # 1 second
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.sat
@@ -474,7 +480,7 @@ class TestMaxSMT(unittest.TestCase):
         weights = []
 
         # Create a mock for z3.Optimize
-        with patch('z3.Optimize') as mock_optimize:
+        with patch("z3.Optimize") as mock_optimize:
             # Configure the mock
             mock_instance = mock_optimize.return_value
             mock_instance.check.return_value = z3.sat
@@ -528,5 +534,5 @@ class TestMaxSMT(unittest.TestCase):
         self.assertEqual(cost, 3)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

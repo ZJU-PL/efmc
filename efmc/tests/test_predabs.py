@@ -13,8 +13,10 @@ class TestPredicateAbstraction(TestCase):
         # return
         x, y, xp, yp = z3.Bools("x y x! y!")
         init = z3.And(x, y)
-        trans = z3.And(z3.Implies(y, xp == y, yp == y),
-                       z3.Implies(z3.Not(y), xp == z3.Not(y), yp == y))
+        trans = z3.And(
+            z3.Implies(y, xp == y, yp == y),
+            z3.Implies(z3.Not(y), xp == z3.Not(y), yp == y),
+        )
         post = x
         preds = [x, y]
 
@@ -43,6 +45,6 @@ class TestPredicateAbstraction(TestCase):
         pp.solve()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     main()

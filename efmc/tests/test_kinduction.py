@@ -1,15 +1,28 @@
 """
 Testing the incremental and non-incremental k-induction prover
 """
+
 import time
 import z3
 
 from efmc.tests import TestCase, main
 from efmc.sts import TransitionSystem
 from efmc.engines.kinduction.kind_prover import KInductionProver
-from efmc.engines.kinduction.kind_prover_inc import KInductionProverInc  # to test the incremental one
-from efmc.tests.simple_sts import get_int_sys1, get_int_sys2, get_int_sys3, get_int_sys4, get_int_sys5, get_int_sys6, \
-    get_int_sys7, get_int_sys8, get_int_sys9, get_int_sys10
+from efmc.engines.kinduction.kind_prover_inc import (
+    KInductionProverInc,
+)  # to test the incremental one
+from efmc.tests.simple_sts import (
+    get_int_sys1,
+    get_int_sys2,
+    get_int_sys3,
+    get_int_sys4,
+    get_int_sys5,
+    get_int_sys6,
+    get_int_sys7,
+    get_int_sys8,
+    get_int_sys9,
+    get_int_sys10,
+)
 
 
 class TestKInduction(TestCase):
@@ -37,7 +50,7 @@ class TestKInduction(TestCase):
         # start = time.time()
         res = pp.solve(k=20)
         # The actual result is a VerificationResult object with is_safe=False
-        assert (hasattr(res, 'is_safe') and not res.is_safe)
+        assert hasattr(res, "is_safe") and not res.is_safe
         # print("time: ", time.time() - start)
 
     def test_kind2(self):
@@ -56,7 +69,9 @@ class TestKInduction(TestCase):
 
         # Update assertions to match the actual behavior of the solvers
         # Both solvers should return the same result for this system
-        assert (inc_res.is_safe == noinc_res.is_safe), "Both solvers should return the same safety result"
+        assert (
+            inc_res.is_safe == noinc_res.is_safe
+        ), "Both solvers should return the same safety result"
 
     def test_kind3(self):
         # Renamed from test_kind2 to test_kind3 to avoid duplicate test names
@@ -74,8 +89,10 @@ class TestKInduction(TestCase):
 
         # Update assertions to match the actual behavior of the solvers
         # Both solvers should return the same result for this system
-        assert (inc_res.is_safe == noinc_res.is_safe), "Both solvers should return the same safety result"
+        assert (
+            inc_res.is_safe == noinc_res.is_safe
+        ), "Both solvers should return the same safety result"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

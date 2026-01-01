@@ -44,59 +44,110 @@ return 0;
 """
 
 
-def is_literal(e): return is_const(e) and e.decl().kind() == Z3_OP_UNINTERPRETED
+def is_literal(e):
+    return is_const(e) and e.decl().kind() == Z3_OP_UNINTERPRETED
 
-def is_bvconst(e): return is_const(e) and e.decl().kind() == Z3_OP_BNUM
 
-def is_int_real_const(e): return z3.is_const(e) and (z3.is_int(e) or z3.is_real(e))
+def is_bvconst(e):
+    return is_const(e) and e.decl().kind() == Z3_OP_BNUM
 
-def is_ite(e): return e.decl().kind() == Z3_OP_ITE
 
-def is_iff(e): return e.decl().kind() == Z3_OP_IFF
+def is_int_real_const(e):
+    return z3.is_const(e) and (z3.is_int(e) or z3.is_real(e))
 
-def is_sge(c): return c.decl().kind() == Z3_OP_SGEQ
+
+def is_ite(e):
+    return e.decl().kind() == Z3_OP_ITE
+
+
+def is_iff(e):
+    return e.decl().kind() == Z3_OP_IFF
+
+
+def is_sge(c):
+    return c.decl().kind() == Z3_OP_SGEQ
+
 
 def is_ira_ge(c):
     """>= in integer or real"""
     return c.decl().kind() == Z3_OP_GE
 
-def is_sgt(c): return c.decl().kind() == Z3_OP_SGT
 
-def is_ira_gt(c): return c.decl().kind() == Z3_OP_GT
+def is_sgt(c):
+    return c.decl().kind() == Z3_OP_SGT
 
-def is_sle(c): return c.decl().kind() == Z3_OP_SLEQ
 
-def is_ira_le(c): return c.decl().kind() == Z3_OP_LE
+def is_ira_gt(c):
+    return c.decl().kind() == Z3_OP_GT
 
-def is_slt(c): return c.decl().kind() == Z3_OP_SLT
 
-def is_ira_lt(c): return c.decl().kind() == Z3_OP_LT
+def is_sle(c):
+    return c.decl().kind() == Z3_OP_SLEQ
 
-def is_badd(c): return c.decl().kind() == Z3_OP_BADD
 
-def is_ira_add(c): return c.decl().kind() == Z3_OP_ADD
+def is_ira_le(c):
+    return c.decl().kind() == Z3_OP_LE
 
-def is_bsub(c): return c.decl().kind() == Z3_OP_BSUB
 
-def is_ira_sub(c): return c.decl().kind() == Z3_OP_SUB
+def is_slt(c):
+    return c.decl().kind() == Z3_OP_SLT
 
-def is_bmul(c): return c.decl().kind() == Z3_OP_BMUL
 
-def is_ira_mul(c): return c.decl().kind() == Z3_OP_MUL
+def is_ira_lt(c):
+    return c.decl().kind() == Z3_OP_LT
 
-def is_bsdiv(c): return c.decl().kind() == Z3_OP_BSDIV
 
-def is_ira_div(c): return c.decl().kind() == Z3_OP_DIV
+def is_badd(c):
+    return c.decl().kind() == Z3_OP_BADD
 
-def is_bsmod(c): return c.decl().kind() == Z3_OP_BSMOD
 
-def is_band(c): return c.decl().kind() == Z3_OP_BAND
+def is_ira_add(c):
+    return c.decl().kind() == Z3_OP_ADD
 
-def is_bor(c): return c.decl().kind() == Z3_OP_BOR
 
-def is_blshift_r(c): return c.decl().kind() == Z3_OP_BLSHR
+def is_bsub(c):
+    return c.decl().kind() == Z3_OP_BSUB
 
-def is_bshift_l(c): return c.decl().kind() == Z3_OP_BSHL
+
+def is_ira_sub(c):
+    return c.decl().kind() == Z3_OP_SUB
+
+
+def is_bmul(c):
+    return c.decl().kind() == Z3_OP_BMUL
+
+
+def is_ira_mul(c):
+    return c.decl().kind() == Z3_OP_MUL
+
+
+def is_bsdiv(c):
+    return c.decl().kind() == Z3_OP_BSDIV
+
+
+def is_ira_div(c):
+    return c.decl().kind() == Z3_OP_DIV
+
+
+def is_bsmod(c):
+    return c.decl().kind() == Z3_OP_BSMOD
+
+
+def is_band(c):
+    return c.decl().kind() == Z3_OP_BAND
+
+
+def is_bor(c):
+    return c.decl().kind() == Z3_OP_BOR
+
+
+def is_blshift_r(c):
+    return c.decl().kind() == Z3_OP_BLSHR
+
+
+def is_bshift_l(c):
+    return c.decl().kind() == Z3_OP_BSHL
+
 
 def find_var_bounds(clauses):
     # name => (lo,hi)
@@ -105,7 +156,7 @@ def find_var_bounds(clauses):
 
     for clause in clauses:
         children = clause.children()
-        '''
+        """
         if is_sge(clause):
             input_vars[children[0]][0] = children[1].as_long()
         elif is_sgt(clause):
@@ -116,7 +167,7 @@ def find_var_bounds(clauses):
             input_vars[children[0]][1] = children[1].as_long() - 1
         else:
             to_process.append(clause)
-        '''
+        """
         tt = children[1]
         if is_sge(clause):
             # BitVecVal(tt, tt.size())
@@ -176,13 +227,25 @@ def compile_bv_to_c_sat(formula):
         for boolean_expr in c_visitor(clause):
             line = "    if (!({})) {{\n     continue;\n    }} \n".format(boolean_expr)
             filters.append(line)
-            for oprt in ['+', '-', '*', '/', '%', ' & ', ' | ', ' ^ ', ' ~ ', '>>', '<<']:
+            for oprt in [
+                "+",
+                "-",
+                "*",
+                "/",
+                "%",
+                " & ",
+                " | ",
+                " ^ ",
+                " ~ ",
+                ">>",
+                "<<",
+            ]:
                 n_ops += line.count(oprt)
 
     full_loop = []
     full_loop.extend(loop)
     full_loop.extend(filters)
-    full_loop.append("  printf(\"Find model!\\n\");")
+    full_loop.append('  printf("Find model!\\n");')
     full_loop.append("  return 0;")  # break or return??
     full_loop.extend(["}"] * len(loop))
 
@@ -209,7 +272,19 @@ def compile_bv_to_c_counting(formula):
         for boolean_expr in c_visitor(clause):
             line = "    if (!({})) {{\n     continue;\n    }} \n".format(boolean_expr)
             filters.append(line)
-            for oprt in ['+', '-', '*', '/', '%', ' & ', ' | ', ' ^ ', ' ~ ', '>>', '<<']:
+            for oprt in [
+                "+",
+                "-",
+                "*",
+                "/",
+                "%",
+                " & ",
+                " | ",
+                " ^ ",
+                " ~ ",
+                ">>",
+                "<<",
+            ]:
                 n_ops += line.count(oprt)
 
     full_loop = []
@@ -353,10 +428,11 @@ def c_visitor(e):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', dest='input', type=str)
-    parser.add_argument('--mode', dest='mode', default='counting', type=str)
-    parser.add_argument("-v", "--verbose", help="increase output verbosity",
-                        action="store_true")
+    parser.add_argument("--input", dest="input", type=str)
+    parser.add_argument("--mode", dest="mode", default="counting", type=str)
+    parser.add_argument(
+        "-v", "--verbose", help="increase output verbosity", action="store_true"
+    )
     args = parser.parse_args()
     # inputfile = sys.argv[1]
     inputfile = args.input
@@ -376,5 +452,5 @@ def main():
         print(code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -13,17 +13,24 @@ TIMEOUT = 5
 if not os.path.exists(RESULT_DIR):
     os.makedirs(RESULT_DIR)
 
+
 def process_file(input_file, output_file):
     with open(output_file, "w") as output:
         subprocess.run(["python3", SCRIPT_PATH, input_file], stdout=output)
 
+
 def run_cvc5(input_file):
     try:
-        result = subprocess.run([CVC5_BINARY, "--lang=sygus2", input_file], capture_output=True, timeout=TIMEOUT)
+        result = subprocess.run(
+            [CVC5_BINARY, "--lang=sygus2", input_file],
+            capture_output=True,
+            timeout=TIMEOUT,
+        )
         return result.stdout.decode("utf-8")
     except subprocess.TimeoutExpired:
         print(f"Timeout occurred for {input_file}")
         return None
+
 
 if __name__ == "__main__":
     result_dir = "./Result/Result"
@@ -39,4 +46,3 @@ if __name__ == "__main__":
                         total_time += data["time"]
 
     print(f"Total time: {total_time}")
-

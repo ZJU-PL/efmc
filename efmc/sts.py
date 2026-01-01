@@ -10,21 +10,21 @@ from efmc.utils import ctx_simplify
 class TransitionSystem(object):
     """
     Transition system supporting multiple data types including QF_FP.
-    
+
     Supports: integers, reals, bit-vectors, booleans, floating-point, and arrays.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Core components
         self.variables: List[z3.ExprRef] = []  # Current state variables
-        self.prime_variables: List[z3.ExprRef] = []  # Next state variables  
+        self.prime_variables: List[z3.ExprRef] = []  # Next state variables
         self.all_variables: List[z3.ExprRef] = []  # variables + prime_variables
         self.trans: Optional[z3.ExprRef] = None  # Transition relation
         self.init: Optional[z3.ExprRef] = None  # Initial condition
         self.post: Optional[z3.ExprRef] = None  # Post condition
         self.invariants: List[z3.ExprRef] = []  # Additional invariants/lemmas
         self.initialized: bool = False
-        
+
         # Type flags
         self.has_bv: bool = False
         self.has_int: bool = False
@@ -40,12 +40,30 @@ class TransitionSystem(object):
 
     def _init_from_kwargs(self, **kwargs: Any) -> None:
         """Initialize the transition system from keyword arguments."""
-        allowed_keys = {'variables', 'prime_variables', 'init', 'trans', 'post', 'invariants'}
+        allowed_keys = {
+            "variables",
+            "prime_variables",
+            "init",
+            "trans",
+            "post",
+            "invariants",
+        }
         for key, value in kwargs.items():
             if key not in allowed_keys:
                 raise ValueError(f"Unexpected argument: {key}")
-            setattr(self, key, list(value) if key in ['variables', 'prime_variables'] 
-                   else (list(value) if key == 'invariants' and isinstance(value, (list, tuple)) else value))
+            setattr(
+                self,
+                key,
+                (
+                    list(value)
+                    if key in ["variables", "prime_variables"]
+                    else (
+                        list(value)
+                        if key == "invariants" and isinstance(value, (list, tuple))
+                        else value
+                    )
+                ),
+            )
 
         self.all_variables = self.variables + self.prime_variables
         self._detect_types()
@@ -55,7 +73,7 @@ class TransitionSystem(object):
         """Detect variable types from the first variable."""
         if not self.variables:
             return
-            
+
         sample_var = self.variables[0]
         if z3.is_int(sample_var):
             self.has_int = True
@@ -95,7 +113,7 @@ class TransitionSystem(object):
     def from_z3_cnts(self, ts: List[z3.ExprRef]) -> None:
         """Initialize from Z3 constraints list [variables, init, trans, post]"""
         self.all_variables, self.init, self.trans, self.post = ts
-        
+
         # Separate variables and prime variables based on naming convention
         for var in self.all_variables:
             var_name = str(var)
@@ -103,7 +121,7 @@ class TransitionSystem(object):
                 self.prime_variables.append(var)
             else:
                 self.variables.append(var)
-        
+
         self._detect_types()
         self.initialized = True
 
@@ -151,14 +169,21 @@ class TransitionSystem(object):
 
         s = z3.SolverFor("HORN")
         sort_sig = self._get_sort_signature()
-        
+
         # Build invariant function signature
         inv_sig = f"z3.Function('inv', {', '.join([sort_sig] * len(self.variables))}, z3.BoolSort())"
         inv = eval(inv_sig)
-        
+
         # Add CHC constraints
         s.add(z3.ForAll(self.variables, z3.Implies(self.init, inv(self.variables))))
-        s.add(z3.ForAll(self.all_variables, z3.Implies(z3.And(inv(self.variables), self.trans), inv(self.prime_variables))))
+        s.add(
+            z3.ForAll(
+                self.all_variables,
+                z3.Implies(
+                    z3.And(inv(self.variables), self.trans), inv(self.prime_variables)
+                ),
+            )
+        )
         s.add(z3.ForAll(self.variables, z3.Implies(inv(self.variables), self.post)))
 
         return z3.And(s.assertions())
@@ -175,7 +200,6 @@ class TransitionSystem(object):
         z3_expr = self.to_chc_constraints()
         logic = self._get_logic_string()
         return f"(set-logic {logic})\n{z3_expr.sexpr()}\n(check-sat)\n"
-    
+
     def to_z3_cnts(self) -> List[z3.ExprRef]:
         return self.all_variables, self.init, self.trans, self.post
-    

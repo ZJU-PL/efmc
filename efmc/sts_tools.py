@@ -6,10 +6,12 @@ import z3
 from efmc.sts import TransitionSystem
 
 
-def simulate_transition_system(ts: TransitionSystem, steps: int = 10,
-                                random_seed: Optional[int] = None,
-                                concrete_init: Optional[Dict[str, Any]] = None
-                                ) -> List[Dict[str, Any]]:
+def simulate_transition_system(
+    ts: TransitionSystem,
+    steps: int = 10,
+    random_seed: Optional[int] = None,
+    concrete_init: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """Simulate transition system execution."""
     assert ts.initialized
 
@@ -34,12 +36,16 @@ def simulate_transition_system(ts: TransitionSystem, steps: int = 10,
     return trace
 
 
-def _get_initial_state(ts: TransitionSystem, solver: z3.Solver,
-                       concrete_init: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def _get_initial_state(
+    ts: TransitionSystem, solver: z3.Solver, concrete_init: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
     """Get initial state from concrete_init or solve init condition."""
     if concrete_init:
-        state_constraints = [var == concrete_init[str(var)]
-                             for var in ts.variables if str(var) in concrete_init]
+        state_constraints = [
+            var == concrete_init[str(var)]
+            for var in ts.variables
+            if str(var) in concrete_init
+        ]
         solver.push()
         solver.add(z3.And(state_constraints + [ts.init]))
         if solver.check() != z3.sat:
@@ -60,11 +66,15 @@ def _get_initial_state(ts: TransitionSystem, solver: z3.Solver,
     return state
 
 
-def _get_next_state(ts: TransitionSystem, solver: z3.Solver,
-                    current_state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _get_next_state(
+    ts: TransitionSystem, solver: z3.Solver, current_state: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
     """Get next state using transition relation."""
-    state_constraints = [var == current_state[str(var)]
-                         for var in ts.variables if str(var) in current_state]
+    state_constraints = [
+        var == current_state[str(var)]
+        for var in ts.variables
+        if str(var) in current_state
+    ]
 
     solver.push()
     solver.add(z3.And(state_constraints + [ts.trans]))
@@ -81,8 +91,10 @@ def _get_next_state(ts: TransitionSystem, solver: z3.Solver,
         var_name = str(var)
         for prime_var in ts.prime_variables:
             prime_name = str(prime_var)
-            if any(prime_name.endswith(suffix) and prime_name[:-len(suffix)] == var_name
-                   for suffix in ["!", "'", "_p"]):
+            if any(
+                prime_name.endswith(suffix) and prime_name[: -len(suffix)] == var_name
+                for suffix in ["!", "'", "_p"]
+            ):
                 next_state[var_name] = model.eval(prime_var, model_completion=True)
                 break
 
@@ -90,11 +102,13 @@ def _get_next_state(ts: TransitionSystem, solver: z3.Solver,
     return next_state
 
 
-def _check_post_violation(ts: TransitionSystem, solver: z3.Solver,
-                          state: Dict[str, Any]) -> bool:
+def _check_post_violation(
+    ts: TransitionSystem, solver: z3.Solver, state: Dict[str, Any]
+) -> bool:
     """Check if post-condition is violated in given state."""
-    state_constraints = [var == state[str(var)]
-                         for var in ts.variables if str(var) in state]
+    state_constraints = [
+        var == state[str(var)] for var in ts.variables if str(var) in state
+    ]
 
     solver.push()
     solver.add(z3.And(state_constraints + [z3.Not(ts.post)]))

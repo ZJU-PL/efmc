@@ -107,7 +107,9 @@ class FormulaGenerator:
             if prob <= 0.25:
                 self.bvs.append(r1 + r2)
                 if self.bv_no_overflow:
-                    self.hard_bools.append(z3.BVAddNoOverflow(r1, r2, signed=self.bv_signed))
+                    self.hard_bools.append(
+                        z3.BVAddNoOverflow(r1, r2, signed=self.bv_signed)
+                    )
                 if self.bv_no_underflow:
                     self.hard_bools.append(z3.BVAddNoUnderflow(r1, r2))
             elif prob <= 0.5:
@@ -115,11 +117,15 @@ class FormulaGenerator:
                 if self.bv_no_underflow:
                     self.hard_bools.append(z3.BVSubNoOverflow(r1, r2))
                 if self.bv_no_underflow:
-                    self.hard_bools.append(z3.BVSubNoUnderflow(r1, r2, signed=self.bv_signed))
+                    self.hard_bools.append(
+                        z3.BVSubNoUnderflow(r1, r2, signed=self.bv_signed)
+                    )
             elif prob <= 0.75:
                 self.bvs.append(r1 * r2)
                 if self.bv_no_underflow:
-                    self.hard_bools.append(z3.BVMulNoOverflow(r1, r2, signed=self.bv_signed))
+                    self.hard_bools.append(
+                        z3.BVMulNoOverflow(r1, r2, signed=self.bv_signed)
+                    )
                 if self.bv_no_underflow:
                     self.hard_bools.append(z3.BVMulNoUnderflow(r1, r2))
             else:
@@ -256,7 +262,7 @@ class FormulaGenerator:
 
         max_assert = random.randint(5, 30)
         res = []
-        assert (len(self.bools) >= 1)
+        assert len(self.bools) >= 1
         for _ in range(max_assert):
             clen = random.randint(1, 8)  # clause length
             if clen == 1:

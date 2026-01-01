@@ -15,7 +15,9 @@ class TransitionSystemGenerator:
 
     def __init__(self):
         self.var_count = random.randint(2, 5)  # Number of variables to generate
-        self.fml_gene = FormulaGenerator(init_vars=[])  # Initialize with empty vars list
+        self.fml_gene = FormulaGenerator(
+            init_vars=[]
+        )  # Initialize with empty vars list
 
     def _create_vars(self, prefix: str, sort_fn) -> tuple:
         """Helper to create variables with given prefix and sort"""
@@ -23,7 +25,9 @@ class TransitionSystemGenerator:
         prime_vars = [sort_fn(f"{prefix}{i}!") for i in range(self.var_count)]
         return vars, prime_vars
 
-    def _create_transition_system(self, vars, prime_vars, init, trans, post) -> TransitionSystem:
+    def _create_transition_system(
+        self, vars, prime_vars, init, trans, post
+    ) -> TransitionSystem:
         """Helper to create and initialize a transition system"""
         sts = TransitionSystem()
         sts.from_z3_cnts([vars + prime_vars, init, trans, post])
@@ -39,11 +43,13 @@ class TransitionSystemGenerator:
         # Random transitions
         trans_conditions = []
         for v, pv in zip(vars, prime_vars):
-            cond = random.choice([
-                pv == z3.Not(v),
-                pv == v,
-                pv == z3.Or(v, vars[random.randint(0, len(vars) - 1)])
-            ])
+            cond = random.choice(
+                [
+                    pv == z3.Not(v),
+                    pv == v,
+                    pv == z3.Or(v, vars[random.randint(0, len(vars) - 1)]),
+                ]
+            )
             trans_conditions.append(cond)
         trans = z3.And(*trans_conditions)
 
@@ -98,8 +104,8 @@ class TransitionSystemGenerator:
         vars, prime_vars = self._create_vars("i", z3.Int)
 
         # Array variables
-        array = z3.Array('arr', z3.IntSort(), z3.IntSort())
-        array_p = z3.Array('arr!', z3.IntSort(), z3.IntSort())
+        array = z3.Array("arr", z3.IntSort(), z3.IntSort())
+        array_p = z3.Array("arr!", z3.IntSort(), z3.IntSort())
         vars.append(array)
         prime_vars.append(array_p)
 
@@ -123,17 +129,19 @@ class TransitionSystemGenerator:
         vars, prime_vars = self._create_vars("bv", lambda x: z3.BitVec(x, width))
 
         # Initial conditions
-        init = z3.And(*[v == random.randint(0, 2 ** width - 1) for v in vars])
+        init = z3.And(*[v == random.randint(0, 2**width - 1) for v in vars])
 
         # Bitvector operations
         trans_conditions = []
         for v, pv in zip(vars, prime_vars):
-            op = random.choice([
-                lambda x: x + 1,  # Increment
-                lambda x: x - 1,  # Decrement
-                lambda x: x << 1,  # Left shift
-                lambda x: x >> 1,  # Right shift
-            ])
+            op = random.choice(
+                [
+                    lambda x: x + 1,  # Increment
+                    lambda x: x - 1,  # Decrement
+                    lambda x: x << 1,  # Left shift
+                    lambda x: x >> 1,  # Right shift
+                ]
+            )
             trans_conditions.append(pv == op(v))
         trans = z3.And(*trans_conditions)
 

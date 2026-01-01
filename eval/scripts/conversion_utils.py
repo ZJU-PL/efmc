@@ -1,6 +1,7 @@
 """
 Common utilities for format conversion scripts
 """
+
 import os
 from typing import List
 from pathlib import Path
@@ -10,24 +11,36 @@ from efmc.frontends.mini_sygus_parser import parse_sexpression
 
 class BitvectorConverter:
     """Base class for bitvector conversions with common functionality"""
-    
+
     def __init__(self, bitvector_width=32, signedness="signed"):
         self.bitvector_width = bitvector_width
         self.signedness = signedness
-    
+
     def rep_operand(self, op: str) -> str:
         """Replace operand with corresponding BV operator"""
         if self.signedness == "signed":
             rep_rules = {
-                "+": "bvadd", "-": "bvsub", "*": "bvmul", "%": "bvsdiv",
+                "+": "bvadd",
+                "-": "bvsub",
+                "*": "bvmul",
+                "%": "bvsdiv",
                 "div": "bvudiv",
-                ">=": "bvsge", "<=": "bvsle", ">": "bvsgt", "<": "bvslt"
+                ">=": "bvsge",
+                "<=": "bvsle",
+                ">": "bvsgt",
+                "<": "bvslt",
             }
         else:
             rep_rules = {
-                "+": "bvadd", "-": "bvsub", "*": "bvmul", "%": "bvurem",
+                "+": "bvadd",
+                "-": "bvsub",
+                "*": "bvmul",
+                "%": "bvurem",
                 "div": "bvudiv",
-                ">=": "bvuge", "<=": "bvule", ">": "bvugt", "<": "bvult"
+                ">=": "bvuge",
+                "<=": "bvule",
+                ">": "bvugt",
+                "<": "bvult",
             }
         return rep_rules.get(op, op)
 
@@ -35,13 +48,13 @@ class BitvectorConverter:
         """Convert LIRA expressions to BV s-expressions"""
         res = ["("]
         if not isinstance(line[0], list):
-            if line[0] == '-' and len(line) == 2 and not isinstance(line[1], list):
+            if line[0] == "-" and len(line) == 2 and not isinstance(line[1], list):
                 # Handle negative numbers using two's complement: -x = bvnot(x) + 1
                 if isinstance(line[1], int):
-                    var = f'(_ bv{line[1]} {self.bitvector_width})'
+                    var = f"(_ bv{line[1]} {self.bitvector_width})"
                 else:
                     var = line[1]
-                new_line = ['bvadd', f'(_ bv1 {self.bitvector_width})', ['bvnot', var]]
+                new_line = ["bvadd", f"(_ bv1 {self.bitvector_width})", ["bvnot", var]]
             else:
                 new_line = [self.rep_operand(line[0])] + line[1:]
         else:
@@ -50,12 +63,20 @@ class BitvectorConverter:
         for element in new_line:
             if isinstance(element, list):
                 if not isinstance(element[0], list):
-                    if element[0] == '-' and len(element) == 2 and not isinstance(element[1], list):
+                    if (
+                        element[0] == "-"
+                        and len(element) == 2
+                        and not isinstance(element[1], list)
+                    ):
                         if isinstance(element[1], int):
-                            var = f'(_ bv{element[1]} {self.bitvector_width})'
+                            var = f"(_ bv{element[1]} {self.bitvector_width})"
                         else:
                             var = element[1]
-                        new_element = ['bvadd', f'(_ bv1 {self.bitvector_width})', ['bvnot', var]]
+                        new_element = [
+                            "bvadd",
+                            f"(_ bv1 {self.bitvector_width})",
+                            ["bvnot", var],
+                        ]
                     else:
                         new_element = [self.rep_operand(element[0])] + element[1:]
                 else:
@@ -76,7 +97,7 @@ class BitvectorConverter:
 
 class FileProcessor:
     """Common file processing utilities"""
-    
+
     @staticmethod
     def get_files_with_extensions(path: str, extensions: List[str]) -> List[str]:
         """Get all files with specified extensions from path (file or directory)"""
@@ -90,7 +111,7 @@ class FileProcessor:
                     if any(fname.endswith(ext) for ext in extensions):
                         files.append(os.path.join(root, fname))
         return files
-    
+
     @staticmethod
     def safe_process_file(filename: str, processor_func, *args, **kwargs):
         """Safely process a file with error handling"""
@@ -102,13 +123,13 @@ class FileProcessor:
         except Exception as ex:
             print(f"Error processing {filename}: {ex}")
             return None
-    
+
     @staticmethod
     def write_output_file(content: str, output_path: str, create_dirs=True):
         """Write content to output file, optionally creating directories"""
         if create_dirs:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
+
         with open(output_path, "w") as f:
             f.write(content)
         print(f"Written to {output_path}")
@@ -116,8 +137,10 @@ class FileProcessor:
 
 def build_bv_variable_signatures(vars_list, bitvector_width: int) -> List[str]:
     """Build bitvector variable signatures for SMT-LIB"""
-    return [f"({var} {z3.BitVec(str(var), bitvector_width).sort().sexpr()})" 
-            for var in vars_list]
+    return [
+        f"({var} {z3.BitVec(str(var), bitvector_width).sort().sexpr()})"
+        for var in vars_list
+    ]
 
 
 def build_inv_signature(vars_list, bitvector_width: int, format_type="sygus") -> str:
@@ -132,4 +155,4 @@ def build_inv_signature(vars_list, bitvector_width: int, format_type="sygus") ->
         for _ in vars_list:
             sig += f"(_ BitVec {bitvector_width}) "
         sig += ") Bool)\n"
-    return sig 
+    return sig

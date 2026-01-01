@@ -7,7 +7,7 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Optional, List, TextIO, Union, Dict, Tuple, Callable, Any
 
-import z3   # type: ignore
+import z3  # type: ignore
 
 
 def to_z3_bitvec(z3_expr: Union[z3.BitVecRef, z3.BoolRef]) -> z3.BitVecRef:
@@ -17,7 +17,9 @@ def to_z3_bitvec(z3_expr: Union[z3.BitVecRef, z3.BoolRef]) -> z3.BitVecRef:
         return z3.BitVecVal(1, 1, z3_expr.ctx)
     if z3.is_false(z3_expr):
         return z3.BitVecVal(0, 1, z3_expr.ctx)
-    return z3.If(z3_expr, z3.BitVecVal(1, 1, z3_expr.ctx), z3.BitVecVal(0, 1, z3_expr.ctx))
+    return z3.If(
+        z3_expr, z3.BitVecVal(1, 1, z3_expr.ctx), z3.BitVecVal(0, 1, z3_expr.ctx)
+    )
 
 
 def to_z3_bool(z3_expr: Union[z3.BitVecRef, z3.BoolRef]) -> z3.BoolRef:
@@ -41,11 +43,17 @@ def to_z3_eq(z3_expr1: z3.ExprRef, z3_expr2: z3.ExprRef) -> z3.BoolRef:
 
 
 # noinspection PyProtectedMember
-def call_z3_mk_bv(z3_mk_bv: Callable[[Any, Any, Any], Any],
-                  z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+def call_z3_mk_bv(
+    z3_mk_bv: Callable[[Any, Any, Any], Any],
+    z3_bitvec1: z3.BitVecRef,
+    z3_bitvec2: z3.BitVecRef,
+) -> z3.BitVecRef:
     from z3.z3 import _coerce_exprs  # type: ignore
+
     a, b = _coerce_exprs(z3_bitvec1, z3_bitvec2)
-    return z3.BitVecRef(z3_mk_bv(z3_bitvec1.ctx_ref(), a.as_ast(), b.as_ast()), z3_bitvec1.ctx)
+    return z3.BitVecRef(
+        z3_mk_bv(z3_bitvec1.ctx_ref(), a.as_ast(), b.as_ast()), z3_bitvec1.ctx
+    )
 
 
 class Z3ExprMemo:
@@ -85,8 +93,9 @@ class BitvecSort(Sort):
         super().__init__(sid, symbol)
         self.width = width
 
-    def to_z3_sort(self, ctx: z3.Context = z3.main_ctx()) -> Union[z3.BitVecSortRef,
-                                                                   z3.BoolSortRef]:
+    def to_z3_sort(
+        self, ctx: z3.Context = z3.main_ctx()
+    ) -> Union[z3.BitVecSortRef, z3.BoolSortRef]:
         if self.width == 1:
             return z3.BoolSort(ctx)
         return z3.BitVecSort(self.width, ctx)
@@ -96,13 +105,17 @@ class ArraySort(Sort):
     index_sort: Sort
     element_sort: Sort
 
-    def __init__(self, sid: int, index_sort: Sort, element_sort: Sort, symbol: str = ""):
+    def __init__(
+        self, sid: int, index_sort: Sort, element_sort: Sort, symbol: str = ""
+    ):
         super().__init__(sid, symbol)
         self.index_sort = index_sort
         self.element_sort = element_sort
 
     def to_z3_sort(self, ctx: z3.Context = z3.main_ctx()) -> z3.ArraySortRef:
-        return z3.ArraySort(self.index_sort.to_z3_sort(ctx), self.element_sort.to_z3_sort(ctx))
+        return z3.ArraySort(
+            self.index_sort.to_z3_sort(ctx), self.element_sort.to_z3_sort(ctx)
+        )
 
 
 class Expr(Node):
@@ -264,7 +277,9 @@ class Ext(Bitvec, ABC):
     bitvec: Bitvec
     w: int
 
-    def __init__(self, nid: int, sort: BitvecSort, bitvec: Bitvec, w: int, symbol: str = ""):
+    def __init__(
+        self, nid: int, sort: BitvecSort, bitvec: Bitvec, w: int, symbol: str = ""
+    ):
         super().__init__(nid, sort, symbol)
         self.bitvec = bitvec
         self.w = w
@@ -285,8 +300,15 @@ class Slice(Bitvec):
     upper: int
     lower: int
 
-    def __init__(self, nid: int, sort: BitvecSort, bitvec: Bitvec, upper: int, lower: int,
-                 symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: BitvecSort,
+        bitvec: Bitvec,
+        upper: int,
+        lower: int,
+        symbol: str = "",
+    ):
         super().__init__(nid, sort, symbol)
         self.bitvec = bitvec
         self.upper = upper
@@ -310,7 +332,9 @@ class BitvecUnaryOp(Bitvec, ABC):
         return self.z3_unary_bool_op(z3_bitvec_or_bool)
 
     @abstractmethod
-    def z3_unary_bitvec_op(self, z3_bitvec: z3.BitVecRef) -> Union[z3.BitVecRef, z3.BoolRef]:
+    def z3_unary_bitvec_op(
+        self, z3_bitvec: z3.BitVecRef
+    ) -> Union[z3.BitVecRef, z3.BoolRef]:
         raise NotImplementedError
 
     @abstractmethod
@@ -381,8 +405,14 @@ class BitvecBinaryOp(Bitvec, ABC):
     bitvec1: Bitvec
     bitvec2: Bitvec
 
-    def __init__(self, nid: int, sort: BitvecSort, bitvec1: Bitvec, bitvec2: Bitvec,
-                 symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: BitvecSort,
+        bitvec1: Bitvec,
+        bitvec2: Bitvec,
+        symbol: str = "",
+    ):
         super().__init__(nid, sort, symbol)
         self.bitvec1 = bitvec1
         self.bitvec2 = bitvec2
@@ -395,18 +425,22 @@ class BitvecBinaryOp(Bitvec, ABC):
         return self.z3_bitvec_op(z3_expr1, z3_expr2)
 
     @abstractmethod
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef,
-                     z3_bitvec2: z3.BitVecRef) -> Union[z3.BitVecRef, z3.BoolRef]:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> Union[z3.BitVecRef, z3.BoolRef]:
         raise NotImplementedError
 
     @abstractmethod
-    def z3_bool_op(self, z3_bool1: z3.BoolRef,
-                   z3_bool2: z3.BoolRef) -> Union[z3.BitVecRef, z3.BoolRef]:
+    def z3_bool_op(
+        self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef
+    ) -> Union[z3.BitVecRef, z3.BoolRef]:
         raise NotImplementedError
 
 
 class Iff(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3_bitvec1 == z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -414,9 +448,14 @@ class Iff(BitvecBinaryOp):
 
 
 class Implies(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
-        return z3.Or(z3_bitvec1 == z3.BitVecVal(0, 1, z3_bitvec1.ctx),
-                     z3_bitvec2 == z3.BitVecVal(1, 1, z3_bitvec1.ctx), z3_bitvec1.ctx)
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
+        return z3.Or(
+            z3_bitvec1 == z3.BitVecVal(0, 1, z3_bitvec1.ctx),
+            z3_bitvec2 == z3.BitVecVal(1, 1, z3_bitvec1.ctx),
+            z3_bitvec1.ctx,
+        )
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
         return z3.Implies(z3_bool1, z3_bool2)
@@ -426,7 +465,9 @@ class Equality(Bitvec, ABC):
     expr1: Expr
     expr2: Expr
 
-    def __init__(self, nid: int, sort: BitvecSort, expr1: Expr, expr2, symbol: str = ""):
+    def __init__(
+        self, nid: int, sort: BitvecSort, expr1: Expr, expr2, symbol: str = ""
+    ):
         super().__init__(nid, sort, symbol)
         self.expr1 = expr1
         self.expr2 = expr2
@@ -447,7 +488,9 @@ class Neq(Equality):
 
 
 class Sgt(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3_bitvec1 > z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -455,7 +498,9 @@ class Sgt(BitvecBinaryOp):
 
 
 class Ugt(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.UGT(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -463,7 +508,9 @@ class Ugt(BitvecBinaryOp):
 
 
 class Sgte(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3_bitvec1 >= z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -471,7 +518,9 @@ class Sgte(BitvecBinaryOp):
 
 
 class Ugte(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.UGE(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -479,7 +528,9 @@ class Ugte(BitvecBinaryOp):
 
 
 class Slt(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3_bitvec1 < z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -487,7 +538,9 @@ class Slt(BitvecBinaryOp):
 
 
 class Ult(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.ULT(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -495,7 +548,9 @@ class Ult(BitvecBinaryOp):
 
 
 class Slte(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3_bitvec1 <= z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -503,7 +558,9 @@ class Slte(BitvecBinaryOp):
 
 
 class Ulte(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.ULE(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -511,7 +568,9 @@ class Ulte(BitvecBinaryOp):
 
 
 class And(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 & z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -519,7 +578,9 @@ class And(BitvecBinaryOp):
 
 
 class Nand(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return call_z3_mk_bv(z3.Z3_mk_bvnand, z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -527,7 +588,9 @@ class Nand(BitvecBinaryOp):
 
 
 class Nor(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return call_z3_mk_bv(z3.Z3_mk_bvnor, z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -535,7 +598,9 @@ class Nor(BitvecBinaryOp):
 
 
 class Or(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 | z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -543,7 +608,9 @@ class Or(BitvecBinaryOp):
 
 
 class Xnor(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return call_z3_mk_bv(z3.Z3_mk_bvxnor, z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -551,7 +618,9 @@ class Xnor(BitvecBinaryOp):
 
 
 class Xor(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 ^ z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -559,7 +628,9 @@ class Xor(BitvecBinaryOp):
 
 
 class Sll(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 << z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -567,7 +638,9 @@ class Sll(BitvecBinaryOp):
 
 
 class Sra(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 >> z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -575,7 +648,9 @@ class Sra(BitvecBinaryOp):
 
 
 class Srl(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3.LShR(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -583,7 +658,9 @@ class Srl(BitvecBinaryOp):
 
 
 class Rol(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3.RotateLeft(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -591,7 +668,9 @@ class Rol(BitvecBinaryOp):
 
 
 class Ror(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3.RotateRight(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -599,7 +678,9 @@ class Ror(BitvecBinaryOp):
 
 
 class Add(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 + z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -607,7 +688,9 @@ class Add(BitvecBinaryOp):
 
 
 class Mul(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 * z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -615,7 +698,9 @@ class Mul(BitvecBinaryOp):
 
 
 class Sdiv(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 / z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -623,7 +708,9 @@ class Sdiv(BitvecBinaryOp):
 
 
 class Udiv(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3.UDiv(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -631,7 +718,9 @@ class Udiv(BitvecBinaryOp):
 
 
 class Smod(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 % z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -639,7 +728,9 @@ class Smod(BitvecBinaryOp):
 
 
 class Srem(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3.SRem(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -647,7 +738,9 @@ class Srem(BitvecBinaryOp):
 
 
 class Urem(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3.URem(z3_bitvec1, z3_bitvec2)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -655,7 +748,9 @@ class Urem(BitvecBinaryOp):
 
 
 class Sub(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         return z3_bitvec1 - z3_bitvec2
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -663,16 +758,25 @@ class Sub(BitvecBinaryOp):
 
 
 class Saddo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
-        return z3.Not(z3.Or(z3.BVAddNoOverflow(z3_bitvec1, z3_bitvec2, True),
-                            z3.BVAddNoUnderflow(z3_bitvec1, z3_bitvec2), z3_bitvec1.ctx))
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
+        return z3.Not(
+            z3.Or(
+                z3.BVAddNoOverflow(z3_bitvec1, z3_bitvec2, True),
+                z3.BVAddNoUnderflow(z3_bitvec1, z3_bitvec2),
+                z3_bitvec1.ctx,
+            )
+        )
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
         return z3.BoolVal(False, z3_bool1.ctx)
 
 
 class Uaddo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.Not(z3.BVAddNoOverflow(z3_bitvec1, z3_bitvec2, False))
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -680,7 +784,9 @@ class Uaddo(BitvecBinaryOp):
 
 
 class Sdivo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.Not(z3.BVSDivNoOverflow(z3_bitvec1, z3_bitvec2))
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -688,7 +794,9 @@ class Sdivo(BitvecBinaryOp):
 
 
 class Udivo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.BoolVal(False, z3_bitvec1.ctx)
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -696,16 +804,25 @@ class Udivo(BitvecBinaryOp):
 
 
 class Smulo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
-        return z3.Not(z3.Or(z3.BVMulNoOverflow(z3_bitvec1, z3_bitvec2, True),
-                            z3.BVMulNoUnderflow(z3_bitvec1, z3_bitvec2), z3_bitvec1.ctx))
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
+        return z3.Not(
+            z3.Or(
+                z3.BVMulNoOverflow(z3_bitvec1, z3_bitvec2, True),
+                z3.BVMulNoUnderflow(z3_bitvec1, z3_bitvec2),
+                z3_bitvec1.ctx,
+            )
+        )
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
         return z3.BoolVal(False, z3_bool1.ctx)
 
 
 class Umulo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.Not(z3.BVMulNoOverflow(z3_bitvec1, z3_bitvec2, False))
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -713,16 +830,25 @@ class Umulo(BitvecBinaryOp):
 
 
 class Ssubo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
-        return z3.Not(z3.Or(z3.BVSubNoUnderflow(z3_bitvec1, z3_bitvec2, True),
-                            z3.BVSubNoOverflow(z3_bitvec1, z3_bitvec2), z3_bitvec1.ctx))
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
+        return z3.Not(
+            z3.Or(
+                z3.BVSubNoUnderflow(z3_bitvec1, z3_bitvec2, True),
+                z3.BVSubNoOverflow(z3_bitvec1, z3_bitvec2),
+                z3_bitvec1.ctx,
+            )
+        )
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
         return z3.BoolVal(False, z3_bool1.ctx)
 
 
 class Usubo(BitvecBinaryOp):
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BoolRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BoolRef:
         return z3.Not(z3.BVSubNoUnderflow(z3_bitvec1, z3_bitvec2, False))
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BoolRef:
@@ -733,7 +859,9 @@ class Concat(BitvecBinaryOp):
     def to_new_z3_expr(self, m: Z3ExprMemo) -> Union[z3.BitVecRef, z3.BoolRef]:
         return z3.Concat(self.bitvec1.to_z3_bitvec(m), self.bitvec2.to_z3_bitvec(m))
 
-    def z3_bitvec_op(self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef) -> z3.BitVecRef:
+    def z3_bitvec_op(
+        self, z3_bitvec1: z3.BitVecRef, z3_bitvec2: z3.BitVecRef
+    ) -> z3.BitVecRef:
         raise ValueError
 
     def z3_bool_op(self, z3_bool1: z3.BoolRef, z3_bool2: z3.BoolRef) -> z3.BitVecRef:
@@ -750,22 +878,39 @@ class Read:
 
 
 class BitvecRead(Bitvec, Read):
-    def __init__(self, nid: int, sort: BitvecSort, array: Array, index_expr: Expr,
-                 symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: BitvecSort,
+        array: Array,
+        index_expr: Expr,
+        symbol: str = "",
+    ):
         Bitvec.__init__(self, nid, sort, symbol)
         Read.__init__(self, array, index_expr)
 
     def to_new_z3_expr(self, m: Z3ExprMemo) -> z3.BitVecRef:
-        return self.array.to_z3_expr(m)[try_bitvec_to_bool(self.index_expr.to_z3_expr(m))]
+        return self.array.to_z3_expr(m)[
+            try_bitvec_to_bool(self.index_expr.to_z3_expr(m))
+        ]
 
 
 class ArrayRead(Array, Read):
-    def __init__(self, nid: int, sort: ArraySort, array: Array, index_expr: Expr, symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: ArraySort,
+        array: Array,
+        index_expr: Expr,
+        symbol: str = "",
+    ):
         Array.__init__(self, nid, sort, symbol)
         Read.__init__(self, array, index_expr)
 
     def to_new_z3_expr(self, m: Z3ExprMemo) -> z3.ArrayRef:
-        return self.array.to_z3_expr(m)[try_bitvec_to_bool(self.index_expr.to_z3_expr(m))]
+        return self.array.to_z3_expr(m)[
+            try_bitvec_to_bool(self.index_expr.to_z3_expr(m))
+        ]
 
 
 class Ite:
@@ -783,8 +928,15 @@ class ArrayIte(Array, Ite):
     then_expr: Array
     else_expr: Array
 
-    def __init__(self, nid: int, sort: ArraySort, cond_bitvec: Bitvec, then_expr: Array,
-                 else_expr: Array, symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: ArraySort,
+        cond_bitvec: Bitvec,
+        then_expr: Array,
+        else_expr: Array,
+        symbol: str = "",
+    ):
         Array.__init__(self, nid, sort, symbol)
         Ite.__init__(self, cond_bitvec, then_expr, else_expr)
 
@@ -794,16 +946,26 @@ class ArrayIte(Array, Ite):
             return self.then_expr.to_z3_expr(m)
         if z3.is_false(cond_z3_bitvec):
             return self.else_expr.to_z3_expr(m)
-        return z3.If(self.cond_bitvec.to_z3_bool(m), self.then_expr.to_z3_expr(m),
-                     self.else_expr.to_z3_expr(m))
+        return z3.If(
+            self.cond_bitvec.to_z3_bool(m),
+            self.then_expr.to_z3_expr(m),
+            self.else_expr.to_z3_expr(m),
+        )
 
 
 class BitvecIte(Bitvec, Ite):
     then_expr: Bitvec
     else_expr: Bitvec
 
-    def __init__(self, nid: int, sort: BitvecSort, cond_bitvec: Bitvec, then_expr: Bitvec,
-                 else_expr: Bitvec, symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: BitvecSort,
+        cond_bitvec: Bitvec,
+        then_expr: Bitvec,
+        else_expr: Bitvec,
+        symbol: str = "",
+    ):
         Bitvec.__init__(self, nid, sort, symbol)
         Ite.__init__(self, cond_bitvec, then_expr, else_expr)
 
@@ -828,17 +990,26 @@ class Write(Array):
     index_expr: Expr
     element_expr: Expr
 
-    def __init__(self, nid: int, sort: ArraySort, array: Array, index_expr: Expr,
-                 element_expr: Expr, symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: ArraySort,
+        array: Array,
+        index_expr: Expr,
+        element_expr: Expr,
+        symbol: str = "",
+    ):
         super().__init__(nid, sort, symbol)
         self.array = array
         self.index_expr = index_expr
         self.element_expr = element_expr
 
     def to_new_z3_expr(self, m: Z3ExprMemo) -> z3.ArrayRef:
-        return z3.Update(self.array.to_z3_expr(m),
-                         try_bitvec_to_bool(self.index_expr.to_z3_expr(m)),
-                         try_bitvec_to_bool(self.element_expr.to_z3_expr(m)))
+        return z3.Update(
+            self.array.to_z3_expr(m),
+            try_bitvec_to_bool(self.index_expr.to_z3_expr(m)),
+            try_bitvec_to_bool(self.element_expr.to_z3_expr(m)),
+        )
 
 
 class BitvecInit(Node):
@@ -847,8 +1018,14 @@ class BitvecInit(Node):
     state: BitvecState
     bitvec: Bitvec
 
-    def __init__(self, nid: int, sort: BitvecSort, state: BitvecState, bitvec: Bitvec,
-                 symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: BitvecSort,
+        state: BitvecState,
+        bitvec: Bitvec,
+        symbol: str = "",
+    ):
         super().__init__(symbol)
         self.nid = nid
         self.sort = sort
@@ -862,8 +1039,14 @@ class ArrayInit(Node):
     state: ArrayState
     array: Array
 
-    def __init__(self, nid: int, sort: ArraySort, state: ArrayState, bitvec: Bitvec,
-                 symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: ArraySort,
+        state: ArrayState,
+        bitvec: Bitvec,
+        symbol: str = "",
+    ):
         super().__init__(symbol)
         self.nid = nid
         self.sort = sort
@@ -877,8 +1060,14 @@ class BitvecNext(Node):
     state: BitvecState
     bitvec: Bitvec
 
-    def __init__(self, nid: int, sort: BitvecSort, state: BitvecState, bitvec: Bitvec,
-                 symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: BitvecSort,
+        state: BitvecState,
+        bitvec: Bitvec,
+        symbol: str = "",
+    ):
         super().__init__(symbol)
         self.nid = nid
         self.sort = sort
@@ -892,8 +1081,14 @@ class ArrayNext(Node):
     state: ArrayState
     array: Array
 
-    def __init__(self, nid: int, sort: ArraySort, state: ArrayState, bitvec: Bitvec,
-                 symbol: str = ""):
+    def __init__(
+        self,
+        nid: int,
+        sort: ArraySort,
+        state: ArrayState,
+        bitvec: Bitvec,
+        symbol: str = "",
+    ):
         super().__init__(symbol)
         self.nid = nid
         self.sort = sort
@@ -973,7 +1168,9 @@ class Ts:
         self.bads = []
         self.constraints = []
 
-    def put_var(self, sort: z3.SortRef, prefix: str = "") -> Tuple[z3.ExprRef, z3.ExprRef]:
+    def put_var(
+        self, sort: z3.SortRef, prefix: str = ""
+    ) -> Tuple[z3.ExprRef, z3.ExprRef]:
         pre_z3_expr: z3.ExprRef = z3.FreshConst(sort, "vi" + prefix)
         post_z3_expr: z3.ExprRef = z3.FreshConst(sort, "vo" + prefix)
         self.pre_vars.append(pre_z3_expr)
@@ -1049,20 +1246,30 @@ def generate_vc(ts: Ts) -> Tuple[z3.ExprRef, z3.ExprRef, z3.ExprRef, z3.FuncDecl
     return init, tr, bad, inv
 
 
-def generate_chc_str(init: z3.ExprRef, tr: z3.ExprRef, bad: z3.ExprRef,
-                     inv: z3.FuncDeclRef) -> List[str]:
-    return ["(set-logic HORN)\n",
-            "(set-option :fp.engine spacer)\n",
-            "{:s}\n".format(inv.sexpr()),
-            "(assert {:s})\n".format(init.sexpr()),
-            "(assert {:s})\n".format(tr.sexpr()),
-            "(assert {:s})\n".format(bad.sexpr()),
-            "(check-sat)\n",
-            "(exit)\n"]
+def generate_chc_str(
+    init: z3.ExprRef, tr: z3.ExprRef, bad: z3.ExprRef, inv: z3.FuncDeclRef
+) -> List[str]:
+    return [
+        "(set-logic HORN)\n",
+        "(set-option :fp.engine spacer)\n",
+        "{:s}\n".format(inv.sexpr()),
+        "(assert {:s})\n".format(init.sexpr()),
+        "(assert {:s})\n".format(tr.sexpr()),
+        "(assert {:s})\n".format(bad.sexpr()),
+        "(check-sat)\n",
+        "(exit)\n",
+    ]
 
 
-def bmc(init: z3.ExprRef, tr: z3.ExprRef, bad: z3.ExprRef, n: int, pre_vars: List[z3.ExprRef],
-        post_vars: List[z3.ExprRef], inputs: List[z3.ExprRef]) -> z3.ExprRef:
+def bmc(
+    init: z3.ExprRef,
+    tr: z3.ExprRef,
+    bad: z3.ExprRef,
+    n: int,
+    pre_vars: List[z3.ExprRef],
+    post_vars: List[z3.ExprRef],
+    inputs: List[z3.ExprRef],
+) -> z3.ExprRef:
     z3_exprs: List[z3.ExprRef] = [init, tr]
 
     vars1: List[z3.ExprRef] = pre_vars.copy()
@@ -1077,11 +1284,13 @@ def bmc(init: z3.ExprRef, tr: z3.ExprRef, bad: z3.ExprRef, n: int, pre_vars: Lis
         var: z3.ExprRef
 
         for var in vars2:
-            new_vars.append(z3.FreshConst(var.sort(), var.sexpr().split('!')[0]))
+            new_vars.append(z3.FreshConst(var.sort(), var.sexpr().split("!")[0]))
         for var in inputs:
-            new_ips.append(z3.FreshConst(var.sort(), var.sexpr().split('!')[0]))
+            new_ips.append(z3.FreshConst(var.sort(), var.sexpr().split("!")[0]))
 
-        tr = z3.substitute(tr, *zip(vars2, new_vars), *zip(vars1, vars2), *zip(ips, new_ips))
+        tr = z3.substitute(
+            tr, *zip(vars2, new_vars), *zip(vars1, vars2), *zip(ips, new_ips)
+        )
         vars1, vars2, ips = vars2, new_vars, new_ips
         z3_exprs.append(tr)
         all_vars += new_vars + new_ips
@@ -1127,8 +1336,11 @@ class Btor2Parser:
 
     def get_sort(self, s: Union[int, str]) -> Sort:
         sid: int = int(s)
-        return self.bitvec_sort_table[sid] if sid in self.bitvec_sort_table else \
-            self.array_sort_table[sid]
+        return (
+            self.bitvec_sort_table[sid]
+            if sid in self.bitvec_sort_table
+            else self.array_sort_table[sid]
+        )
 
     def get_bitvec_sort(self, s: Union[int, str]) -> BitvecSort:
         return self.bitvec_sort_table[int(s)]
@@ -1140,7 +1352,11 @@ class Btor2Parser:
         nid: int = int(n)
         if nid < 0:
             return Minus(self.bitvec_table[-nid])
-        return self.bitvec_table[nid] if nid in self.bitvec_table else self.array_table[nid]
+        return (
+            self.bitvec_table[nid]
+            if nid in self.bitvec_table
+            else self.array_table[nid]
+        )
 
     def get_bitvec_state(self, n: Union[int, str]) -> BitvecState:
         return self.bitvec_state_table[int(n)]
@@ -1161,259 +1377,334 @@ class Btor2Parser:
         for line in source:
             line_left: str
             _: str
-            line_left, _, _ = line.partition(';')
+            line_left, _, _ = line.partition(";")
             tokens: List[str] = line_left.split()
 
             if len(tokens) == 0:
                 continue
 
             name: str = tokens[1]
-            if name == 'sort':
+            if name == "sort":
                 sid: int = int(tokens[0])
-                if tokens[2] == 'array':
-                    self.array_sort_table[sid] = ArraySort(sid, self.get_sort(tokens[3]),
-                                                           self.get_sort(tokens[4]))
-                elif tokens[2] == 'bitvec':
+                if tokens[2] == "array":
+                    self.array_sort_table[sid] = ArraySort(
+                        sid, self.get_sort(tokens[3]), self.get_sort(tokens[4])
+                    )
+                elif tokens[2] == "bitvec":
                     self.bitvec_sort_table[sid] = BitvecSort(sid, int(tokens[3]))
                 continue
 
             nid: int = int(tokens[0])
 
-            if name == 'bad':
+            if name == "bad":
                 self.bad_list.append(Bad(nid, self.get_bitvec(tokens[2])))
                 continue
-            if name == 'constraint':
+            if name == "constraint":
                 self.constraint_list.append(Constraint(nid, self.get_bitvec(tokens[2])))
                 continue
-            if name == 'fair':
+            if name == "fair":
                 self.fair_list.append(Fair(nid, self.get_expr(tokens[2])))
                 continue
-            if name == 'output':
+            if name == "output":
                 self.output_list.append(Output(nid, self.get_expr(tokens[2])))
                 continue
-            if name == 'justice':
+            if name == "justice":
                 n: int = int(tokens[2])
                 self.justice_list.append(
-                    Justice(nid, n, [self.get_expr(x) for x in tokens[3:3 + n]]))
+                    Justice(nid, n, [self.get_expr(x) for x in tokens[3 : 3 + n]])
+                )
                 continue
 
             # noinspection DuplicatedCode
-            if name == 'read':
+            if name == "read":
                 read_sid: int = int(tokens[2])
                 if read_sid in self.bitvec_sort_table:
-                    self.bitvec_table[nid] = BitvecRead(nid, self.get_bitvec_sort(read_sid),
-                                                        self.get_array(tokens[3]),
-                                                        self.get_expr(tokens[4]))
+                    self.bitvec_table[nid] = BitvecRead(
+                        nid,
+                        self.get_bitvec_sort(read_sid),
+                        self.get_array(tokens[3]),
+                        self.get_expr(tokens[4]),
+                    )
                 elif read_sid in self.array_sort_table:
-                    self.array_table[nid] = ArrayRead(nid, self.get_array_sort(read_sid),
-                                                      self.get_array(tokens[3]),
-                                                      self.get_expr(tokens[4]))
+                    self.array_table[nid] = ArrayRead(
+                        nid,
+                        self.get_array_sort(read_sid),
+                        self.get_array(tokens[3]),
+                        self.get_expr(tokens[4]),
+                    )
                 continue
-            if name == 'state':
+            if name == "state":
                 state_sid: int = int(tokens[2])
                 if state_sid in self.bitvec_sort_table:
-                    bitvec_state: BitvecState = BitvecState(nid, self.get_bitvec_sort(state_sid))
+                    bitvec_state: BitvecState = BitvecState(
+                        nid, self.get_bitvec_sort(state_sid)
+                    )
                     self.bitvec_state_table[nid] = self.bitvec_table[nid] = bitvec_state
                 elif state_sid in self.array_sort_table:
-                    array_state: ArrayState = ArrayState(nid, self.get_array_sort(state_sid))
+                    array_state: ArrayState = ArrayState(
+                        nid, self.get_array_sort(state_sid)
+                    )
                     self.array_state_table[nid] = self.array_table[nid] = array_state
                 continue
-            if name == 'input':
+            if name == "input":
                 input_sid: int = int(tokens[2])
                 if input_sid in self.bitvec_sort_table:
-                    bitvec_input: BitvecInput = BitvecInput(nid, self.get_bitvec_sort(input_sid))
+                    bitvec_input: BitvecInput = BitvecInput(
+                        nid, self.get_bitvec_sort(input_sid)
+                    )
                     self.bitvec_input_table[nid] = self.bitvec_table[nid] = bitvec_input
                 elif input_sid in self.array_sort_table:
-                    array_input: ArrayInput = ArrayInput(nid, self.get_array_sort(input_sid))
+                    array_input: ArrayInput = ArrayInput(
+                        nid, self.get_array_sort(input_sid)
+                    )
                     self.array_input_table[nid] = self.array_table[nid] = array_input
                 continue
-            if name == 'init':
+            if name == "init":
                 init_sid: int = int(tokens[2])
                 if init_sid in self.bitvec_sort_table:
                     self.get_bitvec_state(tokens[3]).init = self.get_bitvec(tokens[4])
                 elif init_sid in self.array_sort_table:
                     self.get_array_state(tokens[3]).init = self.get_expr(tokens[4])
                 continue
-            if name == 'next':
+            if name == "next":
                 next_sid: int = int(tokens[2])
                 if next_sid in self.bitvec_sort_table:
                     self.get_bitvec_state(tokens[3]).next = self.get_bitvec(tokens[4])
                 elif next_sid in self.array_sort_table:
                     self.get_array_state(tokens[3]).next = self.get_array(tokens[4])
                 continue
-            if name == 'write':
-                self.array_table[nid] = Write(nid, self.get_array_sort(int(tokens[2])),
-                                              self.get_array(tokens[3]),
-                                              self.get_expr(tokens[4]), self.get_expr(tokens[5]))
+            if name == "write":
+                self.array_table[nid] = Write(
+                    nid,
+                    self.get_array_sort(int(tokens[2])),
+                    self.get_array(tokens[3]),
+                    self.get_expr(tokens[4]),
+                    self.get_expr(tokens[5]),
+                )
                 continue
             if name == "ite":
                 ite_sid: int = int(tokens[2])
                 if ite_sid in self.bitvec_sort_table:
-                    self.bitvec_table[nid] = BitvecIte(nid, self.bitvec_sort_table[ite_sid],
-                                                       self.get_bitvec(tokens[3]),
-                                                       self.get_bitvec(tokens[4]),
-                                                       self.get_bitvec(tokens[5]))
+                    self.bitvec_table[nid] = BitvecIte(
+                        nid,
+                        self.bitvec_sort_table[ite_sid],
+                        self.get_bitvec(tokens[3]),
+                        self.get_bitvec(tokens[4]),
+                        self.get_bitvec(tokens[5]),
+                    )
                 elif ite_sid in self.array_sort_table:
-                    self.array_table[nid] = ArrayIte(nid, self.array_sort_table[ite_sid],
-                                                     self.get_bitvec(tokens[3]),
-                                                     self.get_array(tokens[4]),
-                                                     self.get_array(tokens[5]))
+                    self.array_table[nid] = ArrayIte(
+                        nid,
+                        self.array_sort_table[ite_sid],
+                        self.get_bitvec(tokens[3]),
+                        self.get_array(tokens[4]),
+                        self.get_array(tokens[5]),
+                    )
                 continue
 
             sort: BitvecSort = self.get_bitvec_sort(tokens[2])
-            if name == 'one':
+            if name == "one":
                 self.bitvec_table[nid] = One(nid, sort)
-            elif name == 'ones':
+            elif name == "ones":
                 self.bitvec_table[nid] = Ones(nid, sort)
-            elif name == 'zero':
+            elif name == "zero":
                 self.bitvec_table[nid] = Zero(nid, sort)
-            elif name == 'const':
+            elif name == "const":
                 self.bitvec_table[nid] = Const(nid, sort, tokens[3])
-            elif name == 'constd':
+            elif name == "constd":
                 self.bitvec_table[nid] = Constd(nid, sort, tokens[3])
-            elif name == 'consth':
+            elif name == "consth":
                 self.bitvec_table[nid] = Consth(nid, sort, tokens[3])
-            elif name == 'sext':
-                self.bitvec_table[nid] = Sext(nid, sort, self.get_bitvec(tokens[3]), int(tokens[4]))
-            elif name == 'uext':
-                self.bitvec_table[nid] = Uext(nid, sort, self.get_bitvec(tokens[3]), int(tokens[4]))
-            elif name == 'slice':
-                self.bitvec_table[nid] = Slice(nid, sort, self.get_bitvec(tokens[3]),
-                                               int(tokens[4]), int(tokens[5]))
-            elif name == 'not':
+            elif name == "sext":
+                self.bitvec_table[nid] = Sext(
+                    nid, sort, self.get_bitvec(tokens[3]), int(tokens[4])
+                )
+            elif name == "uext":
+                self.bitvec_table[nid] = Uext(
+                    nid, sort, self.get_bitvec(tokens[3]), int(tokens[4])
+                )
+            elif name == "slice":
+                self.bitvec_table[nid] = Slice(
+                    nid,
+                    sort,
+                    self.get_bitvec(tokens[3]),
+                    int(tokens[4]),
+                    int(tokens[5]),
+                )
+            elif name == "not":
                 self.bitvec_table[nid] = Not(nid, sort, self.get_bitvec(tokens[3]))
-            elif name == 'inc':
+            elif name == "inc":
                 self.bitvec_table[nid] = Inc(nid, sort, self.get_bitvec(tokens[3]))
-            elif name == 'dec':
+            elif name == "dec":
                 self.bitvec_table[nid] = Dec(nid, sort, self.get_bitvec(tokens[3]))
-            elif name == 'neg':
+            elif name == "neg":
                 self.bitvec_table[nid] = Neg(nid, sort, self.get_bitvec(tokens[3]))
-            elif name == 'redand':
+            elif name == "redand":
                 self.bitvec_table[nid] = Redand(nid, sort, self.get_bitvec(tokens[3]))
-            elif name == 'redor':
+            elif name == "redor":
                 self.bitvec_table[nid] = Redor(nid, sort, self.get_bitvec(tokens[3]))
-            elif name == 'redxor':
+            elif name == "redxor":
                 self.bitvec_table[nid] = Redxor(nid, sort, self.get_bitvec(tokens[3]))
-            elif name == 'iff':
-                self.bitvec_table[nid] = Iff(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'implies':
-                self.bitvec_table[nid] = Implies(nid, sort, self.get_bitvec(tokens[3]),
-                                                 self.get_bitvec(tokens[4]))
-            elif name == 'eq':
-                self.bitvec_table[nid] = Eq(nid, sort, self.get_expr(tokens[3]),
-                                            self.get_expr(tokens[4]))
-            elif name == 'neq':
-                self.bitvec_table[nid] = Neq(nid, sort, self.get_expr(tokens[3]),
-                                             self.get_expr(tokens[4]))
-            elif name == 'sgt':
-                self.bitvec_table[nid] = Sgt(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'ugt':
-                self.bitvec_table[nid] = Ugt(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'sgte':
-                self.bitvec_table[nid] = Sgte(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'ugte':
-                self.bitvec_table[nid] = Ugte(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'slt':
-                self.bitvec_table[nid] = Slt(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'ult':
-                self.bitvec_table[nid] = Ult(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'slte':
-                self.bitvec_table[nid] = Slte(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'ulte':
-                self.bitvec_table[nid] = Ulte(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'and':
-                self.bitvec_table[nid] = And(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'nand':
-                self.bitvec_table[nid] = Nand(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'nor':
-                self.bitvec_table[nid] = Nor(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'or':
-                self.bitvec_table[nid] = Or(nid, sort, self.get_bitvec(tokens[3]),
-                                            self.get_bitvec(tokens[4]))
-            elif name == 'xnor':
-                self.bitvec_table[nid] = Xnor(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'xor':
-                self.bitvec_table[nid] = Xor(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'rol':
-                self.bitvec_table[nid] = Rol(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'ror':
-                self.bitvec_table[nid] = Ror(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'sll':
-                self.bitvec_table[nid] = Sll(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'sra':
-                self.bitvec_table[nid] = Sra(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'srl':
-                self.bitvec_table[nid] = Srl(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'add':
-                self.bitvec_table[nid] = Add(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'mul':
-                self.bitvec_table[nid] = Mul(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'sdiv':
-                self.bitvec_table[nid] = Sdiv(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'udiv':
-                self.bitvec_table[nid] = Udiv(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'smod':
-                self.bitvec_table[nid] = Smod(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'srem':
-                self.bitvec_table[nid] = Srem(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'urem':
-                self.bitvec_table[nid] = Urem(nid, sort, self.get_bitvec(tokens[3]),
-                                              self.get_bitvec(tokens[4]))
-            elif name == 'sub':
-                self.bitvec_table[nid] = Sub(nid, sort, self.get_bitvec(tokens[3]),
-                                             self.get_bitvec(tokens[4]))
-            elif name == 'saddo':
-                self.bitvec_table[nid] = Saddo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'uaddo':
-                self.bitvec_table[nid] = Uaddo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'sdivo':
-                self.bitvec_table[nid] = Sdivo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'udivo':
-                self.bitvec_table[nid] = Udivo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'smulo':
-                self.bitvec_table[nid] = Smulo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'umulo':
-                self.bitvec_table[nid] = Umulo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'ssubo':
-                self.bitvec_table[nid] = Ssubo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'usubo':
-                self.bitvec_table[nid] = Usubo(nid, sort, self.get_bitvec(tokens[3]),
-                                               self.get_bitvec(tokens[4]))
-            elif name == 'concat':
-                self.bitvec_table[nid] = Concat(nid, sort, self.get_bitvec(tokens[3]),
-                                                self.get_bitvec(tokens[4]))
+            elif name == "iff":
+                self.bitvec_table[nid] = Iff(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "implies":
+                self.bitvec_table[nid] = Implies(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "eq":
+                self.bitvec_table[nid] = Eq(
+                    nid, sort, self.get_expr(tokens[3]), self.get_expr(tokens[4])
+                )
+            elif name == "neq":
+                self.bitvec_table[nid] = Neq(
+                    nid, sort, self.get_expr(tokens[3]), self.get_expr(tokens[4])
+                )
+            elif name == "sgt":
+                self.bitvec_table[nid] = Sgt(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "ugt":
+                self.bitvec_table[nid] = Ugt(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "sgte":
+                self.bitvec_table[nid] = Sgte(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "ugte":
+                self.bitvec_table[nid] = Ugte(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "slt":
+                self.bitvec_table[nid] = Slt(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "ult":
+                self.bitvec_table[nid] = Ult(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "slte":
+                self.bitvec_table[nid] = Slte(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "ulte":
+                self.bitvec_table[nid] = Ulte(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "and":
+                self.bitvec_table[nid] = And(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "nand":
+                self.bitvec_table[nid] = Nand(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "nor":
+                self.bitvec_table[nid] = Nor(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "or":
+                self.bitvec_table[nid] = Or(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "xnor":
+                self.bitvec_table[nid] = Xnor(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "xor":
+                self.bitvec_table[nid] = Xor(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "rol":
+                self.bitvec_table[nid] = Rol(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "ror":
+                self.bitvec_table[nid] = Ror(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "sll":
+                self.bitvec_table[nid] = Sll(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "sra":
+                self.bitvec_table[nid] = Sra(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "srl":
+                self.bitvec_table[nid] = Srl(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "add":
+                self.bitvec_table[nid] = Add(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "mul":
+                self.bitvec_table[nid] = Mul(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "sdiv":
+                self.bitvec_table[nid] = Sdiv(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "udiv":
+                self.bitvec_table[nid] = Udiv(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "smod":
+                self.bitvec_table[nid] = Smod(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "srem":
+                self.bitvec_table[nid] = Srem(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "urem":
+                self.bitvec_table[nid] = Urem(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "sub":
+                self.bitvec_table[nid] = Sub(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "saddo":
+                self.bitvec_table[nid] = Saddo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "uaddo":
+                self.bitvec_table[nid] = Uaddo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "sdivo":
+                self.bitvec_table[nid] = Sdivo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "udivo":
+                self.bitvec_table[nid] = Udivo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "smulo":
+                self.bitvec_table[nid] = Smulo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "umulo":
+                self.bitvec_table[nid] = Umulo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "ssubo":
+                self.bitvec_table[nid] = Ssubo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "usubo":
+                self.bitvec_table[nid] = Usubo(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
+            elif name == "concat":
+                self.bitvec_table[nid] = Concat(
+                    nid, sort, self.get_bitvec(tokens[3]), self.get_bitvec(tokens[4])
+                )
 
     def to_ts(self) -> Ts:
         ts: Ts = Ts(self.ctx)
@@ -1431,59 +1722,86 @@ class Btor2Parser:
         z3_nexts: List[z3.BoolRef] = []
 
         for nid, bitvec_input in self.bitvec_input_table.items():
-            z3_expr = ts.put_input(bitvec_input.sort.to_z3_sort(self.ctx), bitvec_input.symbol)
+            z3_expr = ts.put_input(
+                bitvec_input.sort.to_z3_sort(self.ctx), bitvec_input.symbol
+            )
             if isinstance(z3_expr, (z3.BitVecRef, z3.BoolRef)):
                 m.z3_bitvec_or_bool_m[nid] = z3_expr
             else:
                 raise ValueError
 
         for nid, array_input in self.array_input_table.items():
-            z3_expr = ts.put_input(array_input.sort.to_z3_sort(self.ctx), array_input.symbol)
+            z3_expr = ts.put_input(
+                array_input.sort.to_z3_sort(self.ctx), array_input.symbol
+            )
             if isinstance(z3_expr, z3.ArrayRef):
                 m.z3_array_m[nid] = z3_expr
             else:
                 raise ValueError
 
         for nid, bitvec_state in self.bitvec_state_table.items():
-            (m.z3_bitvec_or_bool_m[nid], m_post.z3_bitvec_or_bool_m[nid]) = \
-                ts.put_var(bitvec_state.sort.to_z3_sort(self.ctx), bitvec_state.symbol)
+            (m.z3_bitvec_or_bool_m[nid], m_post.z3_bitvec_or_bool_m[nid]) = ts.put_var(
+                bitvec_state.sort.to_z3_sort(self.ctx), bitvec_state.symbol
+            )
 
         for nid, array_state in self.array_state_table.items():
-            (m.z3_array_m[nid], m_post.z3_array_m[nid]) = \
-                ts.put_var(array_state.sort.to_z3_sort(self.ctx), array_state.symbol)
+            (m.z3_array_m[nid], m_post.z3_array_m[nid]) = ts.put_var(
+                array_state.sort.to_z3_sort(self.ctx), array_state.symbol
+            )
 
         # noinspection DuplicatedCode
         for nid, bitvec_state in self.bitvec_state_table.items():
             if bitvec_state.init:
-                z3_inits.append(to_z3_eq(bitvec_state.to_z3_expr(m),
-                                         bitvec_state.init.to_z3_expr(m)))
+                z3_inits.append(
+                    to_z3_eq(
+                        bitvec_state.to_z3_expr(m), bitvec_state.init.to_z3_expr(m)
+                    )
+                )
             if bitvec_state.next:
-                z3_nexts.append(to_z3_eq(bitvec_state.to_z3_expr(m_post),
-                                         bitvec_state.next.to_z3_expr(m)))
+                z3_nexts.append(
+                    to_z3_eq(
+                        bitvec_state.to_z3_expr(m_post), bitvec_state.next.to_z3_expr(m)
+                    )
+                )
 
         # noinspection DuplicatedCode
         for nid, array_state in self.array_state_table.items():
             if array_state.init:
                 if array_state.sort.element_sort == array_state.init.sort:
-                    z3_inits.append(to_z3_eq(array_state.to_z3_expr(m),
-                                             z3.K(array_state.sort.index_sort.to_z3_sort(self.ctx),
-                                                  try_bitvec_to_bool(
-                                                      array_state.init.to_z3_expr(m)))))
+                    z3_inits.append(
+                        to_z3_eq(
+                            array_state.to_z3_expr(m),
+                            z3.K(
+                                array_state.sort.index_sort.to_z3_sort(self.ctx),
+                                try_bitvec_to_bool(array_state.init.to_z3_expr(m)),
+                            ),
+                        )
+                    )
                 else:
                     z3_inits.append(
-                        to_z3_eq(array_state.to_z3_expr(m), array_state.init.to_z3_expr(m)))
+                        to_z3_eq(
+                            array_state.to_z3_expr(m), array_state.init.to_z3_expr(m)
+                        )
+                    )
             if array_state.next:
-                z3_nexts.append(to_z3_eq(array_state.to_z3_expr(m_post),
-                                         array_state.next.to_z3_expr(m)))
+                z3_nexts.append(
+                    to_z3_eq(
+                        array_state.to_z3_expr(m_post), array_state.next.to_z3_expr(m)
+                    )
+                )
 
         ts.init = z3.And(z3_inits, self.ctx)
         ts.tr = z3.And(z3_nexts, self.ctx)
         ts.bads = [bad.bitvec.to_z3_bool(m) for bad in self.bad_list]
-        ts.constraints = [constraint.bitvec.to_z3_bool(m) for constraint in self.constraint_list]
+        ts.constraints = [
+            constraint.bitvec.to_z3_bool(m) for constraint in self.constraint_list
+        ]
         return ts
 
 
-def btor2ts(input_file: TextIO, simplify: bool = True, recursion_limit: int = 10000) -> Ts:
+def btor2ts(
+    input_file: TextIO, simplify: bool = True, recursion_limit: int = 10000
+) -> Ts:
     if recursion_limit > 0:
         sys.setrecursionlimit(recursion_limit)
 
@@ -1499,25 +1817,45 @@ def btor2ts(input_file: TextIO, simplify: bool = True, recursion_limit: int = 10
     return ts
 
 
-def btor2chc(input_file: TextIO, output_file: TextIO, simplify: bool = True,
-             recursion_limit: int = 10000, engine: str = 'spacer') -> None:
+def btor2chc(
+    input_file: TextIO,
+    output_file: TextIO,
+    simplify: bool = True,
+    recursion_limit: int = 10000,
+    engine: str = "spacer",
+) -> None:
     ts: Ts = btor2ts(input_file, simplify, recursion_limit)
 
     if engine:
-        output_file.write('(set-option :fp.engine {:s})\n'.format(engine))
+        output_file.write("(set-option :fp.engine {:s})\n".format(engine))
 
     output_file.writelines(generate_chc_str(*generate_vc(ts)))
 
 
 def main() -> None:
     import argparse
+
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description='A tool to convert btor2 files to Constrained Horn Clauses (CHC) '
-                    'and pretty print them in the SMT-LIB format.')
-    parser.add_argument('input', metavar='FILE', help='input btor2 file', nargs='?',
-                        type=argparse.FileType('r'), default=sys.stdin)
-    parser.add_argument('-output', '--output', metavar='FILE', help='place the output into [FILE]',
-                        nargs='?', type=argparse.FileType('w+'), default=sys.stdout)
+        description="A tool to convert btor2 files to Constrained Horn Clauses (CHC) "
+        "and pretty print them in the SMT-LIB format."
+    )
+    parser.add_argument(
+        "input",
+        metavar="FILE",
+        help="input btor2 file",
+        nargs="?",
+        type=argparse.FileType("r"),
+        default=sys.stdin,
+    )
+    parser.add_argument(
+        "-output",
+        "--output",
+        metavar="FILE",
+        help="place the output into [FILE]",
+        nargs="?",
+        type=argparse.FileType("w+"),
+        default=sys.stdout,
+    )
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -1528,5 +1866,5 @@ def main() -> None:
         args.output.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

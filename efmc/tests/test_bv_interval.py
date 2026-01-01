@@ -10,13 +10,13 @@ class TestBitVecIntervalTemplate(TestCase):
 
     def test_bv_interval(self):
         """Test bit vector interval analysis with transition system.
-        
+
         This test creates a simple transition system with two variables x and y,
         both initialized to 0 and incrementing by 1 until x reaches 8.
         """
         # Define bit vector variables
         BV_SIZE = 6
-        x, y, px, py = z3.BitVecs('x y x! y!', BV_SIZE)
+        x, y, px, py = z3.BitVecs("x y x! y!", BV_SIZE)
         all_vars = [x, y, px, py]
 
         # Define transition system constraints
@@ -39,9 +39,11 @@ class TestBitVecIntervalTemplate(TestCase):
         result = ef_prover.solve()
         # The system should be safe, but the template might be too weak to prove it
         # So we accept either a safe result or an unknown result (not unsafe)
-        self.assertFalse(result.is_safe == False and result.counterexample is not None,
-                         "Expected the system to be safe or unknown, but got unsafe with counterexample")
+        self.assertFalse(
+            result.is_safe == False and result.counterexample is not None,
+            "Expected the system to be safe or unknown, but got unsafe with counterexample",
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

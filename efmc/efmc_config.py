@@ -3,7 +3,7 @@ from typing import Dict, Optional
 
 
 class EFMCConfig:
-    _instance: Optional['EFMCConfig'] = None
+    _instance: Optional["EFMCConfig"] = None
     _solvers: Dict[str, str] = {
         "z3": "z3",
         "cvc5": "cvc5",
@@ -12,10 +12,10 @@ class EFMCConfig:
         "yices": "yices-smt2",
         "mathsat": "mathsat",
         "caqe": "caqe",
-        "q3b": "q3b"
+        "q3b": "q3b",
     }
 
-    def __new__(cls) -> 'EFMCConfig':
+    def __new__(cls) -> "EFMCConfig":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialize()
@@ -34,6 +34,7 @@ class EFMCConfig:
     def check_available(self, solver_name: str) -> bool:
         exec_path = getattr(self, f"{solver_name}_exec", None)
         return exec_path is not None and Path(exec_path).exists()
+
 
 config = EFMCConfig()
 
