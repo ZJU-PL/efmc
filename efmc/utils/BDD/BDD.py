@@ -2,53 +2,53 @@ from weakref import WeakSet
 from .ordering import Ordering
 
 
-def BDDsons_and_BDD(operator, A, B, ordering, r_cache):
-    low = apply(operator, A.low, B, ordering, r_cache)
-    high = apply(operator, A.high, B, ordering, r_cache)
-    return BDDNonTerminalNode(A.var, low, high)
+def BDDsons_and_BDD(operator, node_a, node_b, ordering, r_cache):
+    low = apply(operator, node_a.low, node_b, ordering, r_cache)
+    high = apply(operator, node_a.high, node_b, ordering, r_cache)
+    return BDDNonTerminalNode(node_a.var, low, high)
 
 
-def BDD_and_BDDsons(operator, A, B, ordering, r_cache):
-    low = apply(operator, A, B.low, ordering, r_cache)
-    high = apply(operator, A, B.high, ordering, r_cache)
-    return BDDNonTerminalNode(B.var, low, high)
+def BDD_and_BDDsons(operator, node_a, node_b, ordering, r_cache):
+    low = apply(operator, node_a, node_b.low, ordering, r_cache)
+    high = apply(operator, node_a, node_b.high, ordering, r_cache)
+    return BDDNonTerminalNode(node_b.var, low, high)
 
 
-def BDDsons_and_BDDsons(operator, A, B, ordering, r_cache):
-    low = apply(operator, A.low, B.low, ordering, r_cache)
-    high = apply(operator, A.high, B.high, ordering, r_cache)
-    return BDDNonTerminalNode(A.var, low, high)
+def BDDsons_and_BDDsons(operator, node_a, node_b, ordering, r_cache):
+    low = apply(operator, node_a.low, node_b.low, ordering, r_cache)
+    high = apply(operator, node_a.high, node_b.high, ordering, r_cache)
+    return BDDNonTerminalNode(node_a.var, low, high)
 
 
-def apply(operator, A, B, ordering, r_cache):
-    if A not in r_cache:
-        r_cache[A] = dict()
+def apply(operator, node_a, node_b, ordering, r_cache):
+    if node_a not in r_cache:
+        r_cache[node_a] = {}
 
-    if B in r_cache[A]:
-        return r_cache[A][B]
+    if node_b in r_cache[node_a]:
+        return r_cache[node_a][node_b]
 
-    r_cache[A][B] = compute(operator, A, B, ordering, r_cache)
+    r_cache[node_a][node_b] = compute(operator, node_a, node_b, ordering, r_cache)
 
-    return r_cache[A][B]
+    return r_cache[node_a][node_b]
 
 
-def compute(operator, A, B, ordering, r_cache):
-    if isinstance(A, BDDTerminalNode):
-        if isinstance(B, BDDTerminalNode):
-            return BDDTerminalNode(operator(A.value, B.value))
+def compute(operator, node_a, node_b, ordering, r_cache):
+    if isinstance(node_a, BDDTerminalNode):
+        if isinstance(node_b, BDDTerminalNode):
+            return BDDTerminalNode(operator(node_a.value, node_b.value))
 
-        return BDD_and_BDDsons(operator, A, B, ordering, r_cache)
+        return BDD_and_BDDsons(operator, node_a, node_b, ordering, r_cache)
 
-    if isinstance(B, BDDTerminalNode) or ordering.in_order(A.var, B.var):
-        return BDDsons_and_BDD(operator, A, B, ordering, r_cache)
+    if isinstance(node_b, BDDTerminalNode) or ordering.in_order(node_a.var, node_b.var):
+        return BDDsons_and_BDD(operator, node_a, node_b, ordering, r_cache)
 
-    if A.var == B.var:
-        return BDDsons_and_BDDsons(operator, A, B, ordering, r_cache)
+    if node_a.var == node_b.var:
+        return BDDsons_and_BDDsons(operator, node_a, node_b, ordering, r_cache)
 
-    if ordering.in_order(B.var, A.var):
-        return BDD_and_BDDsons(operator, A, B, ordering, r_cache)
+    if ordering.in_order(node_b.var, node_a.var):
+        return BDD_and_BDDsons(operator, node_a, node_b, ordering, r_cache)
 
-    raise RuntimeError("Unsupported configuration %s %s" % A, B)
+    raise RuntimeError(f"Unsupported configuration {node_a} {node_b}")
 
 
 def descendents(root, checked=None):
@@ -87,7 +87,7 @@ def ancestors(leaf, checked=None):
     return anc
 
 
-class BDDNode(object):
+class BDDNode:
     r"""
     A class to represent Binary Decision Diagram (BDD) nodes.
     """
@@ -100,10 +100,10 @@ class BDDNode(object):
             return BDDNonTerminalNode(*data)
 
         raise RuntimeError(
-            "passed {} parameters, ".format(len(data))
-            + "but only  BDDNode(value) for terminal node and "
-            + "BDDNode(var, low, high) for non terminal node "
-            + "have been implemented"
+            f"passed {len(data)} parameters, "
+            "but only  BDDNode(value) for terminal node and "
+            "BDDNode(var, low, high) for non terminal node "
+            "have been implemented"
         )
 
     def __hash__(self):
@@ -134,11 +134,11 @@ class BDDNode(object):
 
         if not (isinstance(var, str) and isinstance(value, bool)):
             raise TypeError(
-                "expected a pair (str, bool), "
-                + "got ({}, {})".format(var.__class__, value.__class__)
+                f"expected a pair (str, bool), "
+                f"got ({var.__class__}, {value.__class__})"
             )
 
-        return cache_restrict(self, var, value, dict())
+        return cache_restrict(self, var, value, {})
 
     def __reset__(self):
         self.f_low = WeakSet()
@@ -175,13 +175,11 @@ class BDDNode(object):
         :returns: all the variable that label some the descendents of this node
         :rtype: set of str
         """
-        return set(
-            [
-                node.var
-                for node in self.descendents()
-                if isinstance(node, BDDNonTerminalNode)
-            ]
-        )
+        return {
+            node.var
+            for node in self.descendents()
+            if isinstance(node, BDDNonTerminalNode)
+        }
 
     def __repr__(self):
         return self.__str__()
@@ -190,16 +188,18 @@ class BDDNode(object):
 def find_isomorph(var, low, high):
     if len(low.f_low) < len(high.f_high):
         node_set = low.f_low
-        lh_test = lambda low, high: high is node.high
+        def lh_test(node, low_val, high_val):
+            return high_val is node.high
     else:
         node_set = high.f_high
-        lh_test = lambda low, high: low is node.low
+        def lh_test(node, low_val, high_val):
+            return low_val is node.low
 
     for node in node_set:
         if (
             isinstance(node, BDDNonTerminalNode)
             and var == node.var
-            and lh_test(low, high)
+            and lh_test(node, low, high)
         ):
             return node
 
@@ -222,20 +222,18 @@ def compute_restrict(bdd, var, value, r_cache):
     if bdd.var == var:
         if value:
             return cache_restrict(bdd.high, var, value, r_cache)
-        else:
-            return cache_restrict(bdd.low, var, value, r_cache)
-    else:
-        low = cache_restrict(bdd.low, var, value, r_cache)
-        high = cache_restrict(bdd.high, var, value, r_cache)
+        return cache_restrict(bdd.low, var, value, r_cache)
+    low = cache_restrict(bdd.low, var, value, r_cache)
+    high = cache_restrict(bdd.high, var, value, r_cache)
 
-        return BDDNonTerminalNode(bdd.var, low, high)
+    return BDDNonTerminalNode(bdd.var, low, high)
 
 
 class BDDNonTerminalNode(BDDNode):
     def __new__(cls, var, low, high):
         for p in [low, high]:
             if not isinstance(p, BDDNode):
-                raise TypeError("expected an BBD node, got {}".format(p))
+                raise TypeError(f"expected an BBD node, got {p}")
 
         if low is high:
             return low
@@ -249,11 +247,11 @@ class BDDNonTerminalNode(BDDNode):
 
         return node
 
-    def respect_ordering(self, O, checked=None):
+    def respect_ordering(self, ordering, checked=None):
         r"""Test whether a BDDNode respects an ordering.
 
-        :param O: the ordering to be tested
-        :type O: Ordering
+        :param ordering: the ordering to be tested
+        :type ordering: Ordering
         :param checked: already checked nodes
         :type checked: set
         :returns: True if and only if the variable of `node` is smaller that
@@ -261,8 +259,8 @@ class BDDNonTerminalNode(BDDNode):
                   subgraph rooted in this object
         :rtype: bool
         """
-        if not isinstance(O, Ordering):
-            TypeError("expected an Ordering, got {}".format(O))
+        if not isinstance(ordering, Ordering):
+            raise TypeError(f"expected an Ordering, got {ordering}")
 
         if checked is None:
             checked = set()
@@ -270,17 +268,17 @@ class BDDNonTerminalNode(BDDNode):
         if self in checked:
             return True
 
-        if self.var not in O:
-            raise RuntimeError("%s in not in %s" % (self.var, O))
+        if self.var not in ordering:
+            raise RuntimeError(f"{self.var} in not in {ordering}")
 
         for son in [self.low, self.high]:
-            if isinstance(son, BDDNonTerminalNode) and not O.in_order(
+            if isinstance(son, BDDNonTerminalNode) and not ordering.in_order(
                 self.var, son.var
             ):
                 return False
 
-        if self.high.respect_ordering(O, checked) and self.low.respect_ordering(
-            O, checked
+        if self.high.respect_ordering(ordering, checked) and self.low.respect_ordering(
+            ordering, checked
         ):
             checked.add(self)
 
@@ -298,7 +296,7 @@ class BDDNonTerminalNode(BDDNode):
         :param high: the high BDDNode
         :type high: BDDNode
         """
-        super(BDDNonTerminalNode, self).__reset__()
+        super().__reset__()
 
         self.var = var
         self.low = low
@@ -317,7 +315,7 @@ class BDDNonTerminalNode(BDDNode):
         :rtype: BDDNode
         """
         if r_cache is None:
-            r_cache = dict()
+            r_cache = {}
 
         if self in r_cache:
             return r_cache[self]
@@ -347,28 +345,28 @@ class BDDNonTerminalNode(BDDNode):
         :returns: a string that represents the BDD rooted in `self`
         :rtype: str
         """
-        repr = []
+        repr_list = []
 
         for succ, neg in [(self.low, "~"), (self.high, "")]:
             if isinstance(succ, BDDTerminalNode):
                 if succ.value:
-                    repr.append("%s%s" % (neg, self.var))
+                    repr_list.append(f"{neg}{self.var}")
             else:
-                repr.append("%s%s & %s" % (neg, self.var, succ))
+                repr_list.append(f"{neg}{self.var} & {succ}")
 
-        if len(repr) == 2:
-            return "(%s) | (%s)" % (repr[0], repr[1])
+        if len(repr_list) == 2:
+            return f"({repr_list[0]}) | ({repr_list[1]})"
 
-        return repr[0]
+        return repr_list[0]
 
 
 class BDDTerminalNode(BDDNode):
     Tnodes = {}
 
     def __new__(cls, value):
-        if not (value in set([0, 1, False, True])):
+        if not (value in {0, 1, False, True}):
             raise TypeError(
-                "expected a value among [0, 1, False, True], " + "got {}".format(value)
+                f"expected a value among [0, 1, False, True], got {value}"
             )
 
         if value not in BDDTerminalNode.Tnodes:
@@ -381,11 +379,11 @@ class BDDTerminalNode(BDDNode):
 
         return BDDTerminalNode.Tnodes[value]
 
-    def respect_ordering(self, O, checked=None):
+    def respect_ordering(self, ordering, checked=None):
         r"""Test whether a BDDNode respects an Ordering or not.
 
-        :param O: the ordering to be tested
-        :type O: Ordering
+        :param ordering: the ordering to be tested
+        :type ordering: Ordering
         :param checked: already checked nodes
         :type checked: set
         :returns: True
@@ -399,7 +397,7 @@ class BDDTerminalNode(BDDNode):
         :param value: the new value
         :type value: bool
         """
-        super(BDDTerminalNode, self).__reset__()
+        super().__reset__()
         self.value = value
 
     def __invert__(self, r_cache=None):
@@ -412,7 +410,7 @@ class BDDTerminalNode(BDDNode):
         :rtype: BDDNode
         """
         if r_cache is None:
-            r_cache = dict()
+            r_cache = {}
 
         if self in r_cache:
             return r_cache[self]

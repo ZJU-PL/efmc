@@ -1,6 +1,6 @@
-from efmc.utils.BDD import *
-
 import unittest
+
+from efmc.utils.BDD import BDDNode, OBDD
 
 
 class TestOBDD(unittest.TestCase):
@@ -12,18 +12,19 @@ class TestOBDD(unittest.TestCase):
 
         self.ordering = ["c", "a"]
 
-    def test_BDD(self):
-        for bdd, text, vars in [
+    def test_bdd(self):
+        for bdd, text, bdd_vars in [
             (self.a, "a", ["a"]),
             (self.b, "~a", ["a"]),
             (self.c, "~c & ~a", ["a", "c"]),
             (self.d, "~b", ["b"]),
         ]:
 
-            self.assertEqual("{}".format(bdd), text)
-            self.assertEqual(bdd.variables(), set(vars))
+            self.assertEqual(f"{bdd}", text)
+            self.assertEqual(bdd.variables(), set(bdd_vars))
 
-        get_ancestors = lambda: ["{}".format(BDD) for BDD in BDDNode.nodes()]
+        def get_ancestors():
+            return [f"{bdd_node}" for bdd_node in BDDNode.nodes()]
 
         before_e = get_ancestors()
 
@@ -38,7 +39,7 @@ class TestOBDD(unittest.TestCase):
         self.assertEqual(before_e, after_e)
         self.assertNotEqual(with_e, after_e)
 
-    def test_OBDD(self):
+    def test_obdd(self):
         oa = OBDD(self.a, self.ordering)
         ob = OBDD(self.c, self.ordering)
 
@@ -55,9 +56,9 @@ class TestOBDD(unittest.TestCase):
             (~(oa & ob) | (oa | ob), "lambda c,a: 1", []),
         ]
 
-        for obdd, text, vars in tests_list:
-            self.assertEqual("{}".format(obdd), text)
-            self.assertEqual(obdd.variables(), set(vars))
+        for obdd, text, bdd_vars in tests_list:
+            self.assertEqual(f"{obdd}", text)
+            self.assertEqual(obdd.variables(), set(bdd_vars))
 
         self.assertEqual(ob.restrict("a", True), 0)
         self.assertEqual(~(oa & ob) | (oa | ob), 1)
@@ -65,12 +66,12 @@ class TestOBDD(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             OBDD(self.d, self.ordering)
 
-    def test_OBDD_parser(self):
+    def test_obdd_parser(self):
         oa = OBDD(self.a, self.ordering)
         ob = OBDD(self.c, self.ordering)
 
         for obdd in [oa, ob, ~ob, oa & ob, oa | ob, ~(oa & ob) | (oa | ob)]:
-            self.assertEqual(OBDD("{}".format(obdd.root), self.ordering), obdd)
+            self.assertEqual(OBDD(f"{obdd.root}", self.ordering), obdd)
 
         for a, b in [
             ("a & ~a", "0"),

@@ -218,7 +218,7 @@ class Z3SolverPlus(z3.Solver):
         for line in unify_solver.to_smt2().split("\n"):
             if line.startswith("(as"):
                 break
-            signature += "{}\n".format(line)
+            signature += f"{line}\n"
         smtlib = SmtlibProc(self.abduction_solver, debug=self.debug)
         smtlib.start()
         if logic:

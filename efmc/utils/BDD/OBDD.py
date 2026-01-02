@@ -104,10 +104,10 @@ class BinaryParser:
         if not isinstance(ordering, Ordering):
             try:
                 ordering = Ordering(ordering)
-            except TypeError:
+            except TypeError as exc:
                 raise TypeError(
-                    "expected an Ordering of variables, got " + "{}".format(ordering)
-                )
+                    f"expected an Ordering of variables, got {ordering}"
+                ) from exc
 
         self.ordering = ordering
 
@@ -125,10 +125,10 @@ class BinaryParser:
 
             body_node = st.body[0].value.body
 
-        except Exception:
+        except Exception as exc:
             raise SyntaxError(
-                "expected a binary lambda function, got " + "{}".format(binary_funct)
-            )
+                f"expected a binary lambda function, got {binary_funct}"
+            ) from exc
 
         ordering = parse_args(args_node)
         return parse_binary_expr(ordering, body_node)
@@ -137,15 +137,15 @@ class BinaryParser:
         st = ast.parse(binary_expr)
         try:
             binary_expr_node = st.body[0].value
-        except Exception:
+        except Exception as exc:
             raise SyntaxError(
-                "expected a binary expression, got " + "{}".format(binary_expr)
-            )
+                f"expected a binary expression, got {binary_expr}"
+            ) from exc
 
         return parse_binary_expr(self.ordering, binary_expr_node)
 
 
-class OBDD(object):
+class OBDD:
     r"""
     A class to represent Ordered Binary Decision Diagrams (OBDDs).
     """
@@ -184,8 +184,8 @@ class OBDD(object):
         if isinstance(bfunct, BDDNode):
             if check_ordering and not bfunct.respect_ordering(ordering):
                 raise ValueError(
-                    "the BDDNode {} ".format(bfunct)
-                    + "does not respect {}".format(ordering)
+                    f"the BDDNode {bfunct} "
+                    f"does not respect {ordering}"
                 )
 
             self.root = bfunct
@@ -195,7 +195,7 @@ class OBDD(object):
                 self.root = (bparser.parse(bfunct)).root
             else:
                 raise TypeError(
-                    "expected a BDDNode or a str, got " + "{}".format(bfunct)
+                    f"expected a BDDNode or a str, got {bfunct}"
                 )
 
     def restrict(self, var, value):
@@ -220,97 +220,95 @@ class OBDD(object):
         """
         return self.root.variables()
 
-    def __eq__(self, A):
+    def __eq__(self, other):
         r"""Check whether two OBDD are the same.
 
-        :param A: either a BDDNode,  an OBDD,  a binary,  or a Boolean value
-        :type A: BDDNode,  OBDD,  binary,  or Boolean value
+        :param other: either a BDDNode,  an OBDD,  a binary,  or a Boolean value
+        :type other: BDDNode,  OBDD,  binary,  or Boolean value
         :returns: True if the two OBDD are the same and respect the same
                   ordering,  False otherwise
         :rtype: bool
         """
-        if isinstance(A, BDDNode):
-            return self == OBDD(A, self.ordering)
+        if isinstance(other, BDDNode):
+            return self == OBDD(other, self.ordering)
 
-        if isinstance(A, OBDD):
-            return self.root is A.root and self.ordering == A.ordering
+        if isinstance(other, OBDD):
+            return self.root is other.root and self.ordering == other.ordering
 
-        if A in set([0, 1, True, False]):
-            return self == OBDD(BDDNode(A), self.ordering)
+        if other in set([0, 1, True, False]):
+            return self == OBDD(BDDNode(other), self.ordering)
 
-        raise TypeError("expected an OBDD, got %s" % (A))
+        raise TypeError(f"expected an OBDD, got {other}")
 
-    def __req__(self, A):
+    def __req__(self, other):
         r"""Check whether two OBDD are the same.
 
-        :param A: either a BDDNode,  an OBDD,  a binary,  or a Boolean value
-        :type A: BDDNode,  OBDD,  binary,  or Boolean value
+        :param other: either a BDDNode,  an OBDD,  a binary,  or a Boolean value
+        :type other: BDDNode,  OBDD,  binary,  or Boolean value
         :returns: True if the two OBDD are the same and respect the same
                   ordering,  False otherwise
         :rtype: bool
         """
-        return self == A
+        return self == other
 
-    def apply(self, operator, B):
+    def apply(self, operator, other):
         r"""Apply a binary binary operator to two OBDD.
 
         :param operator: a binary boolean operator
         :type operator: function
-        :param A: an OBDD
-        :type A: OBDD
-        :param B: an OBDD
-        :type B: OBDD
+        :param other: an OBDD
+        :type other: OBDD
         :returns: The OBDD obtained by applying the operator to the two OBDD
         :rtype: OBDD
         """
 
-        if not isinstance(B, OBDD):
-            raise TypeError("expected an OBDD, got {}".format(B))
+        if not isinstance(other, OBDD):
+            raise TypeError(f"expected an OBDD, got {other}")
 
-        if self.ordering != B.ordering:
+        if self.ordering != other.ordering:
             raise RuntimeError(
-                "Unsupported operation: {}".format(self)
-                + " and {} ".format(B)
-                + "have different variable ordering"
+                f"Unsupported operation: {self} "
+                f"and {other} "
+                f"have different variable ordering"
             )
 
-        result_cache = dict()
+        result_cache = {}
 
-        bdd = BDDapply(operator, self.root, B.root, self.ordering, result_cache)
+        bdd = BDDapply(operator, self.root, other.root, self.ordering, result_cache)
         return OBDD(bdd, self.ordering, check_ordering=False)
 
-    def __and__(self, A):
+    def __and__(self, other):
         r"""Build the conjunction of two OBDD.
 
-        :param A: an OBDD
-        :type A: OBDD
+        :param other: an OBDD
+        :type other: OBDD
         :returns: the OBDD that represents the logical conjunction of
                   the two OBDD
         :rtype: OBDD
         """
-        return self.apply((lambda a, b: a and b), A)
+        return self.apply((lambda a, b: a and b), other)
 
-    def __or__(self, A):
+    def __or__(self, other):
         r"""Build the non-exclusive disjunction of two OBDD.
 
-        :param A: an OBDD
-        :type A: OBDD
+        :param other: an OBDD
+        :type other: OBDD
         :returns: the OBDD that represents the logical non-exclusive
                   disjunction of the two OBDD
         :rtype: OBDD
         """
-        return self.apply((lambda a, b: a or b), A)
+        return self.apply((lambda a, b: a or b), other)
 
-    def __xor__(self, A):
+    def __xor__(self, other):
         r"""Build the exclusive disjunction of two OBDD.
 
-        :param A: an OBDD
-        :type A: OBDD
+        :param other: an OBDD
+        :type other: OBDD
         :returns: the OBDD that represents the logical exclusive disjunction
                   of the two OBDD
         :rtype: OBDD
         """
-        return self.apply((lambda a, b: a ^ b), A)
+        return self.apply((lambda a, b: a ^ b), other)
 
     def __invert__(self):
         r"""Build the negation of an OBDD.
@@ -332,12 +330,12 @@ class OBDD(object):
             result = "lambda"
             sep = " "
             for var in self.ordering.get_list():
-                result += "{}{}".format(sep, var)
+                result += f"{sep}{var}"
                 sep = ","
 
-            return result + ": {}".format(self.root)
+            return f"{result}: {self.root}"
 
-        return "{}".format(self.root)
+        return f"{self.root}"
 
     def __repr__(self):
         r"""Return a string that represents an OBDD
@@ -345,4 +343,4 @@ class OBDD(object):
         :returns: a string that represents the OBDD
         :rtype: str
         """
-        return "{}".format(str(self))
+        return f"{str(self)}"

@@ -1,4 +1,4 @@
-class Ordering(object):
+class Ordering:
     r"""
     A class representing variable ordering.
 
@@ -8,13 +8,13 @@ class Ordering(object):
         if isinstance(ordering, list):
             return ListOrdering(ordering)
 
-        TypeError("unsupported ordering %s" % (ordering))
+        raise TypeError(f"unsupported ordering {ordering}")
 
     def __eq__(self, ordering):
         raise RuntimeError("not implemented")
 
     def __ne__(self, ordering):
-        return not (self == ordering)
+        return not self == ordering
 
     def in_order(self, x, y):
         raise RuntimeError("not implemented")
@@ -36,13 +36,13 @@ class FunctionOrdering(Ordering):
         return super(Ordering, cls).__new__(cls)
 
     def __init__(self, ordering):
-        if not isinstance(ordering, function):
-            TypeError("expected a function, got %s" % (ordering))
+        if not callable(ordering):
+            raise TypeError(f"expected a function, got {ordering}")
 
         self.ordering = ordering
 
     def __eq__(self, ordering):
-        if not isinstance(ordering, FunctionalOrdering):
+        if not isinstance(ordering, FunctionOrdering):
             return False
 
         return self.ordering is ordering.ordering
@@ -63,7 +63,7 @@ class FunctionOrdering(Ordering):
         return 1
 
     def __str__(self):
-        return "%s" % (self.ordering)
+        return f"{self.ordering}"
 
 
 def cmp_to_key(mycmp):
@@ -105,14 +105,14 @@ class ListOrdering(Ordering):
 
     def __init__(self, ordering):
         if not isinstance(ordering, list):
-            TypeError("expected a list, got %s" % (ordering))
+            raise TypeError(f"expected a list, got {ordering}")
 
-        self.ordering = dict()
+        self.ordering = {}
 
         i = 0
         for obj in ordering:
             if obj in self.ordering:
-                raise RuntimeError("%s is repeated in %s" % (obj, ordering))
+                raise RuntimeError(f"{obj} is repeated in {ordering}")
             self.ordering[obj] = i
             i += 1
 
@@ -133,8 +133,8 @@ class ListOrdering(Ordering):
 
     def get_list(self):
         return sorted(
-            self.ordering.keys(), key=cmp_to_key((lambda x, y: self.cmp(x, y)))
+            self.ordering.keys(), key=cmp_to_key(self.cmp)
         )
 
     def __str__(self):
-        return "%s" % (self.get_list())
+        return f"{self.get_list()}"
