@@ -1,16 +1,16 @@
 # pylint: disable=global-variable-not-assigned,no-self-argument
-import efmc.verifytools.boogie.ast as ast
-import z3
-
+import sys
+import atexit
+from functools import reduce
+from signal import signal, SIGTERM, SIGINT
 from threading import Condition, local
 from time import sleep, time
 from random import randint
 from multiprocessing import Process, Queue as PQueue
-from efmc.verifytools.common.util import error
 import Pyro4
-import sys
-import atexit
-from signal import signal, SIGTERM, SIGINT
+import z3
+import efmc.verifytools.boogie.ast as ast
+from efmc.verifytools.common.util import error
 
 ctxHolder = local()
 
@@ -32,7 +32,7 @@ def env_to_expr(env, suff=""):
     return ast.ast_and(
         [
             ast.AstBinExpr(ast.AstId(k + suff), "==", val_to_boogie(v))
-            for (k, v) in env.iteritems()
+            for (k, v) in env.items()
         ]
     )
 
@@ -252,7 +252,7 @@ def getSolver():
         while True:
             free = [
                 (proxy, busy)
-                for (proxy, busy) in z3ProcessPool.iteritems()
+                for (proxy, busy) in z3ProcessPool.items()
                 if (not busy)
             ]
 

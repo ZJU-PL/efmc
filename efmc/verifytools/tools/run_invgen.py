@@ -6,7 +6,7 @@ from os.path import exists
 
 from efmc.verifytools.boogie.ast import parseExprAst
 from efmc.verifytools.common.util import error
-from efmc.verifytools.invgen import convertCppFileForInvGen, runInvGen
+from efmc.verifytools.invgen import convert_cpp_file_for_invgen, run_invgen
 from efmc.verifytools.tools.levels import loadBoogieLvlSet
 from efmc.verifytools.tools.vc_check import tryAndVerifyLvl
 

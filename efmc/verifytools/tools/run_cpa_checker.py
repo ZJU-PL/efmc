@@ -16,7 +16,7 @@ def handler():
     """Handle timeout exception."""
     # def handler(signum):
     #  assert (signum == SIGALRM)
-    raise Exception("timeout")
+    raise TimeoutError("timeout")
 
 
 # signal(SIGALRM, handler);

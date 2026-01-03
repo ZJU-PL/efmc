@@ -102,7 +102,7 @@ def ssa_stmt(stmt, prev_replm, cur_replm):
 
 
 def _ssa_stmts(stmts, envs):
-    return [ssa_stmt(stmts[i], envs[i], envs[i + 1]) for i in xrange(0, len(stmts))]
+    return [ssa_stmt(stmts[i], envs[i], envs[i + 1]) for i in range(0, len(stmts))]
 
 
 def ssa_path_to_z3(ssa_path, bbs):

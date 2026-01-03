@@ -1,21 +1,27 @@
 #! /usr/bin/env python
 import argparse
+import os
+import shutil
+from os.path import exists
+from threading import Timer
+
+from efmc.verifytools.boogie.z3_embed import to_smt2, z3_expr_to_boogie
+from efmc.verifytools.common.util import error
 from efmc.verifytools.tools.levels import loadBoogieLvlSet
 from efmc.verifytools.tools.vc_check import tryAndVerifyLvl
-from efmc.verifytools.ice import runICE
-from efmc.verifytools.boogie.z3_embed import to_smt2, z3_expr_to_boogie, Unknown
-from efmc.verifytools.common.util import error
-from shutil import move
 
-# from signal import signal , SIGALRM,  alarm
-from threading import Timer
-from os.path import exists
+try:
+    from efmc.verifytools.ice import runICE
+except ImportError:
+    # Fallback if ice module doesn't exist
+    def runICE(*args, **kwargs):
+        raise NotImplementedError("ICE module not available")
 
 
 def handler():
     # def handler(signum):
     #  assert (signum == SIGALRM)
-    raise Exception("timeout")
+    raise TimeoutError("timeout")
 
 
 # signal(SIGALRM, handler);

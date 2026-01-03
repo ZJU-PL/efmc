@@ -1,7 +1,7 @@
 from collections import namedtuple
-from bb import BB, get_bbs, bbEntry
 from copy import copy
-from ast import (
+from efmc.verifytools.boogie.bb import BB, get_bbs, bbEntry
+from efmc.verifytools.boogie.ast import (
     AstAssert,
     AstAssume,
     AstHavoc,
@@ -236,7 +236,7 @@ def trace_n(bbs, state, nsteps, rand, filt):
     active_traces = [[state]]
     inactive_traces = []
 
-    for step in xrange(nsteps):
+    for step in range(nsteps):
         new_traces = []
 
         for t in active_traces:
@@ -266,7 +266,7 @@ def trace_n_from_start(bbs, starting_store, nsteps, rand, filt):
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
-    from lib.common.util import error
+    from efmc.verifytools.common.util import error
     from random import randint, choice
 
     p = ArgumentParser(description="interpeter")
