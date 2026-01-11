@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("numpy")
+
 import efmc.cli.polyhorn as polyhorn_cli
 
 
@@ -78,4 +80,3 @@ def test_main_exits_on_missing_input(monkeypatch, tmp_path: Path, capsys):
         polyhorn_cli.main()
     assert excinfo.value.code == 1
     assert "does not exist" in capsys.readouterr().out
-
