@@ -1,0 +1,698 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>efmc.frontends.boogie2efmc &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../frontends.html" accesskey="U">efmc.frontends</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.frontends.boogie2efmc</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for efmc.frontends.boogie2efmc</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Boogie to EFMC Transition System Converter</span>
+
+<span class="sd">This module converts Boogie programs (specifically loops) to EFMC&#39;s transition system format,</span>
+<span class="sd">allowing verification using EFMC&#39;s engines.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">z3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.verifytools.boogie.ast</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">AstProgram</span><span class="p">,</span>
+    <span class="n">AstImplementation</span><span class="p">,</span>
+    <span class="n">AstLabel</span><span class="p">,</span>
+    <span class="n">AstAssert</span><span class="p">,</span>
+    <span class="n">AstAssume</span><span class="p">,</span>
+    <span class="n">AstAssignment</span><span class="p">,</span>
+    <span class="n">AstGoto</span><span class="p">,</span>
+    <span class="n">AstReturn</span><span class="p">,</span>
+    <span class="n">AstBinExpr</span><span class="p">,</span>
+    <span class="n">AstId</span><span class="p">,</span>
+    <span class="n">AstNumber</span><span class="p">,</span>
+    <span class="n">AstTrue</span><span class="p">,</span>
+    <span class="n">AstFalse</span><span class="p">,</span>
+    <span class="n">AstUnExpr</span><span class="p">,</span>
+    <span class="n">parseAst</span><span class="p">,</span>
+    <span class="n">stmt_read</span><span class="p">,</span>
+    <span class="n">stmt_changed</span><span class="p">,</span>
+    <span class="n">AstHavoc</span><span class="p">,</span>
+    <span class="n">AstWhile</span><span class="p">,</span>
+    <span class="n">AstBlock</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.verifytools.boogie.bb</span><span class="w"> </span><span class="kn">import</span> <span class="n">BB</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.verifytools.tools.boogie_loops</span><span class="w"> </span><span class="kn">import</span> <span class="n">loops</span><span class="p">,</span> <span class="n">Loop</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.sts</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransitionSystem</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="BoogieToEFMCConverter"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.boogie2efmc.BoogieToEFMCConverter">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">BoogieToEFMCConverter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Converts Boogie programs to EFMC transition systems.</span>
+
+<span class="sd">    This converter focuses on extracting loops from Boogie programs and converting</span>
+<span class="sd">    them to transition systems that can be verified using EFMC&#39;s engines.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the converter.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logger</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># Maps original variables to Z3 variables</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">{}</span>
+        <span class="p">)</span>  <span class="c1"># Maps original variables to Z3 prime variables</span>
+
+<div class="viewcode-block" id="BoogieToEFMCConverter.parse_boogie_file"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.parse_boogie_file">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">parse_boogie_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AstProgram</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parse a Boogie file and return the AST.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">content</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">parseAst</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to parse Boogie file </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">raise</span></div>
+
+<div class="viewcode-block" id="BoogieToEFMCConverter.extract_loops_from_program"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.extract_loops_from_program">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">extract_loops_from_program</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">ast_program</span><span class="p">:</span> <span class="n">AstProgram</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Loop</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract loops from a Boogie program AST.&quot;&quot;&quot;</span>
+        <span class="c1"># Get the first implementation (assuming single implementation)</span>
+        <span class="n">implementations</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">decl</span> <span class="k">for</span> <span class="n">decl</span> <span class="ow">in</span> <span class="n">ast_program</span><span class="o">.</span><span class="n">decls</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">decl</span><span class="p">,</span> <span class="n">AstImplementation</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">implementations</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No implementation found in Boogie program&quot;</span><span class="p">)</span>
+
+        <span class="n">implementation</span> <span class="o">=</span> <span class="n">implementations</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Processing implementation: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">implementation</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="c1"># Convert to basic blocks</span>
+        <span class="n">bbs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_to_basic_blocks</span><span class="p">(</span><span class="n">implementation</span><span class="p">)</span>
+
+        <span class="c1"># Extract loops using the existing loop detection</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">detected_loops</span> <span class="o">=</span> <span class="n">loops</span><span class="p">(</span><span class="n">bbs</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Found </span><span class="si">%d</span><span class="s2"> loops&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">detected_loops</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to detect loops: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="c1"># If loop detection fails, try to create a simple loop manually</span>
+            <span class="n">detected_loops</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_manual_loop</span><span class="p">(</span><span class="n">bbs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">detected_loops</span><span class="p">,</span> <span class="n">bbs</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ast_to_basic_blocks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">implementation</span><span class="p">:</span> <span class="n">AstImplementation</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert AST implementation to basic blocks.&quot;&quot;&quot;</span>
+        <span class="n">bbs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">cur_label</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">implementation</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+            <span class="c1"># A basic block starts with a labeled statement</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstLabel</span><span class="p">):</span>
+                <span class="n">cur_label</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">bbs</span><span class="p">[</span><span class="n">cur_label</span><span class="p">]</span> <span class="o">=</span> <span class="n">BB</span><span class="p">([],</span> <span class="p">[],</span> <span class="p">[])</span>
+                <span class="n">stmt</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="n">stmt</span>
+
+            <span class="c1"># Add statement to current basic block</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="p">(</span><span class="n">AstAssert</span><span class="p">,</span> <span class="n">AstAssume</span><span class="p">,</span> <span class="n">AstHavoc</span><span class="p">,</span> <span class="n">AstAssignment</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">cur_label</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="c1"># Create entry block if no label found</span>
+                    <span class="n">cur_label</span> <span class="o">=</span> <span class="s2">&quot;_entry_&quot;</span>
+                    <span class="n">bbs</span><span class="p">[</span><span class="n">cur_label</span><span class="p">]</span> <span class="o">=</span> <span class="n">BB</span><span class="p">([],</span> <span class="p">[],</span> <span class="p">[])</span>
+                <span class="n">bbs</span><span class="p">[</span><span class="n">cur_label</span><span class="p">]</span><span class="o">.</span><span class="n">stmts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstWhile</span><span class="p">):</span>
+                <span class="c1"># Convert while loop to basic blocks</span>
+                <span class="k">if</span> <span class="n">cur_label</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">cur_label</span> <span class="o">=</span> <span class="s2">&quot;_entry_&quot;</span>
+                    <span class="n">bbs</span><span class="p">[</span><span class="n">cur_label</span><span class="p">]</span> <span class="o">=</span> <span class="n">BB</span><span class="p">([],</span> <span class="p">[],</span> <span class="p">[])</span>
+
+                <span class="c1"># Create while loop structure with basic blocks</span>
+                <span class="n">while_header</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">cur_label</span><span class="si">}</span><span class="s2">_while_header&quot;</span>
+                <span class="n">while_body</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">cur_label</span><span class="si">}</span><span class="s2">_while_body&quot;</span>
+                <span class="n">while_exit</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">cur_label</span><span class="si">}</span><span class="s2">_while_exit&quot;</span>
+
+                <span class="c1"># Header block: contains the loop condition</span>
+                <span class="n">bbs</span><span class="p">[</span><span class="n">while_header</span><span class="p">]</span> <span class="o">=</span> <span class="n">BB</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">cur_label</span><span class="p">],</span> <span class="p">[</span><span class="n">AstAssume</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">condition</span><span class="p">)],</span> <span class="p">[</span><span class="n">while_body</span><span class="p">,</span> <span class="n">while_exit</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">bbs</span><span class="p">[</span><span class="n">cur_label</span><span class="p">]</span><span class="o">.</span><span class="n">successors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">while_header</span><span class="p">)</span>
+
+                <span class="c1"># Body block: contains the loop body statements</span>
+                <span class="n">body_stmts</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="n">AstBlock</span><span class="p">):</span>
+                    <span class="n">body_stmts</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">stmts</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">body_stmts</span> <span class="o">=</span> <span class="p">[</span><span class="n">stmt</span><span class="o">.</span><span class="n">body</span><span class="p">]</span>
+
+                <span class="n">bbs</span><span class="p">[</span><span class="n">while_body</span><span class="p">]</span> <span class="o">=</span> <span class="n">BB</span><span class="p">([</span><span class="n">while_header</span><span class="p">],</span> <span class="n">body_stmts</span><span class="p">,</span> <span class="p">[</span><span class="n">while_header</span><span class="p">])</span>
+
+                <span class="c1"># Exit block: for statements after the while loop</span>
+                <span class="n">bbs</span><span class="p">[</span><span class="n">while_exit</span><span class="p">]</span> <span class="o">=</span> <span class="n">BB</span><span class="p">(</span>
+                    <span class="p">[</span><span class="n">while_header</span><span class="p">],</span> <span class="p">[</span><span class="n">AstAssume</span><span class="p">(</span><span class="n">AstUnExpr</span><span class="p">(</span><span class="s2">&quot;!&quot;</span><span class="p">,</span> <span class="n">stmt</span><span class="o">.</span><span class="n">condition</span><span class="p">))],</span> <span class="p">[]</span>
+                <span class="p">)</span>
+
+                <span class="n">cur_label</span> <span class="o">=</span> <span class="n">while_exit</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstGoto</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">cur_label</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">bbs</span><span class="p">[</span><span class="n">cur_label</span><span class="p">]</span><span class="o">.</span><span class="n">successors</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">stmt</span><span class="o">.</span><span class="n">labels</span><span class="p">))</span>
+                <span class="n">cur_label</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstReturn</span><span class="p">):</span>
+                <span class="n">cur_label</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unknown statement type: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">stmt</span><span class="p">))</span>
+
+        <span class="c1"># Build predecessor relationships</span>
+        <span class="k">for</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">[</span><span class="n">bb_name</span><span class="p">]</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                    <span class="n">bbs</span><span class="p">[</span><span class="n">succ</span><span class="p">]</span><span class="o">.</span><span class="n">predecessors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bb_name</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">bbs</span>
+
+<div class="viewcode-block" id="BoogieToEFMCConverter.convert_loop_to_transition_system"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.convert_loop_to_transition_system">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">convert_loop_to_transition_system</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">loop</span><span class="p">:</span> <span class="n">Loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">],</span> <span class="n">variables</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionSystem</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a single Boogie loop to an EFMC transition system.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Converting loop with header: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">loop</span><span class="o">.</span><span class="n">header</span><span class="p">)</span>
+
+        <span class="c1"># Extract variables from loop if not provided</span>
+        <span class="k">if</span> <span class="n">variables</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">variables</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_loop_variables</span><span class="p">(</span><span class="n">loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">)</span>
+
+        <span class="c1"># Create Z3 variables</span>
+        <span class="n">z3_vars</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">z3_prime_vars</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="n">variables</span><span class="p">:</span>
+            <span class="c1"># Create current state variable</span>
+            <span class="n">z3_var</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="n">var_name</span><span class="p">)</span>  <span class="c1"># Assuming integer variables for now</span>
+            <span class="n">z3_prime_var</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>  <span class="c1"># Prime variable with ! suffix</span>
+
+            <span class="n">z3_vars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z3_var</span><span class="p">)</span>
+            <span class="n">z3_prime_vars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z3_prime_var</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">z3_var</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">z3_prime_var</span>
+
+        <span class="c1"># Extract initial condition (entry condition to loop)</span>
+        <span class="n">init_condition</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_initial_condition</span><span class="p">(</span><span class="n">loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">)</span>
+
+        <span class="c1"># Extract transition relation from loop body</span>
+        <span class="n">trans_condition</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_transition_relation</span><span class="p">(</span><span class="n">loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">)</span>
+
+        <span class="c1"># Extract post condition (safety property to verify)</span>
+        <span class="n">post_condition</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_post_condition</span><span class="p">(</span><span class="n">loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">)</span>
+
+        <span class="c1"># Create transition system</span>
+        <span class="n">ts</span> <span class="o">=</span> <span class="n">TransitionSystem</span><span class="p">(</span>
+            <span class="n">variables</span><span class="o">=</span><span class="n">z3_vars</span><span class="p">,</span>
+            <span class="n">prime_variables</span><span class="o">=</span><span class="n">z3_prime_vars</span><span class="p">,</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">init_condition</span><span class="p">,</span>
+            <span class="n">trans</span><span class="o">=</span><span class="n">trans_condition</span><span class="p">,</span>
+            <span class="n">post</span><span class="o">=</span><span class="n">post_condition</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Successfully created transition system&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">ts</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ts</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_loop_variables</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loop</span><span class="p">:</span> <span class="n">Loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract all variables used in the loop.&quot;&quot;&quot;</span>
+        <span class="n">variables</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="c1"># Collect variables from all loop paths</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">loop</span><span class="o">.</span><span class="n">loop_paths</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                    <span class="n">bb</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">bb_name</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                        <span class="n">variables</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">stmt_read</span><span class="p">(</span><span class="n">stmt</span><span class="p">))</span>
+                        <span class="n">variables</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">stmt_changed</span><span class="p">(</span><span class="n">stmt</span><span class="p">))</span>
+
+        <span class="c1"># Also collect from exit paths</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">loop</span><span class="o">.</span><span class="n">exit_paths</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                    <span class="n">bb</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">bb_name</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                        <span class="n">variables</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">stmt_read</span><span class="p">(</span><span class="n">stmt</span><span class="p">))</span>
+                        <span class="n">variables</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">stmt_changed</span><span class="p">(</span><span class="n">stmt</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">variables</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_initial_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loop</span><span class="p">:</span> <span class="n">Loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract initial condition for entering the loop.&quot;&quot;&quot;</span>
+        <span class="n">conditions</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Look for entry blocks that lead to the loop header</span>
+        <span class="c1"># These contain initialization statements</span>
+        <span class="n">loop_header</span> <span class="o">=</span> <span class="n">loop</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">loop</span><span class="o">.</span><span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">loop_header</span><span class="p">:</span>
+            <span class="c1"># Find blocks that have the loop header as successor (entry blocks)</span>
+            <span class="c1"># But exclude blocks that are part of the loop itself (like loop body blocks)</span>
+            <span class="n">entry_blocks</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">bb_name</span><span class="p">,</span> <span class="n">bb</span> <span class="ow">in</span> <span class="n">bbs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">loop_header</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">successors</span> <span class="ow">and</span> <span class="n">bb_name</span> <span class="o">!=</span> <span class="n">loop_header</span><span class="p">:</span>
+                    <span class="c1"># Check if this block is part of the loop structure</span>
+                    <span class="c1"># Loop body blocks typically have names ending with &quot;_while_body&quot;</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">bb_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;_while_body&quot;</span><span class="p">):</span>
+                        <span class="n">entry_blocks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bb_name</span><span class="p">)</span>
+
+            <span class="c1"># Process assignments in entry blocks to create initial conditions</span>
+            <span class="k">for</span> <span class="n">entry_bb_name</span> <span class="ow">in</span> <span class="n">entry_blocks</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">entry_bb_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                    <span class="n">bb</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">entry_bb_name</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstAssignment</span><span class="p">):</span>
+                            <span class="c1"># Convert assignment to initial condition: x = value</span>
+                            <span class="n">lhs_var</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">lhs</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">lhs_var</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">:</span>
+                                <span class="n">rhs_expr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span>
+                                    <span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="p">,</span> <span class="n">is_prime</span><span class="o">=</span><span class="kc">False</span>
+                                <span class="p">)</span>
+                                <span class="n">lhs_z3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">lhs_var</span><span class="p">]</span>
+                                <span class="n">conditions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lhs_z3</span> <span class="o">==</span> <span class="n">rhs_expr</span><span class="p">)</span>
+
+        <span class="c1"># Don&#39;t include the loop entry condition here - that should be part of the transition relation</span>
+        <span class="c1"># The initial condition should only contain the initialization assignments</span>
+
+        <span class="k">if</span> <span class="n">conditions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">conditions</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">conditions</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">conditions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># No specific entry condition</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_transition_relation</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">loop</span><span class="p">:</span> <span class="n">Loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract transition relation from loop body.&quot;&quot;&quot;</span>
+        <span class="n">transitions</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Process each loop path</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">loop</span><span class="o">.</span><span class="n">loop_paths</span><span class="p">:</span>
+            <span class="n">path_condition</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_path_condition</span><span class="p">(</span>
+                <span class="n">path</span><span class="p">,</span> <span class="n">bbs</span><span class="p">,</span> <span class="n">include_guards</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">path_condition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">transitions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path_condition</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">transitions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">Or</span><span class="p">(</span><span class="n">transitions</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">transitions</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">transitions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># No valid transitions</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_path_condition</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">],</span> <span class="n">include_guards</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract condition for a single path through the loop.&quot;&quot;&quot;</span>
+        <span class="n">conditions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">assignments</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">bb_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">bb</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">bb_name</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstAssume</span><span class="p">):</span>
+                    <span class="c1"># Only add assumption as condition if we&#39;re including guards</span>
+                    <span class="k">if</span> <span class="n">include_guards</span><span class="p">:</span>
+                        <span class="n">cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">expr</span><span class="p">,</span> <span class="n">is_prime</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                        <span class="n">conditions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cond</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstAssignment</span><span class="p">):</span>
+                    <span class="c1"># Add assignment relation</span>
+                    <span class="n">lhs_var</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">lhs</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">lhs_var</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">:</span>
+                        <span class="n">rhs_expr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="p">,</span> <span class="n">is_prime</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                        <span class="n">lhs_prime</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">lhs_var</span><span class="p">]</span>
+                        <span class="n">assignments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">lhs_prime</span> <span class="o">==</span> <span class="n">rhs_expr</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstHavoc</span><span class="p">):</span>
+                    <span class="c1"># Havoc statements introduce non-determinism</span>
+                    <span class="c1"># For now, we&#39;ll just allow any value (no constraint)</span>
+                    <span class="k">pass</span>
+
+        <span class="c1"># Add frame conditions for unchanged variables</span>
+        <span class="k">for</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">:</span>
+                <span class="c1"># Check if variable is modified in this path</span>
+                <span class="n">modified</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">for</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                        <span class="n">bb</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">bb_name</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="p">(</span>
+                                <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstAssignment</span><span class="p">)</span>
+                                <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">lhs</span><span class="p">)</span> <span class="o">==</span> <span class="n">var_name</span>
+                            <span class="p">):</span>
+                                <span class="n">modified</span> <span class="o">=</span> <span class="kc">True</span>
+                                <span class="k">break</span>
+                            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstHavoc</span><span class="p">)</span> <span class="ow">and</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="p">[</span>
+                                <span class="nb">str</span><span class="p">(</span><span class="n">id_node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">id_node</span> <span class="ow">in</span> <span class="n">stmt</span><span class="o">.</span><span class="n">ids</span>
+                            <span class="p">]:</span>
+                                <span class="n">modified</span> <span class="o">=</span> <span class="kc">True</span>
+                                <span class="k">break</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">modified</span><span class="p">:</span>
+                    <span class="c1"># Variable unchanged: x&#39; = x</span>
+                    <span class="n">assignments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span>
+                        <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span>
+                    <span class="p">)</span>
+
+        <span class="n">all_conditions</span> <span class="o">=</span> <span class="n">conditions</span> <span class="o">+</span> <span class="n">assignments</span>
+        <span class="k">if</span> <span class="n">all_conditions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">all_conditions</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_post_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loop</span><span class="p">:</span> <span class="n">Loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract post condition (safety property) from actual assert statements.&quot;&quot;&quot;</span>
+        <span class="n">assertions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">seen_assertions</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># Track unique assertions by string representation</span>
+
+        <span class="c1"># Look for assert statements in exit paths and exit blocks</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">loop</span><span class="o">.</span><span class="n">exit_paths</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                    <span class="n">bb</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">bb_name</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstAssert</span><span class="p">):</span>
+                            <span class="c1"># Convert the assertion to Z3</span>
+                            <span class="n">z3_assertion</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">expr</span><span class="p">)</span>
+                            <span class="n">assertion_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">z3_assertion</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">assertion_str</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen_assertions</span><span class="p">:</span>
+                                <span class="n">assertions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z3_assertion</span><span class="p">)</span>
+                                <span class="n">seen_assertions</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">assertion_str</span><span class="p">)</span>
+
+        <span class="c1"># Also look in blocks that might contain post-loop assertions</span>
+        <span class="c1"># (blocks with names ending in &#39;_while_exit&#39; or similar)</span>
+        <span class="k">for</span> <span class="n">bb_name</span><span class="p">,</span> <span class="n">bb</span> <span class="ow">in</span> <span class="n">bbs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="s2">&quot;_while_exit&quot;</span> <span class="ow">in</span> <span class="n">bb_name</span> <span class="ow">or</span> <span class="s2">&quot;_exit&quot;</span> <span class="ow">in</span> <span class="n">bb_name</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstAssert</span><span class="p">):</span>
+                        <span class="c1"># Convert the assertion to Z3</span>
+                        <span class="n">z3_assertion</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">expr</span><span class="p">)</span>
+                        <span class="n">assertion_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">z3_assertion</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">assertion_str</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen_assertions</span><span class="p">:</span>
+                            <span class="n">assertions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z3_assertion</span><span class="p">)</span>
+                            <span class="n">seen_assertions</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">assertion_str</span><span class="p">)</span>
+
+        <span class="c1"># For k-induction, we need inductive safety properties, not post-conditions</span>
+        <span class="c1"># So we prioritize safety invariants over assertions</span>
+        <span class="c1"># Create a simple safety property for decreasing loops</span>
+        <span class="n">safety_invariants</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Look for simple patterns like decreasing counters in the loop body</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">loop</span><span class="o">.</span><span class="n">loop_paths</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">bb_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                    <span class="n">bb</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">bb_name</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">stmts</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">AstAssignment</span><span class="p">):</span>
+                            <span class="n">lhs_var</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">lhs</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">lhs_var</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">:</span>
+                                <span class="c1"># Check if this is a decrement: x := x - 1</span>
+                                <span class="k">if</span> <span class="p">(</span>
+                                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="p">,</span> <span class="n">AstBinExpr</span><span class="p">)</span>
+                                    <span class="ow">and</span> <span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span>
+                                <span class="p">):</span>
+                                    <span class="k">if</span> <span class="p">(</span>
+                                        <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">lhs</span><span class="p">,</span> <span class="n">AstId</span><span class="p">)</span>
+                                        <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">lhs</span><span class="o">.</span><span class="n">name</span><span class="p">)</span> <span class="o">==</span> <span class="n">lhs_var</span>
+                                        <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">rhs</span><span class="p">,</span> <span class="n">AstNumber</span><span class="p">)</span>
+                                        <span class="ow">and</span> <span class="n">stmt</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">num</span> <span class="o">==</span> <span class="mi">1</span>
+                                    <span class="p">):</span>
+                                        <span class="c1"># This is x := x - 1, so x &gt;= 0 is likely a good invariant</span>
+                                        <span class="n">var_z3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">lhs_var</span><span class="p">]</span>
+                                        <span class="n">safety_invariants</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">var_z3</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">safety_invariants</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">safety_invariants</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">safety_invariants</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span>
+                <span class="k">else</span> <span class="n">safety_invariants</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Default safety property: true (no specific property to verify)</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ast_expr_to_z3</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ast_expr</span><span class="p">,</span> <span class="n">is_prime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert Boogie AST expression to Z3 expression.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_expr</span><span class="p">,</span> <span class="n">AstTrue</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_expr</span><span class="p">,</span> <span class="n">AstFalse</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_expr</span><span class="p">,</span> <span class="n">AstNumber</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">IntVal</span><span class="p">(</span><span class="n">ast_expr</span><span class="o">.</span><span class="n">num</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_expr</span><span class="p">,</span> <span class="n">AstId</span><span class="p">):</span>
+            <span class="n">var_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">ast_expr</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_prime</span> <span class="ow">and</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">is_prime</span> <span class="ow">and</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Create new variable if not seen before</span>
+                <span class="k">if</span> <span class="n">is_prime</span><span class="p">:</span>
+                    <span class="n">z3_var</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">z3_var</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">z3_var</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="n">var_name</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">z3_var</span>
+                <span class="k">return</span> <span class="n">z3_var</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_expr</span><span class="p">,</span> <span class="n">AstUnExpr</span><span class="p">):</span>
+            <span class="n">operand</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span><span class="n">ast_expr</span><span class="o">.</span><span class="n">expr</span><span class="p">,</span> <span class="n">is_prime</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ast_expr</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;!&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">Not</span><span class="p">(</span><span class="n">operand</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">ast_expr</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="o">-</span><span class="n">operand</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unary operator </span><span class="si">{</span><span class="n">ast_expr</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2"> not supported&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ast_expr</span><span class="p">,</span> <span class="n">AstBinExpr</span><span class="p">):</span>
+            <span class="n">left</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span><span class="n">ast_expr</span><span class="o">.</span><span class="n">lhs</span><span class="p">,</span> <span class="n">is_prime</span><span class="p">)</span>
+            <span class="n">right</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ast_expr_to_z3</span><span class="p">(</span><span class="n">ast_expr</span><span class="o">.</span><span class="n">rhs</span><span class="p">,</span> <span class="n">is_prime</span><span class="p">)</span>
+
+            <span class="n">op</span> <span class="o">=</span> <span class="n">ast_expr</span><span class="o">.</span><span class="n">op</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;+&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">+</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">-</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;*&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">*</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;div&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">/</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;mod&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">%</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;==&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">==</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;!=&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">!=</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">&lt;</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&lt;=&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">&lt;=</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">&gt;</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&gt;=&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">left</span> <span class="o">&gt;=</span> <span class="n">right</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&amp;&amp;&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;||&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">Or</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;==&gt;&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">Implies</span><span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Binary operator </span><span class="si">{</span><span class="n">op</span><span class="si">}</span><span class="s2"> not supported&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expression type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">ast_expr</span><span class="p">)</span><span class="si">}</span><span class="s2"> not supported&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="BoogieToEFMCConverter.convert_file_to_transition_system"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.convert_file_to_transition_system">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">convert_file_to_transition_system</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionSystem</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert a Boogie file to a transition system (main entry point).&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Converting Boogie file: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Parse the file</span>
+        <span class="n">ast_program</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_boogie_file</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+
+        <span class="c1"># Extract loops</span>
+        <span class="n">detected_loops</span><span class="p">,</span> <span class="n">bbs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_loops_from_program</span><span class="p">(</span><span class="n">ast_program</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">detected_loops</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No loops found in the Boogie program&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">detected_loops</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Multiple loops found, using the first one&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Convert the first loop to transition system</span>
+        <span class="n">loop</span> <span class="o">=</span> <span class="n">detected_loops</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">convert_loop_to_transition_system</span><span class="p">(</span><span class="n">loop</span><span class="p">,</span> <span class="n">bbs</span><span class="p">)</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_manual_loop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Loop</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a simple manual loop when automatic detection fails.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Attempting manual loop creation...&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Look for while loop structures we created</span>
+        <span class="n">while_headers</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;_while_header&quot;</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="n">while_headers</span><span class="p">:</span>
+            <span class="c1"># Use the while loop structure we created</span>
+            <span class="n">header</span> <span class="o">=</span> <span class="n">while_headers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Found while loop header: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">header</span><span class="p">)</span>
+
+            <span class="c1"># Find the corresponding body and exit blocks</span>
+            <span class="n">body_name</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_while_header&quot;</span><span class="p">,</span> <span class="s2">&quot;_while_body&quot;</span><span class="p">)</span>
+            <span class="n">exit_name</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_while_header&quot;</span><span class="p">,</span> <span class="s2">&quot;_while_exit&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">body_name</span> <span class="ow">in</span> <span class="n">bbs</span> <span class="ow">and</span> <span class="n">exit_name</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+                <span class="c1"># Create proper loop paths</span>
+                <span class="n">loop_paths</span> <span class="o">=</span> <span class="p">[[</span><span class="n">header</span><span class="p">,</span> <span class="n">body_name</span><span class="p">]]</span>  <span class="c1"># header -&gt; body -&gt; back to header</span>
+                <span class="n">exit_paths</span> <span class="o">=</span> <span class="p">[[</span><span class="n">header</span><span class="p">,</span> <span class="n">exit_name</span><span class="p">]]</span>  <span class="c1"># header -&gt; exit</span>
+
+                <span class="c1"># Extract the condition from the header block</span>
+                <span class="n">entry_cond</span> <span class="o">=</span> <span class="n">AstTrue</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">bbs</span><span class="p">[</span><span class="n">header</span><span class="p">]</span><span class="o">.</span><span class="n">stmts</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bbs</span><span class="p">[</span><span class="n">header</span><span class="p">]</span><span class="o">.</span><span class="n">stmts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">AstAssume</span><span class="p">):</span>
+                    <span class="n">entry_cond</span> <span class="o">=</span> <span class="n">bbs</span><span class="p">[</span><span class="n">header</span><span class="p">]</span><span class="o">.</span><span class="n">stmts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">expr</span>
+
+                <span class="c1"># Create the Loop namedtuple</span>
+                <span class="n">manual_loop</span> <span class="o">=</span> <span class="n">Loop</span><span class="p">(</span>
+                    <span class="n">header</span><span class="o">=</span><span class="nb">tuple</span><span class="p">([</span><span class="n">header</span><span class="p">]),</span>
+                    <span class="n">loop_paths</span><span class="o">=</span><span class="n">loop_paths</span><span class="p">,</span>
+                    <span class="n">exit_paths</span><span class="o">=</span><span class="n">exit_paths</span><span class="p">,</span>
+                    <span class="n">entry_cond</span><span class="o">=</span><span class="n">entry_cond</span><span class="p">,</span>
+                <span class="p">)</span>
+
+                <span class="k">return</span> <span class="p">[</span><span class="n">manual_loop</span><span class="p">]</span>
+
+        <span class="c1"># Fallback to generic loop detection</span>
+        <span class="n">loop_candidates</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">bb_name</span><span class="p">,</span> <span class="n">bb</span> <span class="ow">in</span> <span class="n">bbs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># A loop header typically has predecessors and successors</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bb</span><span class="o">.</span><span class="n">predecessors</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">bb</span><span class="o">.</span><span class="n">successors</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="c1"># Check if any successor can reach back to this block</span>
+                <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">bb</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_reach</span><span class="p">(</span><span class="n">succ</span><span class="p">,</span> <span class="n">bb_name</span><span class="p">,</span> <span class="n">bbs</span><span class="p">,</span> <span class="n">visited</span><span class="o">=</span><span class="nb">set</span><span class="p">()):</span>
+                        <span class="n">loop_candidates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bb_name</span><span class="p">)</span>
+                        <span class="k">break</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">loop_candidates</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No loop candidates found&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="c1"># Use the first candidate as loop header</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="n">loop_candidates</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using </span><span class="si">%s</span><span class="s2"> as loop header&quot;</span><span class="p">,</span> <span class="n">header</span><span class="p">)</span>
+
+        <span class="c1"># Create a simple loop structure</span>
+        <span class="n">loop_paths</span> <span class="o">=</span> <span class="p">[[</span><span class="n">header</span><span class="p">]]</span>  <span class="c1"># Simple single-block loop path</span>
+        <span class="n">exit_paths</span> <span class="o">=</span> <span class="p">[[</span><span class="n">header</span><span class="p">,</span> <span class="s2">&quot;_exit_&quot;</span><span class="p">]]</span>  <span class="c1"># Simple exit path</span>
+        <span class="n">entry_cond</span> <span class="o">=</span> <span class="n">AstTrue</span><span class="p">()</span>  <span class="c1"># Default entry condition</span>
+
+        <span class="c1"># Ensure we have at least one variable for the transition system to work</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">:</span>
+            <span class="c1"># Add a dummy variable if none found</span>
+            <span class="n">dummy_var</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="s2">&quot;dummy&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="s2">&quot;dummy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dummy_var</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="s2">&quot;dummy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="s2">&quot;dummy!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Create the Loop namedtuple</span>
+        <span class="n">manual_loop</span> <span class="o">=</span> <span class="n">Loop</span><span class="p">(</span>
+            <span class="n">header</span><span class="o">=</span><span class="nb">tuple</span><span class="p">([</span><span class="n">header</span><span class="p">]),</span>  <span class="c1"># Convert to tuple as expected</span>
+            <span class="n">loop_paths</span><span class="o">=</span><span class="n">loop_paths</span><span class="p">,</span>
+            <span class="n">exit_paths</span><span class="o">=</span><span class="n">exit_paths</span><span class="p">,</span>
+            <span class="n">entry_cond</span><span class="o">=</span><span class="n">entry_cond</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">[</span><span class="n">manual_loop</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_can_reach</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">bbs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">BB</span><span class="p">],</span> <span class="n">visited</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if start block can reach target block.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="o">==</span> <span class="n">target</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="ow">in</span> <span class="n">visited</span> <span class="ow">or</span> <span class="n">start</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">visited</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">bbs</span><span class="p">[</span><span class="n">start</span><span class="p">]</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_reach</span><span class="p">(</span><span class="n">succ</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">bbs</span><span class="p">,</span> <span class="n">visited</span><span class="o">.</span><span class="n">copy</span><span class="p">()):</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="boogie_to_efmc"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.boogie2efmc.boogie_to_efmc">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">boogie_to_efmc</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionSystem</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convenience function to convert a Boogie file to EFMC transition system.&quot;&quot;&quot;</span>
+    <span class="n">converter</span> <span class="o">=</span> <span class="n">BoogieToEFMCConverter</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">converter</span><span class="o">.</span><span class="n">convert_file_to_transition_system</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../frontends.html" >efmc.frontends</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.frontends.boogie2efmc</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>

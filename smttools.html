@@ -1,0 +1,867 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>SMT Tools &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css" />
+    
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="LLM Tools" href="llmtools.html" />
+    <link rel="prev" title="Frontends" href="frontend.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="llmtools.html" title="LLM Tools"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="frontend.html" title="Frontends"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">SMT Tools</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="smt-tools">
+<span id="smttools"></span><h1>SMT Tools<a class="headerlink" href="#smt-tools" title="Permalink to this heading">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">smttools</span></code> module provides interfaces to various SMT solvers and related utilities for handling SMT-LIB format formulas.</p>
+<section id="architecture">
+<h2>Architecture<a class="headerlink" href="#architecture" title="Permalink to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>efmc/smttools/
+├── smtlib_solver.py    # SMT-LIB interactive process interface
+├── sygus_solver.py     # SyGuS solver interface
+├── pysmt_solver.py     # PySMT-based solver wrapper
+├── mapped_blast.py     # Bit-blasting utilities
+├── smt_exceptions.py   # Exception definitions
+└── __init__.py         # Module exports
+</pre></div>
+</div>
+</section>
+<section id="smt-lib-solver-interface">
+<h2>SMT-LIB Solver Interface<a class="headerlink" href="#smt-lib-solver-interface" title="Permalink to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">smtlib_solver</span></code> module provides an interactive interface to SMT solvers that support the SMT-LIB 2 format.</p>
+<section id="smtlibproc">
+<h3>SmtlibProc<a class="headerlink" href="#smtlibproc" title="Permalink to this heading">¶</a></h3>
+<p>Main class for interacting with SMT-LIB compliant solvers.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.smttools.smtlib_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">SmtlibProc</span>
+
+<span class="c1"># Create solver interface</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">SmtlibProc</span><span class="p">(</span><span class="s2">&quot;z3 -smt2 -in&quot;</span><span class="p">)</span>
+
+<span class="c1"># Start the solver process</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+<span class="c1"># Send commands and get responses</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;(set-logic QF_BV)&quot;</span><span class="p">)</span>
+<span class="n">response</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+<span class="c1"># Check satisfiability</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;(check-sat)&quot;</span><span class="p">)</span>
+<span class="n">response</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>  <span class="c1"># &quot;sat&quot;, &quot;unsat&quot;, or &quot;unknown&quot;</span>
+
+<span class="c1"># Close the solver</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="available-solvers">
+<h3>Available Solvers<a class="headerlink" href="#available-solvers" title="Permalink to this heading">¶</a></h3>
+<p>EFMC supports the following SMT solvers:</p>
+<ul class="simple">
+<li><p><strong>Z3</strong>: Microsoft Research’s SMT solver</p></li>
+<li><p><strong>CVC5</strong>: The SMT solver from Stanford AI Lab</p></li>
+<li><p><strong>Yices2</strong>: SRI’s SMT solver</p></li>
+<li><p><strong>Bitwuzla</strong>: The SMT solver for bit-vectors and arrays</p></li>
+<li><p><strong>MathSAT</strong>: The MathSAT5 SMT solver</p></li>
+</ul>
+<p>Example usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.smttools.smtlib_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">SmtlibProc</span>
+
+<span class="c1"># Use Z3</span>
+<span class="n">z3_solver</span> <span class="o">=</span> <span class="n">SmtlibProc</span><span class="p">(</span><span class="s2">&quot;z3 -smt2 -in&quot;</span><span class="p">)</span>
+
+<span class="c1"># Use CVC5</span>
+<span class="n">cvc5_solver</span> <span class="o">=</span> <span class="n">SmtlibProc</span><span class="p">(</span><span class="s2">&quot;cvc5 --lang=smt2 --incremental&quot;</span><span class="p">)</span>
+
+<span class="c1"># Use Bitwuzla</span>
+<span class="n">bitwuzla_solver</span> <span class="o">=</span> <span class="n">SmtlibProc</span><span class="p">(</span><span class="s2">&quot;bitwuzla --sat&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="sygus-solver-interface">
+<h2>SyGuS Solver Interface<a class="headerlink" href="#sygus-solver-interface" title="Permalink to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">sygus_solver</span></code> module provides support for Syntax-Guided Synthesis (SyGuS) problems.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.smttools.sygus_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">SyGuSSolver</span>
+
+<span class="n">solver</span> <span class="o">=</span> <span class="n">SyGuSSolver</span><span class="p">()</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">set_options</span><span class="p">([</span>
+    <span class="s2">&quot;--generate-synth-assumptions&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;--cegqi-si-all&quot;</span>
+<span class="p">])</span>
+
+<span class="c1"># Submit synthesis problem</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;(set-logic LIA)&quot;</span><span class="p">)</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;(synth-fun f ((x Int)) Int)&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get solution</span>
+<span class="n">solution</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">get_synth_solution</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="pysmt-integration">
+<h2>PySMT Integration<a class="headerlink" href="#pysmt-integration" title="Permalink to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">pysmt_solver</span></code> module provides integration with PySMT, enabling solver-agnostic SMT solving.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symbol</span><span class="p">,</span> <span class="n">Int</span><span class="p">,</span> <span class="n">GT</span><span class="p">,</span> <span class="n">Plus</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.smttools.pysmt_solver</span><span class="w"> </span><span class="kn">import</span> <span class="n">PySMTZ3Solver</span>
+
+<span class="c1"># Create solver</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">PySMTZ3Solver</span><span class="p">()</span>
+
+<span class="c1"># Create formula</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">Symbol</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">Int</span><span class="p">())</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">Symbol</span><span class="p">(</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">Int</span><span class="p">())</span>
+
+<span class="n">formula</span> <span class="o">=</span> <span class="n">GT</span><span class="p">(</span><span class="n">Plus</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">Int</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+
+<span class="c1"># Solve</span>
+<span class="n">solver</span><span class="o">.</span><span class="n">add_assertion</span><span class="p">(</span><span class="n">formula</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="mapped-blast">
+<h2>Mapped Blast<a class="headerlink" href="#mapped-blast" title="Permalink to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">mapped_blast</span></code> module provides utilities for bit-blasting SMT formulas, converting them to CNF format.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.smttools.mapped_blast</span><span class="w"> </span><span class="kn">import</span> <span class="n">BitBlaster</span>
+
+<span class="n">blaster</span> <span class="o">=</span> <span class="n">BitBlaster</span><span class="p">()</span>
+<span class="n">cnf</span> <span class="o">=</span> <span class="n">blaster</span><span class="o">.</span><span class="n">bv_to_cnf</span><span class="p">(</span><span class="n">bv_formula</span><span class="p">)</span>
+<span class="n">blaster</span><span class="o">.</span><span class="n">dump_cnf</span><span class="p">(</span><span class="n">cnf</span><span class="p">,</span> <span class="s2">&quot;output.cnf&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="exception-handling">
+<h2>Exception Handling<a class="headerlink" href="#exception-handling" title="Permalink to this heading">¶</a></h2>
+<p>Custom exceptions for SMT-related errors:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.smttools.smt_exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">SolverError</span><span class="p">,</span> <span class="n">SolverTimeout</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+<span class="k">except</span> <span class="n">SolverTimeout</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Solver timed out&quot;</span><span class="p">)</span>
+<span class="k">except</span> <span class="n">SolverError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Solver error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="supported-logics">
+<h2>Supported Logics<a class="headerlink" href="#supported-logics" title="Permalink to this heading">¶</a></h2>
+<p>The following SMT logics are supported:</p>
+<ul class="simple">
+<li><p><strong>QF_BV</strong>: Quantifier-free bit-vectors</p></li>
+<li><p><strong>QF_UFBV</strong>: Unbounded bit-vectors</p></li>
+<li><p><strong>QF_LIA</strong>: Quantifier-free linear integer arithmetic</p></li>
+<li><p><strong>QF_LRA</strong>: Quantifier-free linear real arithmetic</p></li>
+<li><p><strong>QF_NIA</strong>: Non-linear integer arithmetic</p></li>
+<li><p><strong>QF_NRA</strong>: Non-linear real arithmetic</p></li>
+<li><p><strong>QF_FP</strong>: Floating-point arithmetic</p></li>
+<li><p><strong>QF_SLIA</strong>: String length integer arithmetic</p></li>
+</ul>
+</section>
+<section id="module-efmc.smttools.smtlib_solver">
+<span id="api-reference"></span><h2>API Reference<a class="headerlink" href="#module-efmc.smttools.smtlib_solver" title="Permalink to this heading">¶</a></h2>
+<p>SMTLIB solver interface.</p>
+<p>Partially modified from <a class="reference external" href="https://github.com/trailofbits/manticore">https://github.com/trailofbits/manticore</a>
+TODO: allow the user to select different modes
+1. Use the same process to first accept the whole formula, and then accept</p>
+<blockquote>
+<div><p>multiple (check-sat-assuming) commands?</p>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p>Every time, create a new process the solve each individual instance
+(including formulas and check-sat-assuming)</p></li>
+</ol>
+<p>TODO: we need to consider three “incremental mode”
+1. Every time build new assertions</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>build new solver process + new assertions?</p></li>
+<li><p>reuse the solver process, but use <cite>reset</cite> command? (it seems that
+<cite>reset</cite> can affect the tactic)</p></li>
+</ul>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p>Use push/pop</p></li>
+<li><p>Use assumption literal</p></li>
+</ol>
+<dl class="py class">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.smttools.smtlib_solver.</span></span><span class="sig-name descname"><span class="pre">SMTLIBSolver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">solver_command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>SMTLIB solver interface using external solver via subprocess.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.assert_assertions">
+<span class="sig-name descname"><span class="pre">assert_assertions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">assertions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.assert_assertions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.assert_assertions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add new assertions</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat">
+<span class="sig-name descname"><span class="pre">check_sat</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.check_sat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat" title="Permalink to this definition">¶</a></dt>
+<dd><p>check sat</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_assuming">
+<span class="sig-name descname"><span class="pre">check_sat_assuming</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">assumptions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.check_sat_assuming"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_assuming" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>assumptions</strong> – a list of assumption literal</p>
+</dd>
+</dl>
+<p>FIXME: implement and test; figure out what should “assumptions” look like</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_from_scratch">
+<span class="sig-name descname"><span class="pre">check_sat_from_scratch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">whole_fml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.check_sat_from_scratch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_from_scratch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check the satisfiability of the current state
+:param whole_fml: should be a whole formula (with declaration,</p>
+<blockquote>
+<div><p>assertions, and check-sat)</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>whether current state is satisfiable or not.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_with_pushpop_scope">
+<span class="sig-name descname"><span class="pre">check_sat_with_pushpop_scope</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_assertions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.check_sat_with_pushpop_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_with_pushpop_scope" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>new_assertions</strong> – is a tmp cnt</p>
+</dd>
+</dl>
+<p>FIXME: implement and test</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.get_expr_values">
+<span class="sig-name descname"><span class="pre">get_expr_values</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expressions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.get_expr_values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.get_expr_values" title="Permalink to this definition">¶</a></dt>
+<dd><p>If satisfiable, fetch the values of expressions</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.get_unsat_core">
+<span class="sig-name descname"><span class="pre">get_unsat_core</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.get_unsat_core"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.get_unsat_core" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the unsat core.
+FIXME: implement and test</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.pop">
+<span class="sig-name descname"><span class="pre">pop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.pop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.pop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recall the last pushed constraint store and state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.push">
+<span class="sig-name descname"><span class="pre">push</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.push"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.push" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pushes and save the current constraint store and state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.reset">
+<span class="sig-name descname"><span class="pre">reset</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.reset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Auxiliary method to reset the smtlib external solver to initial defaults
+TODO: Z3 and CVC5 supports the “reset” cmd. Maybe can use it</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SMTLIBSolver.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SMTLIBSolver.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SMTLIBSolver.stop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stop the solver process.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SmtlibProc">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.smttools.smtlib_solver.</span></span><span class="sig-name descname"><span class="pre">SmtlibProc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">solver_command</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SmtlibProc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SmtlibProc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Single SMTLIB interactive process.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SmtlibProc.clear_buffers">
+<span class="sig-name descname"><span class="pre">clear_buffers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SmtlibProc.clear_buffers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SmtlibProc.clear_buffers" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SmtlibProc.is_started">
+<span class="sig-name descname"><span class="pre">is_started</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SmtlibProc.is_started"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SmtlibProc.is_started" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SmtlibProc.recv">
+<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wait</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SmtlibProc.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SmtlibProc.recv" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reads the response from the smtlib solver
+:param wait: a boolean that indicate to wait with a blocking call
+until the results are available. Otherwise, it returns None if the solver
+does not respond.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SmtlibProc.send">
+<span class="sig-name descname"><span class="pre">send</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SmtlibProc.send"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SmtlibProc.send" title="Permalink to this definition">¶</a></dt>
+<dd><p>Send a string to the solver.
+:param cmd: a SMTLIBv2 command (ex. (check-sat))</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SmtlibProc.start">
+<span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SmtlibProc.start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SmtlibProc.start" title="Permalink to this definition">¶</a></dt>
+<dd><p>Spawns POpen solver process</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.smtlib_solver.SmtlibProc.stop">
+<span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/smtlib_solver.html#SmtlibProc.stop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smtlib_solver.SmtlibProc.stop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stops the solver process by:
+- sending a SIGKILL signal,
+- waiting till the process terminates (so we don’t leave a zombie process)</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-efmc.smttools.sygus_solver"></span><dl class="simple">
+<dt>SyGuS (Syntax-Guided Synthesis) solver implementation:</dt><dd><ol class="arabic simple">
+<li><p>Build SyGuS instances (PBE and other constraints)</p></li>
+<li><p>Call CVC5 to solve the SyGuS instances</p></li>
+<li><p>Parse function definition from SyGuS result</p></li>
+<li><p>Map the result to Z3py world</p></li>
+</ol>
+</dd>
+<dt>Supports synthesis for:</dt><dd><ul class="simple">
+<li><p>Integer and Boolean functions</p></li>
+<li><p>Bit-vector functions</p></li>
+<li><p>String functions</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.build_sygus_cnt">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">build_sygus_cnt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">funcs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">FuncDeclRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cnts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">BoolRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ALL'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#build_sygus_cnt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.build_sygus_cnt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate specification (written with z3 expr) to SyGuS format</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>funcs</strong> – a list of function to be synthesized</p></li>
+<li><p><strong>cnts</strong> – a list of constraints</p></li>
+<li><p><strong>variables</strong> – a list of variables</p></li>
+<li><p><strong>logic</strong> – SMT logic to use (default: “ALL”)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>SyGuS problem as a string</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.convert_bv_literal">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">convert_bv_literal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">literal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#convert_bv_literal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.convert_bv_literal" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a bit-vector literal from SyGuS format to Z3 format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>literal</strong> – SyGuS bit-vector literal (e.g., “#b101”, “#x1A”)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Z3-compatible bit-vector expression</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.convert_string_literal">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">convert_string_literal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">literal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#convert_string_literal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.convert_string_literal" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a string literal from SyGuS format to Z3 format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>literal</strong> – SyGuS string literal</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Z3-compatible string expression</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.convert_sygus_expr_to_z3">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">convert_sygus_expr_to_z3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#convert_sygus_expr_to_z3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.convert_sygus_expr_to_z3" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a SyGuS expression to a Z3 expression.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>expr</strong> – SyGuS expression</p></li>
+<li><p><strong>var_dict</strong> – Dictionary mapping variable names to their indices
+in the variables list</p></li>
+<li><p><strong>return_type</strong> – Return type of the expression</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Z3-compatible expression</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.get_sort_sexpr">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">get_sort_sexpr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sort</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SortRef</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#get_sort_sexpr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.get_sort_sexpr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the SyGuS-compatible S-expression for a Z3 sort.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>sort</strong> – Z3 sort</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>SyGuS-compatible S-expression for the sort</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.parse_sygus_solution">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">parse_sygus_solution</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cvc5_output</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#parse_sygus_solution"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.parse_sygus_solution" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse the output of CVC5 to extract the synthesized functions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cvc5_output</strong> – CVC5 output as a string</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary mapping function names to their definitions</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.replace_fun_with_synthesized_one">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">replace_fun_with_synthesized_one</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func_to_rep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">FuncDeclRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func_def</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ExprRef</span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#replace_fun_with_synthesized_one"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.replace_fun_with_synthesized_one" title="Permalink to this definition">¶</a></dt>
+<dd><p>Replace an uninterpreted function with a concrete template in a formula.</p>
+<p>This is a wrapper around replace_func_with_template for backward
+compatibility.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>formula</strong> – Z3 formula containing the uninterpreted function</p></li>
+<li><p><strong>func_to_rep</strong> – Uninterpreted function to replace</p></li>
+<li><p><strong>func_def</strong> – Template to replace the uninterpreted function with</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Modified formula with the uninterpreted function replaced
+by the template</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.solve_sygus">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">solve_sygus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sygus_problem</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">60</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#solve_sygus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.solve_sygus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Call CVC5 to solve a SyGuS problem.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sygus_problem</strong> – SyGuS problem as a string</p></li>
+<li><p><strong>timeout</strong> – Timeout in seconds (default: 60)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>CVC5 output as a string, or None if CVC5 fails or times out</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.sygus_to_z3">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">sygus_to_z3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">func_def</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ExprRef</span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#sygus_to_z3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.sygus_to_z3" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a SyGuS function definition to a Z3 expression.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>func_name</strong> – Name of the function</p></li>
+<li><p><strong>func_def</strong> – Function definition from parse_sygus_solution</p></li>
+<li><p><strong>variables</strong> – List of Z3 variables to use in the expression</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Z3 expression representing the function</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.sygus_solver.synthesize_function">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.sygus_solver.</span></span><span class="sig-name descname"><span class="pre">synthesize_function</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">FuncDeclRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constraints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">BoolRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'ALL'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">60</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_cvc5</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/smttools/sygus_solver.html#synthesize_function"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.sygus_solver.synthesize_function" title="Permalink to this definition">¶</a></dt>
+<dd><p>Synthesize a function using SyGuS.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>func</strong> – Function to synthesize</p></li>
+<li><p><strong>constraints</strong> – Constraints the function must satisfy</p></li>
+<li><p><strong>variables</strong> – Variables used in the constraints</p></li>
+<li><p><strong>logic</strong> – SMT logic to use (default: “ALL”)</p></li>
+<li><p><strong>timeout</strong> – Timeout in seconds (default: 60)</p></li>
+<li><p><strong>force_cvc5</strong> – If True, always try to use CVC5 even for common
+functions (default: False)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Z3 expression representing the synthesized function, or None
+if synthesis fails</p>
+</dd>
+</dl>
+</dd></dl>
+
+<span class="target" id="module-efmc.smttools.pysmt_solver"></span><p>FIXME: the name of this file can be confusing</p>
+<p>Augmenting Z3 using PySMT, e.g., interpolant generation
+APIs of this file:
+- to_pysmt_vars: Convert Z3 variables to PySMT variables
+- PySMTSolver.convert: Convert Z3 formula to PySMT formula
+- PySMTSolver.check_with_pysmt: Check satisfiability using PySMT solver
+- PySMTSolver.check_portfolio: Check satisfiability using multiple solvers
+- PySMTSolver.all_smt: Sample k models of a formula
+- PySMTSolver.binary_interpolant: Generate binary interpolant (Craig interpolant)
+- PySMTSolver.sequence_interpolant: Generate sequence interpolant
+- PySMTSolver.efsmt: Solve exists-forall formula (used by the template-based invariant inference engine)</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.smttools.pysmt_solver.</span></span><span class="sig-name descname"><span class="pre">PySMTSolver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Solver</span></code></p>
+<p>PySMT-based solver wrapper for Z3.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver.all_smt">
+<span class="sig-name descname"><span class="pre">all_smt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">keys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver.all_smt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver.all_smt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sample k models</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver.binary_interpolant">
+<span class="sig-name descname"><span class="pre">binary_interpolant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fml_a</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BoolRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fml_b</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BoolRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'z3'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver.binary_interpolant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver.binary_interpolant" title="Permalink to this definition">¶</a></dt>
+<dd><p>Binary interpolant</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver.check_portfolio">
+<span class="sig-name descname"><span class="pre">check_portfolio</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver.check_portfolio"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver.check_portfolio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Use multiple solvers (in parallel?)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver.check_with_pysmt">
+<span class="sig-name descname"><span class="pre">check_with_pysmt</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver.check_with_pysmt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver.check_with_pysmt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check satisfiability using PySMT solver. TODO: build a Z3 model?</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver.convert">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">convert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">zf</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver.convert"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver.convert" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert Z3 formula to PySMT formula.
+FIXME: if we do not call “pysmt_vars = …”, z3 will report
+naming warning..</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver.efsmt">
+<span class="sig-name descname"><span class="pre">efsmt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">evars</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uvars</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z3fml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">QF_BV</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxloops</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">esolver_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'z3'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fsolver_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'z3'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver.efsmt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver.efsmt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Solves exists x. forall y. phi(x, y)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>evars</strong> – Existentially quantified variables</p></li>
+<li><p><strong>uvars</strong> – Universally quantified variables</p></li>
+<li><p><strong>z3fml</strong> – Z3 formula representing the constraint</p></li>
+<li><p><strong>logic</strong> – The logic to use (default: QF_BV)</p></li>
+<li><p><strong>maxloops</strong> – Maximum number of iterations (default: None,
+meaning no limit)</p></li>
+<li><p><strong>esolver_name</strong> – Name of the solver to use for existential solving
+(default: “z3”)</p></li>
+<li><p><strong>fsolver_name</strong> – Name of the solver to use for universal solving
+(default: “z3”)</p></li>
+<li><p><strong>verbose</strong> – Whether to print debugging information (default: False)</p></li>
+<li><p><strong>timeout</strong> – Maximum execution time in seconds (default: None,
+meaning no timeout)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>“sat”, “unsat”, or “unknown”</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.PySMTSolver.sequence_interpolant">
+<span class="sig-name descname"><span class="pre">sequence_interpolant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">formulas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExprRef</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#PySMTSolver.sequence_interpolant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.PySMTSolver.sequence_interpolant" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sequence interpolant</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.test">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.pysmt_solver.</span></span><span class="sig-name descname"><span class="pre">test</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#test"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Test function for PySMTSolver.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.pysmt_solver.to_pysmt_vars">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.pysmt_solver.</span></span><span class="sig-name descname"><span class="pre">to_pysmt_vars</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">z3vars:</span> <span class="pre">[&lt;class</span> <span class="pre">'z3.z3.ExprRef'&gt;]</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/pysmt_solver.html#to_pysmt_vars"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.pysmt_solver.to_pysmt_vars" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a list of Z3 variables to PySMT variables.
+:param z3vars: A list of Z3 variables to be converted.
+:type z3vars: list of z3.ExprRef</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of PySMT variables corresponding to the input Z3 variables.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>list of pysmt.fnode.FNode</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>NotImplementedError</strong> – If a variable type is not supported.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>The function supports the following Z3 variable types:</dt><dd><ul class="simple">
+<li><p>Integer</p></li>
+<li><p>Real</p></li>
+<li><p>Bit-Vector</p></li>
+<li><p>Boolean</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<span class="target" id="module-efmc.smttools.mapped_blast"></span><p>This module contains functions for translating SMT2 formulas to CNF and DIMACS format.</p>
+<p>It also keeps track of the mapping between bit-vector variables and their corresponding Boolean variables.</p>
+<p>TODO: it seems that this file can be slow. We need to profile and optimize it.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.bitblast">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">bitblast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#bitblast"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.bitblast" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bit-blast a formula to CNF.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.collect_vars">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">collect_vars</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seen</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#collect_vars"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.collect_vars" title="Permalink to this definition">¶</a></dt>
+<dd><p>Collect all variables in an SMT2 formula.
+TODO: this can be slow?</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.dimacs_visitor">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">dimacs_visitor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#dimacs_visitor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.dimacs_visitor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Visit an SMT2 formula and return the DIMACS clauses.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.dimacs_visitor_numeric">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">dimacs_visitor_numeric</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#dimacs_visitor_numeric"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.dimacs_visitor_numeric" title="Permalink to this definition">¶</a></dt>
+<dd><p>Visit an SMT2 formula and return numeric DIMACS clauses.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.is_literal">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">is_literal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#is_literal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.is_literal" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check if an expression is a literal (uninterpreted constant).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.map_bitvector">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">map_bitvector</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_vars</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#map_bitvector"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.map_bitvector" title="Permalink to this definition">¶</a></dt>
+<dd><p>Map bit-vector variables to their corresponding Boolean variables.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.proj_id_last">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">proj_id_last</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">var</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_proj_vars</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_vars</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#proj_id_last"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.proj_id_last" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a projected variable ID to the original variable ID.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>var</strong> – The projected variable ID to convert.</p></li>
+<li><p><strong>n_proj_vars</strong> – The number of projected variables.</p></li>
+<li><p><strong>n_vars</strong> – The total number of variables.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.test_blast">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">test_blast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#test_blast"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.test_blast" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.to_dimacs">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">to_dimacs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cnf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proj_last</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#to_dimacs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.to_dimacs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate an SMT2 formula to a CNF.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.to_dimacs_numeric">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">to_dimacs_numeric</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cnf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">proj_last</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#to_dimacs_numeric"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.to_dimacs_numeric" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate an SMT2 formula to numeric clauses.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.translate_smt2formula_to_cnf">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">translate_smt2formula_to_cnf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#translate_smt2formula_to_cnf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.translate_smt2formula_to_cnf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate an SMT2 formula to a CNF.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.translate_smt2formula_to_cnf_file">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">translate_smt2formula_to_cnf_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#translate_smt2formula_to_cnf_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.translate_smt2formula_to_cnf_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate an SMT2 formula to a CNF file.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.smttools.mapped_blast.translate_smt2formula_to_numeric_clauses">
+<span class="sig-prename descclassname"><span class="pre">efmc.smttools.mapped_blast.</span></span><span class="sig-name descname"><span class="pre">translate_smt2formula_to_numeric_clauses</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">formula</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExprRef</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/smttools/mapped_blast.html#translate_smt2formula_to_numeric_clauses"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.mapped_blast.translate_smt2formula_to_numeric_clauses" title="Permalink to this definition">¶</a></dt>
+<dd><p>Translate an SMT2 formula to numeric clauses.</p>
+</dd></dl>
+
+<span class="target" id="module-efmc.smttools.smt_exceptions"></span><p>Custom exception hierarchy for SMT-related errors.</p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="efmc.smttools.smt_exceptions.SMTError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.smttools.smt_exceptions.</span></span><span class="sig-name descname"><span class="pre">SMTError</span></span><a class="reference internal" href="_modules/efmc/smttools/smt_exceptions.html#SMTError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smt_exceptions.SMTError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
+<p>Top level Exception object for custom exception hierarchy.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="efmc.smttools.smt_exceptions.SmtlibError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.smttools.smt_exceptions.</span></span><span class="sig-name descname"><span class="pre">SmtlibError</span></span><a class="reference internal" href="_modules/efmc/smttools/smt_exceptions.html#SmtlibError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smt_exceptions.SmtlibError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#efmc.smttools.smt_exceptions.SMTError" title="efmc.smttools.smt_exceptions.SMTError"><code class="xref py py-class docutils literal notranslate"><span class="pre">SMTError</span></code></a></p>
+<p>Exception for SMTLIB-related errors.</p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="efmc.smttools.smt_exceptions.SolverError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.smttools.smt_exceptions.</span></span><span class="sig-name descname"><span class="pre">SolverError</span></span><a class="reference internal" href="_modules/efmc/smttools/smt_exceptions.html#SolverError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.smttools.smt_exceptions.SolverError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#efmc.smttools.smt_exceptions.SmtlibError" title="efmc.smttools.smt_exceptions.SmtlibError"><code class="xref py py-class docutils literal notranslate"><span class="pre">SmtlibError</span></code></a></p>
+<p>Exception for solver-related errors.</p>
+</dd></dl>
+
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">SMT Tools</a><ul>
+<li><a class="reference internal" href="#architecture">Architecture</a></li>
+<li><a class="reference internal" href="#smt-lib-solver-interface">SMT-LIB Solver Interface</a><ul>
+<li><a class="reference internal" href="#smtlibproc">SmtlibProc</a></li>
+<li><a class="reference internal" href="#available-solvers">Available Solvers</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sygus-solver-interface">SyGuS Solver Interface</a></li>
+<li><a class="reference internal" href="#pysmt-integration">PySMT Integration</a></li>
+<li><a class="reference internal" href="#mapped-blast">Mapped Blast</a></li>
+<li><a class="reference internal" href="#exception-handling">Exception Handling</a></li>
+<li><a class="reference internal" href="#supported-logics">Supported Logics</a></li>
+<li><a class="reference internal" href="#module-efmc.smttools.smtlib_solver">API Reference</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="frontend.html"
+                          title="previous chapter">Frontends</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="llmtools.html"
+                          title="next chapter">LLM Tools</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/smttools.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="llmtools.html" title="LLM Tools"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="frontend.html" title="Frontends"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">SMT Tools</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>

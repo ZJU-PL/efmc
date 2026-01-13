@@ -1,0 +1,358 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>efmc.smttools.pysmt_solver &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.smttools.pysmt_solver</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for efmc.smttools.pysmt_solver</h1><div class="highlight"><pre>
+<span></span><span class="c1"># coding: utf-8</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">FIXME: the name of this file can be confusing</span>
+
+<span class="sd">Augmenting Z3 using PySMT, e.g., interpolant generation</span>
+<span class="sd">APIs of this file:</span>
+<span class="sd">- to_pysmt_vars: Convert Z3 variables to PySMT variables</span>
+<span class="sd">- PySMTSolver.convert: Convert Z3 formula to PySMT formula</span>
+<span class="sd">- PySMTSolver.check_with_pysmt: Check satisfiability using PySMT solver</span>
+<span class="sd">- PySMTSolver.check_portfolio: Check satisfiability using multiple solvers</span>
+<span class="sd">- PySMTSolver.all_smt: Sample k models of a formula</span>
+<span class="sd">- PySMTSolver.binary_interpolant: Generate binary interpolant (Craig interpolant)</span>
+<span class="sd">- PySMTSolver.sequence_interpolant: Generate sequence interpolant</span>
+<span class="sd">- PySMTSolver.efsmt: Solve exists-forall formula (used by the template-based invariant inference engine)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">z3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.logics</span><span class="w"> </span><span class="kn">import</span> <span class="n">QF_BV</span>  <span class="c1"># AUTO</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.oracles</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_logic</span>
+
+<span class="c1"># from pysmt.smtlib.parser import SmtLibParser</span>
+<span class="c1"># from pysmt.exceptions import SolverReturnedUnknownResultError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">Bool</span><span class="p">,</span> <span class="n">get_model</span><span class="p">,</span> <span class="n">Not</span><span class="p">,</span> <span class="n">Solver</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">EqualsOrIff</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">Portfolio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symbol</span><span class="p">,</span> <span class="n">And</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.shortcuts</span><span class="w"> </span><span class="kn">import</span> <span class="n">binary_interpolant</span><span class="p">,</span> <span class="n">sequence_interpolant</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pysmt.typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">INT</span><span class="p">,</span> <span class="n">REAL</span><span class="p">,</span> <span class="n">BVType</span><span class="p">,</span> <span class="n">BOOL</span>
+
+<span class="c1"># BV1, BV8, BV16, BV32, BV64, BV128</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.utils.z3_expr_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_variables</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="c1"># NOTE: both pysmt and z3 have a class &quot;Solver&quot;</span>
+
+
+<div class="viewcode-block" id="to_pysmt_vars"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.to_pysmt_vars">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">to_pysmt_vars</span><span class="p">(</span><span class="n">z3vars</span><span class="p">:</span> <span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert a list of Z3 variables to PySMT variables.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        z3vars (list of z3.ExprRef): A list of Z3 variables to be converted.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        list of pysmt.fnode.FNode: A list of PySMT variables corresponding to the input Z3 variables.</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        NotImplementedError: If a variable type is not supported.</span>
+<span class="sd">    The function supports the following Z3 variable types:</span>
+<span class="sd">        - Integer</span>
+<span class="sd">        - Real</span>
+<span class="sd">        - Bit-Vector</span>
+<span class="sd">        - Boolean</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">z3vars</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">z3</span><span class="o">.</span><span class="n">is_int</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Symbol</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">decl</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span> <span class="n">INT</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">z3</span><span class="o">.</span><span class="n">is_real</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Symbol</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">decl</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span> <span class="n">REAL</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">z3</span><span class="o">.</span><span class="n">is_bv</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Symbol</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">decl</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span> <span class="n">BVType</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span><span class="o">.</span><span class="n">size</span><span class="p">())))</span>
+        <span class="k">elif</span> <span class="n">z3</span><span class="o">.</span><span class="n">is_bool</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Symbol</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">decl</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span> <span class="n">BOOL</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="PySMTSolver"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">PySMTSolver</span><span class="p">(</span><span class="n">z3</span><span class="o">.</span><span class="n">Solver</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySMT-based solver wrapper for Z3.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+<div class="viewcode-block" id="PySMTSolver.convert"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver.convert">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">convert</span><span class="p">(</span><span class="n">zf</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convert Z3 formula to PySMT formula.</span>
+<span class="sd">        FIXME: if we do not call &quot;pysmt_vars = ...&quot;, z3 will report</span>
+<span class="sd">        naming warning..</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">zvs</span> <span class="o">=</span> <span class="n">get_variables</span><span class="p">(</span><span class="n">zf</span><span class="p">)</span>
+        <span class="c1"># pysmt_vars = [Symbol(v.decl().name(), INT if v.is_int() else REAL)</span>
+        <span class="c1">#               for v in zvs]</span>
+        <span class="n">pysmt_vars</span> <span class="o">=</span> <span class="n">to_pysmt_vars</span><span class="p">(</span><span class="n">zvs</span><span class="p">)</span>
+        <span class="n">z3s</span> <span class="o">=</span> <span class="n">Solver</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;z3&quot;</span><span class="p">)</span>
+        <span class="n">pysmt_fml</span> <span class="o">=</span> <span class="n">z3s</span><span class="o">.</span><span class="n">converter</span><span class="o">.</span><span class="n">back</span><span class="p">(</span><span class="n">zf</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pysmt_vars</span><span class="p">,</span> <span class="n">pysmt_fml</span></div>
+
+<div class="viewcode-block" id="PySMTSolver.check_with_pysmt"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver.check_with_pysmt">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">check_with_pysmt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check satisfiability using PySMT solver. TODO: build a Z3 model?&quot;&quot;&quot;</span>
+        <span class="n">z3fml</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">assertions</span><span class="p">())</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">pysmt_fml</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">z3fml</span><span class="p">)</span>
+        <span class="c1"># print(pysmt_vars)</span>
+        <span class="n">f_logic</span> <span class="o">=</span> <span class="n">get_logic</span><span class="p">(</span><span class="n">pysmt_fml</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">Solver</span><span class="p">(</span><span class="n">logic</span><span class="o">=</span><span class="n">f_logic</span><span class="p">)</span> <span class="k">as</span> <span class="n">solver</span><span class="p">:</span>
+                <span class="n">solver</span><span class="o">.</span><span class="n">add_assertion</span><span class="p">(</span><span class="n">pysmt_fml</span><span class="p">)</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">res</span><span class="p">:</span>
+                    <span class="c1"># print(solver.get_model())</span>
+                    <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">sat</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">unsat</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">unknown</span></div>
+
+<div class="viewcode-block" id="PySMTSolver.check_portfolio"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver.check_portfolio">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">check_portfolio</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Use multiple solvers (in parallel?)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">z3fml</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">assertions</span><span class="p">())</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">pysmt_fml</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">z3fml</span><span class="p">)</span>
+        <span class="n">f_logic</span> <span class="o">=</span> <span class="n">get_logic</span><span class="p">(</span><span class="n">pysmt_fml</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Portfolio</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="p">(</span><span class="s2">&quot;msat&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;random_seed&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span>
+                <span class="p">(</span><span class="s2">&quot;msat&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;random_seed&quot;</span><span class="p">:</span> <span class="mi">17</span><span class="p">}),</span>
+                <span class="p">(</span><span class="s2">&quot;msat&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;random_seed&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">}),</span>
+                <span class="s2">&quot;cvc4&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;yices&quot;</span><span class="p">,</span>
+            <span class="p">],</span>
+            <span class="n">logic</span><span class="o">=</span><span class="n">f_logic</span><span class="p">,</span>
+            <span class="n">incremental</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">generate_models</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">as</span> <span class="n">solver</span><span class="p">:</span>
+            <span class="n">solver</span><span class="o">.</span><span class="n">add_assertion</span><span class="p">(</span><span class="n">pysmt_fml</span><span class="p">)</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">res</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">sat</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">unsat</span></div>
+
+<div class="viewcode-block" id="PySMTSolver.all_smt"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver.all_smt">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">all_smt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">keys</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">],</span> <span class="n">bound</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sample k models&quot;&quot;&quot;</span>
+        <span class="n">z3fml</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">assertions</span><span class="p">())</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">pysmt_fml</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">z3fml</span><span class="p">)</span>
+        <span class="n">target_logic</span> <span class="o">=</span> <span class="n">get_logic</span><span class="p">(</span><span class="n">pysmt_fml</span><span class="p">)</span>
+
+        <span class="n">pysmt_var_keys</span> <span class="o">=</span> <span class="n">to_pysmt_vars</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span>
+        <span class="c1"># print(&quot;Target Logic: %s&quot; % target_logic)</span>
+
+        <span class="k">with</span> <span class="n">Solver</span><span class="p">(</span><span class="n">logic</span><span class="o">=</span><span class="n">target_logic</span><span class="p">)</span> <span class="k">as</span> <span class="n">solver</span><span class="p">:</span>
+            <span class="n">solver</span><span class="o">.</span><span class="n">add_assertion</span><span class="p">(</span><span class="n">pysmt_fml</span><span class="p">)</span>
+            <span class="n">iteration</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">while</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">():</span>
+                <span class="n">partial_model</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">EqualsOrIff</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">solver</span><span class="o">.</span><span class="n">get_value</span><span class="p">(</span><span class="n">k</span><span class="p">))</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">pysmt_var_keys</span>
+                <span class="p">]</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">partial_model</span><span class="p">)</span>
+                <span class="n">solver</span><span class="o">.</span><span class="n">add_assertion</span><span class="p">(</span><span class="n">Not</span><span class="p">(</span><span class="n">And</span><span class="p">(</span><span class="n">partial_model</span><span class="p">)))</span>
+                <span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">iteration</span> <span class="o">&gt;=</span> <span class="n">bound</span><span class="p">:</span>
+                    <span class="k">break</span></div>
+
+<div class="viewcode-block" id="PySMTSolver.binary_interpolant"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver.binary_interpolant">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">binary_interpolant</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">fml_a</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolRef</span><span class="p">,</span> <span class="n">fml_b</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolRef</span><span class="p">,</span> <span class="n">solver_name</span><span class="o">=</span><span class="s2">&quot;z3&quot;</span><span class="p">,</span> <span class="n">logic</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Binary interpolant&quot;&quot;&quot;</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">pysmt_fml_a</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">fml_a</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">pysmt_fml_b</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">fml_b</span><span class="p">)</span>
+
+        <span class="n">itp</span> <span class="o">=</span> <span class="n">binary_interpolant</span><span class="p">(</span>
+            <span class="n">pysmt_fml_a</span><span class="p">,</span> <span class="n">pysmt_fml_b</span><span class="p">,</span> <span class="n">solver_name</span><span class="o">=</span><span class="n">solver_name</span><span class="p">,</span> <span class="n">logic</span><span class="o">=</span><span class="n">logic</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">Solver</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;z3&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">converter</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">itp</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PySMTSolver.sequence_interpolant"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver.sequence_interpolant">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">sequence_interpolant</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">formulas</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sequence interpolant&quot;&quot;&quot;</span>
+        <span class="n">pysmt_formulas</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">fml</span> <span class="ow">in</span> <span class="n">formulas</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">pysmt_fml_a</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">fml</span><span class="p">)</span>
+            <span class="n">pysmt_formulas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pysmt_fml_a</span><span class="p">)</span>
+
+        <span class="n">seq_itp</span> <span class="o">=</span> <span class="n">sequence_interpolant</span><span class="p">(</span><span class="n">pysmt_formulas</span><span class="p">)</span>
+        <span class="n">z3_seq_itp</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">cnt</span> <span class="ow">in</span> <span class="n">seq_itp</span><span class="p">:</span>
+            <span class="n">z3_seq_itp</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Solver</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;z3&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">converter</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">cnt</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">z3_seq_itp</span></div>
+
+    <span class="c1"># should allow the users to choose the solver for existential and</span>
+    <span class="c1"># universal quantifiers</span>
+<div class="viewcode-block" id="PySMTSolver.efsmt"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.PySMTSolver.efsmt">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">efsmt</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">evars</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">],</span>
+        <span class="n">uvars</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">],</span>
+        <span class="n">z3fml</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span>
+        <span class="n">logic</span><span class="o">=</span><span class="n">QF_BV</span><span class="p">,</span>
+        <span class="n">maxloops</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">esolver_name</span><span class="o">=</span><span class="s2">&quot;z3&quot;</span><span class="p">,</span>
+        <span class="n">fsolver_name</span><span class="o">=</span><span class="s2">&quot;z3&quot;</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Solves exists x. forall y. phi(x, y)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            evars: Existentially quantified variables</span>
+<span class="sd">            uvars: Universally quantified variables</span>
+<span class="sd">            z3fml: Z3 formula representing the constraint</span>
+<span class="sd">            logic: The logic to use (default: QF_BV)</span>
+<span class="sd">            maxloops: Maximum number of iterations (default: None,</span>
+<span class="sd">                     meaning no limit)</span>
+<span class="sd">            esolver_name: Name of the solver to use for existential solving</span>
+<span class="sd">                         (default: &quot;z3&quot;)</span>
+<span class="sd">            fsolver_name: Name of the solver to use for universal solving</span>
+<span class="sd">                         (default: &quot;z3&quot;)</span>
+<span class="sd">            verbose: Whether to print debugging information (default: False)</span>
+<span class="sd">            timeout: Maximum execution time in seconds (default: None,</span>
+<span class="sd">                    meaning no timeout)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            &quot;sat&quot;, &quot;unsat&quot;, or &quot;unknown&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+        <span class="n">_</span><span class="p">,</span> <span class="n">phi</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="n">z3fml</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">to_pysmt_vars</span><span class="p">(</span><span class="n">uvars</span><span class="p">)</span>  <span class="c1"># universally quantified</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="c1"># x = phi.get_free_variables() - y</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">to_pysmt_vars</span><span class="p">(</span><span class="n">evars</span><span class="p">))</span>  <span class="c1"># should we use previous line or this</span>
+
+        <span class="k">with</span> <span class="n">Solver</span><span class="p">(</span><span class="n">logic</span><span class="o">=</span><span class="n">logic</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">esolver_name</span><span class="p">)</span> <span class="k">as</span> <span class="n">esolver</span><span class="p">:</span>
+            <span class="n">esolver</span><span class="o">.</span><span class="n">add_assertion</span><span class="p">(</span><span class="n">Bool</span><span class="p">(</span><span class="kc">True</span><span class="p">))</span>
+            <span class="n">loops</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+            <span class="k">while</span> <span class="n">maxloops</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">loops</span> <span class="o">&lt;=</span> <span class="n">maxloops</span><span class="p">:</span>
+                <span class="c1"># Check timeout</span>
+                <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span> <span class="o">&gt;</span> <span class="n">timeout</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                        <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Timeout reached after </span><span class="si">{</span><span class="n">elapsed</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+                    <span class="k">break</span>
+
+                <span class="n">loops</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">eres</span> <span class="o">=</span> <span class="n">esolver</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">eres</span><span class="p">:</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;unsat&quot;</span>
+                    <span class="k">break</span>
+                <span class="n">tau</span> <span class="o">=</span> <span class="p">{</span><span class="n">v</span><span class="p">:</span> <span class="n">esolver</span><span class="o">.</span><span class="n">get_value</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">x</span><span class="p">}</span>
+                <span class="n">sub_phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">substitute</span><span class="p">(</span><span class="n">tau</span><span class="p">)</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">: Tau = </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">loops</span><span class="p">,</span> <span class="n">tau</span><span class="p">))</span>
+
+                <span class="n">fmodel</span> <span class="o">=</span> <span class="n">get_model</span><span class="p">(</span><span class="n">Not</span><span class="p">(</span><span class="n">sub_phi</span><span class="p">),</span> <span class="n">logic</span><span class="o">=</span><span class="n">logic</span><span class="p">,</span> <span class="n">solver_name</span><span class="o">=</span><span class="n">fsolver_name</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">fmodel</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;sat&quot;</span>
+                    <span class="k">break</span>
+                <span class="n">sigma</span> <span class="o">=</span> <span class="p">{</span><span class="n">v</span><span class="p">:</span> <span class="n">fmodel</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">y</span><span class="p">}</span>
+                <span class="n">sub_phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">substitute</span><span class="p">(</span><span class="n">sigma</span><span class="p">)</span><span class="o">.</span><span class="n">simplify</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">: Sigma = </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">loops</span><span class="p">,</span> <span class="n">sigma</span><span class="p">))</span>
+                <span class="n">esolver</span><span class="o">.</span><span class="n">add_assertion</span><span class="p">(</span><span class="n">sub_phi</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">result</span></div></div>
+
+
+<div class="viewcode-block" id="test"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.pysmt_solver.test">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">test</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Test function for PySMTSolver.&quot;&quot;&quot;</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Ints</span><span class="p">(</span><span class="s2">&quot;x y z&quot;</span><span class="p">)</span>
+    <span class="n">fml</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">,</span> <span class="n">y</span> <span class="o">&lt;</span> <span class="mi">19</span><span class="p">,</span> <span class="n">z</span> <span class="o">==</span> <span class="mf">3.0</span><span class="p">)</span>
+    <span class="n">sol</span> <span class="o">=</span> <span class="n">PySMTSolver</span><span class="p">()</span>
+    <span class="n">sol</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fml</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">sol</span><span class="o">.</span><span class="n">check</span><span class="p">())</span>
+    <span class="c1"># sol.all_smt([x, y])</span>
+
+    <span class="n">fml_a</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">x</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">y</span> <span class="o">&lt;</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">fml_b</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">y</span> <span class="o">&gt;=</span> <span class="n">z</span><span class="p">,</span> <span class="n">z</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">sol</span><span class="o">.</span><span class="n">binary_interpolant</span><span class="p">(</span><span class="n">fml_a</span><span class="p">,</span> <span class="n">fml_b</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">sol</span><span class="o">.</span><span class="n">sequence_interpolant</span><span class="p">([</span><span class="n">fml_a</span><span class="p">,</span> <span class="n">fml_b</span><span class="p">]))</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">test</span><span class="p">()</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.smttools.pysmt_solver</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>

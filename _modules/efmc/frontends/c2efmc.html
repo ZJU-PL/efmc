@@ -1,0 +1,550 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>efmc.frontends.c2efmc &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../frontends.html" accesskey="U">efmc.frontends</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.frontends.c2efmc</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for efmc.frontends.c2efmc</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;C to EFMC transition system converter.</span>
+
+<span class="sd">This frontend parses a (loop-centric) C program with ``pycparser`` and</span>
+<span class="sd">builds an EFMC :class:`~efmc.sts.TransitionSystem`. The translation is</span>
+<span class="sd">lightweight and currently focuses on integer variables and the first loop</span>
+<span class="sd">encountered in the selected function (default: ``main``).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">z3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.sts</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransitionSystem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.utils.pycparser</span><span class="w"> </span><span class="kn">import</span> <span class="n">c_ast</span><span class="p">,</span> <span class="n">parse_file</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="CToEFMCConverter"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.c2efmc.CToEFMCConverter">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">CToEFMCConverter</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert simple C programs into EFMC transition systems.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logger</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="c1"># Public API                                                         #</span>
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+<div class="viewcode-block" id="CToEFMCConverter.parse_c_file"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.c2efmc.CToEFMCConverter.parse_c_file">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">parse_c_file</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">use_cpp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">cpp_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FileAST</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parse a C file into a ``pycparser`` AST.&quot;&quot;&quot;</span>
+        <span class="n">cpp_args</span> <span class="o">=</span> <span class="n">cpp_args</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="n">parse_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">use_cpp</span><span class="o">=</span><span class="n">use_cpp</span><span class="p">,</span> <span class="n">cpp_args</span><span class="o">=</span><span class="n">cpp_args</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="CToEFMCConverter.convert_file_to_transition_system"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.c2efmc.CToEFMCConverter.convert_file_to_transition_system">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">convert_file_to_transition_system</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">function</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">use_cpp</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">cpp_args</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionSystem</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Main entry point for converting a C file.&quot;&quot;&quot;</span>
+        <span class="n">file_ast</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_c_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">use_cpp</span><span class="o">=</span><span class="n">use_cpp</span><span class="p">,</span> <span class="n">cpp_args</span><span class="o">=</span><span class="n">cpp_args</span><span class="p">)</span>
+        <span class="n">func_def</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pick_function</span><span class="p">(</span><span class="n">file_ast</span><span class="p">,</span> <span class="n">function</span><span class="p">)</span>
+        <span class="n">pre_stmts</span><span class="p">,</span> <span class="n">loop_node</span><span class="p">,</span> <span class="n">post_stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_split_around_first_loop</span><span class="p">(</span><span class="n">func_def</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">loop_node</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No loop found in target function&quot;</span><span class="p">)</span>
+
+        <span class="n">variables</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_variables</span><span class="p">(</span><span class="n">func_def</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">variables</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No variables detected in target function&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_create_z3_variables</span><span class="p">(</span><span class="n">variables</span><span class="p">)</span>
+
+        <span class="n">init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_init_condition</span><span class="p">(</span><span class="n">pre_stmts</span><span class="p">)</span>
+        <span class="n">trans</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_transition</span><span class="p">(</span><span class="n">loop_node</span><span class="p">)</span>
+
+        <span class="c1"># Safety after the loop should only be enforced once the loop exits.</span>
+        <span class="n">loop_guard</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">loop_node</span><span class="o">.</span><span class="n">cond</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">post</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_post_condition</span><span class="p">(</span><span class="n">post_stmts</span><span class="p">,</span> <span class="n">exit_guard</span><span class="o">=</span><span class="n">z3</span><span class="o">.</span><span class="n">Not</span><span class="p">(</span><span class="n">loop_guard</span><span class="p">))</span>
+
+        <span class="n">ts</span> <span class="o">=</span> <span class="n">TransitionSystem</span><span class="p">(</span>
+            <span class="n">variables</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">variables</span><span class="p">],</span>
+            <span class="n">prime_variables</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">variables</span><span class="p">],</span>
+            <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+            <span class="n">trans</span><span class="o">=</span><span class="n">trans</span><span class="p">,</span>
+            <span class="n">post</span><span class="o">=</span><span class="n">post</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Created transition system with </span><span class="si">%d</span><span class="s2"> variables&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">variables</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">ts</span></div>
+
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="c1"># AST utilities                                                      #</span>
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pick_function</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">ast</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FileAST</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncDef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the requested function definition or the first one.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="n">ast</span><span class="o">.</span><span class="n">ext</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncDef</span><span class="p">):</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">ext</span><span class="o">.</span><span class="n">decl</span><span class="o">.</span><span class="n">name</span>
+                <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">target</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">ext</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Function &#39;</span><span class="si">{</span><span class="n">target</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;&lt;first&gt;&#39;</span><span class="si">}</span><span class="s2">&#39; not found&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_split_around_first_loop</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">func_def</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncDef</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Split the function body into pre-loop, loop, and post-loop parts.&quot;&quot;&quot;</span>
+        <span class="n">pre</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">post</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">loop_node</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">body_items</span> <span class="o">=</span> <span class="n">func_def</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">block_items</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">body_items</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="p">(</span><span class="n">c_ast</span><span class="o">.</span><span class="n">While</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">For</span><span class="p">)):</span>
+                <span class="n">loop_node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_loop</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">pre</span><span class="p">)</span>
+                <span class="n">post</span> <span class="o">=</span> <span class="n">body_items</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:]</span>
+                <span class="k">break</span>
+            <span class="n">pre</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pre</span><span class="p">,</span> <span class="n">loop_node</span><span class="p">,</span> <span class="n">post</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_loop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">pre</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">While</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``for`` loops to an equivalent ``while`` shape.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">While</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">node</span>
+
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">For</span><span class="p">)</span>
+        <span class="c1"># Handle for-loop initialization as pre-loop statements</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pre</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">init</span><span class="p">)</span>
+
+        <span class="n">cond</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">cond</span> <span class="ow">or</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;1&quot;</span><span class="p">)</span>
+
+        <span class="n">body_items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Compound</span><span class="p">)</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">stmt</span><span class="o">.</span><span class="n">block_items</span><span class="p">:</span>
+            <span class="n">body_items</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">stmt</span><span class="o">.</span><span class="n">block_items</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">node</span><span class="o">.</span><span class="n">stmt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">body_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">stmt</span><span class="p">)</span>
+
+        <span class="c1"># The increment executes after the body</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">next</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">body_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">next</span><span class="p">)</span>
+
+        <span class="n">new_body</span> <span class="o">=</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Compound</span><span class="p">(</span><span class="n">block_items</span><span class="o">=</span><span class="n">body_items</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">While</span><span class="p">(</span><span class="n">cond</span><span class="o">=</span><span class="n">cond</span><span class="p">,</span> <span class="n">stmt</span><span class="o">=</span><span class="n">new_body</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collect_variables</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_def</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncDef</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Collect variable names (parameters + local declarations).&quot;&quot;&quot;</span>
+        <span class="n">names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Parameters</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">func_def</span><span class="o">.</span><span class="n">decl</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="s2">&quot;args&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">params</span> <span class="ow">and</span> <span class="n">params</span><span class="o">.</span><span class="n">params</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">params</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Decl</span><span class="p">)</span> <span class="ow">and</span> <span class="n">p</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                    <span class="n">names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="k">class</span><span class="w"> </span><span class="nc">DeclVisitor</span><span class="p">(</span><span class="n">c_ast</span><span class="o">.</span><span class="n">NodeVisitor</span><span class="p">):</span>
+            <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">visit_Decl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Decl</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="n">dv</span> <span class="o">=</span> <span class="n">DeclVisitor</span><span class="p">()</span>
+        <span class="n">dv</span><span class="o">.</span><span class="n">visit</span><span class="p">(</span><span class="n">func_def</span><span class="o">.</span><span class="n">body</span><span class="p">)</span>
+        <span class="n">names</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">dv</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+        <span class="c1"># Preserve deterministic ordering</span>
+        <span class="n">unique_names</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">names</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">unique_names</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_z3_variables</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create Z3 variables and their prime counterparts.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">prime</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">Int</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">var</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">prime</span>
+
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="c1"># Translation helpers                                                #</span>
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_init_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Translate pre-loop statements into an initial condition.&quot;&quot;&quot;</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enumerate_paths</span><span class="p">(</span><span class="n">stmts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">)</span>
+        <span class="n">disjuncts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">guard</span><span class="p">,</span> <span class="n">env</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="n">eqs</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">==</span> <span class="n">value</span>
+                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">env</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">[</span><span class="n">name</span><span class="p">])</span> <span class="o">!=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="p">]</span>
+            <span class="n">pieces</span> <span class="o">=</span> <span class="p">[</span><span class="n">guard</span><span class="p">]</span> <span class="o">+</span> <span class="n">eqs</span> <span class="k">if</span> <span class="n">eqs</span> <span class="k">else</span> <span class="p">[</span><span class="n">guard</span><span class="p">]</span>
+            <span class="n">disjuncts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">pieces</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">disjuncts</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">disjuncts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">disjuncts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">z3</span><span class="o">.</span><span class="n">Or</span><span class="p">(</span><span class="n">disjuncts</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_transition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loop_node</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">While</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Translate the loop body into a transition relation.&quot;&quot;&quot;</span>
+        <span class="n">guard</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">loop_node</span><span class="o">.</span><span class="n">cond</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">))</span>
+        <span class="n">body_items</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_body_items</span><span class="p">(</span><span class="n">loop_node</span><span class="o">.</span><span class="n">stmt</span><span class="p">)</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enumerate_paths</span><span class="p">(</span><span class="n">body_items</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">)</span>
+
+        <span class="n">transitions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">path_guard</span><span class="p">,</span> <span class="n">env</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="n">eqs</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">prime_variable_mapping</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">==</span> <span class="n">env</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span>
+            <span class="p">]</span>
+            <span class="n">transitions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">guard</span><span class="p">,</span> <span class="n">path_guard</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">eqs</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">transitions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">transitions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">transitions</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">z3</span><span class="o">.</span><span class="n">Or</span><span class="p">(</span><span class="n">transitions</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_post_condition</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">stmts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">],</span> <span class="n">exit_guard</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Translate post-loop assertions into a safety property.</span>
+
+<span class="sd">        The guard captures the loop-exit condition so assertions are only</span>
+<span class="sd">        required to hold after leaving the loop.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">assertions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_assertions_with_guards</span><span class="p">(</span>
+            <span class="n">stmts</span><span class="p">,</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable_mapping</span><span class="p">),</span> <span class="n">initial_guard</span><span class="o">=</span><span class="n">exit_guard</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">assertions</span><span class="p">)</span> <span class="k">if</span> <span class="n">assertions</span> <span class="k">else</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="c1"># Statement/path handling                                            #</span>
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_enumerate_paths</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">stmts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">],</span> <span class="n">env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Symbolically enumerate straight-line paths through a statement list.&quot;&quot;&quot;</span>
+        <span class="n">paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">env</span><span class="p">))</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">stmts</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="n">new_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">guard</span><span class="p">,</span> <span class="n">cur_env</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+                <span class="n">handled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_statement</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">guard</span><span class="p">,</span> <span class="n">cur_env</span><span class="p">)</span>
+                <span class="n">new_paths</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">handled</span><span class="p">)</span>
+            <span class="n">paths</span> <span class="o">=</span> <span class="n">new_paths</span>
+
+        <span class="k">return</span> <span class="n">paths</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_process_statement</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">stmt</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">guard</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Process a single statement under a given guard and environment.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Compound</span><span class="p">):</span>
+            <span class="n">sub_paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enumerate_paths</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">block_items</span> <span class="ow">or</span> <span class="p">[],</span> <span class="n">env</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">guard</span><span class="p">,</span> <span class="n">g</span><span class="p">),</span> <span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">sub_paths</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">If</span><span class="p">):</span>
+            <span class="n">cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">cond</span><span class="p">,</span> <span class="n">env</span><span class="p">))</span>
+            <span class="n">then_items</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_body_items</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">iftrue</span><span class="p">)</span>
+            <span class="n">else_items</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_body_items</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">iffalse</span><span class="p">)</span>
+
+            <span class="n">then_paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enumerate_paths</span><span class="p">(</span><span class="n">then_items</span><span class="p">,</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">env</span><span class="p">))</span>
+            <span class="n">else_paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_enumerate_paths</span><span class="p">(</span><span class="n">else_items</span><span class="p">,</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">env</span><span class="p">))</span>
+
+            <span class="n">results</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">then_paths</span><span class="p">:</span>
+                <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">guard</span><span class="p">,</span> <span class="n">cond</span><span class="p">,</span> <span class="n">g</span><span class="p">),</span> <span class="n">e</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">else_paths</span><span class="p">:</span>
+                <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">guard</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">Not</span><span class="p">(</span><span class="n">cond</span><span class="p">),</span> <span class="n">g</span><span class="p">),</span> <span class="n">e</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">results</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Assignment</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">stmt</span><span class="o">.</span><span class="n">op</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="s2">&quot;+=&quot;</span><span class="p">,</span> <span class="s2">&quot;-=&quot;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Assignment op &#39;</span><span class="si">{</span><span class="n">stmt</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2">&#39; not supported&quot;</span><span class="p">)</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">stmt</span><span class="o">.</span><span class="n">lvalue</span><span class="o">.</span><span class="n">name</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">lvalue</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">ID</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">target</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">target</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">env</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported assignment target: </span><span class="si">{</span><span class="n">stmt</span><span class="o">.</span><span class="n">lvalue</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">rhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">rvalue</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">stmt</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;+=&quot;</span><span class="p">:</span>
+                <span class="n">rhs</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="o">+</span> <span class="n">rhs</span>
+            <span class="k">elif</span> <span class="n">stmt</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;-=&quot;</span><span class="p">:</span>
+                <span class="n">rhs</span> <span class="o">=</span> <span class="n">env</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="o">-</span> <span class="n">rhs</span>
+
+            <span class="n">new_env</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
+            <span class="n">new_env</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="o">=</span> <span class="n">rhs</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="n">guard</span><span class="p">,</span> <span class="n">new_env</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Decl</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">stmt</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">env</span> <span class="ow">and</span> <span class="n">stmt</span><span class="o">.</span><span class="n">init</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">new_env</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
+                <span class="n">new_env</span><span class="p">[</span><span class="n">stmt</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">init</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">[(</span><span class="n">guard</span><span class="p">,</span> <span class="n">new_env</span><span class="p">)]</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="n">guard</span><span class="p">,</span> <span class="n">env</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncCall</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_func_name</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;__VERIFIER_assume&quot;</span><span class="p">,</span> <span class="s2">&quot;assume&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">stmt</span><span class="o">.</span><span class="n">args</span> <span class="ow">and</span> <span class="n">stmt</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">exprs</span><span class="p">:</span>
+                    <span class="n">assume_expr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">exprs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">env</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="p">[(</span><span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">guard</span><span class="p">,</span> <span class="n">assume_expr</span><span class="p">),</span> <span class="n">env</span><span class="p">)]</span>
+                <span class="k">return</span> <span class="p">[(</span><span class="n">guard</span><span class="p">,</span> <span class="n">env</span><span class="p">)]</span>
+            <span class="c1"># Other calls are treated as no-ops here</span>
+            <span class="k">return</span> <span class="p">[(</span><span class="n">guard</span><span class="p">,</span> <span class="n">env</span><span class="p">)]</span>
+
+        <span class="c1"># Unsupported or no-op statements keep the environment unchanged</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="n">guard</span><span class="p">,</span> <span class="n">env</span><span class="p">)]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_body_items</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the block items list for a node if present.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">node</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Compound</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">block_items</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">node</span><span class="p">]</span>
+
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="c1"># Expression translation                                             #</span>
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_c_expr_to_z3</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Translate a ``pycparser`` expression node to a Z3 expression.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Constant</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;int&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">IntVal</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported constant type: </span><span class="si">{</span><span class="n">expr</span><span class="o">.</span><span class="n">type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">ID</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">env</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">env</span><span class="p">[</span><span class="n">expr</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown identifier: </span><span class="si">{</span><span class="n">expr</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">BinaryOp</span><span class="p">):</span>
+            <span class="n">lhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">left</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="n">rhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">right</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="n">op</span> <span class="o">=</span> <span class="n">expr</span><span class="o">.</span><span class="n">op</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;+&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">+</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">-</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;*&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">*</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;/&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">IntDiv</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;%&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">%</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;==&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">==</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;!=&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">!=</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">&lt;</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&lt;=&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">&lt;=</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">&gt;</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&gt;=&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lhs</span> <span class="o">&gt;=</span> <span class="n">rhs</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;&amp;&amp;&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="n">lhs</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="n">rhs</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;||&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">Or</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="n">lhs</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="n">rhs</span><span class="p">))</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Binary op &#39;</span><span class="si">{</span><span class="n">op</span><span class="si">}</span><span class="s2">&#39; not supported&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">UnaryOp</span><span class="p">):</span>
+            <span class="n">operand</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">expr</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="o">-</span><span class="n">operand</span>
+            <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;+&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">operand</span>
+            <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;!&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">Not</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="n">operand</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">op</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;p++&quot;</span><span class="p">,</span> <span class="s2">&quot;p--&quot;</span><span class="p">,</span> <span class="s2">&quot;++&quot;</span><span class="p">,</span> <span class="s2">&quot;--&quot;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Increment/decrement not supported&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unary op &#39;</span><span class="si">{</span><span class="n">expr</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2">&#39; not supported&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">TernaryOp</span><span class="p">):</span>
+            <span class="n">cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">cond</span><span class="p">,</span> <span class="n">env</span><span class="p">))</span>
+            <span class="n">iftrue</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">iftrue</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="n">iffalse</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">iffalse</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">z3</span><span class="o">.</span><span class="n">If</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">iftrue</span><span class="p">,</span> <span class="n">iffalse</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">Cast</span><span class="p">):</span>
+            <span class="c1"># Ignore the cast for now; assume integer-like sorts.</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">expr</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expression &#39;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39; not supported&quot;</span><span class="p">)</span>
+
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="c1"># Assertions and helpers                                            #</span>
+    <span class="c1"># ------------------------------------------------------------------ #</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collect_assertions_with_guards</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">stmts</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">],</span>
+        <span class="n">env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">],</span>
+        <span class="n">initial_guard</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span> <span class="o">=</span> <span class="n">z3</span><span class="o">.</span><span class="n">BoolVal</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Collect guarded assertions, including those nested in conditionals.&quot;&quot;&quot;</span>
+
+        <span class="n">collected</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">walk</span><span class="p">(</span>
+            <span class="n">stmt_list</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">c_ast</span><span class="o">.</span><span class="n">Node</span><span class="p">],</span>
+            <span class="n">guard</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span>
+            <span class="n">cur_env</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">],</span>
+        <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]:</span>
+            <span class="n">paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[(</span><span class="n">guard</span><span class="p">,</span> <span class="n">cur_env</span><span class="p">)]</span>
+
+            <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">stmt_list</span> <span class="ow">or</span> <span class="p">[]:</span>
+                <span class="n">new_paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">env_at_stmt</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncCall</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_assert_call</span><span class="p">(</span><span class="n">stmt</span><span class="p">):</span>
+                        <span class="n">expr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">exprs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">env_at_stmt</span><span class="p">)</span>
+                        <span class="p">)</span>
+                        <span class="n">collected</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">z3</span><span class="o">.</span><span class="n">Implies</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">expr</span><span class="p">))</span>
+                        <span class="n">new_paths</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">g</span><span class="p">,</span> <span class="n">env_at_stmt</span><span class="p">))</span>
+                        <span class="k">continue</span>
+
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">If</span><span class="p">):</span>
+                        <span class="n">cond</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_as_bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_c_expr_to_z3</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">cond</span><span class="p">,</span> <span class="n">env_at_stmt</span><span class="p">))</span>
+                        <span class="n">then_paths</span> <span class="o">=</span> <span class="n">walk</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_body_items</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">iftrue</span><span class="p">),</span>
+                            <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">cond</span><span class="p">),</span>
+                            <span class="n">deepcopy</span><span class="p">(</span><span class="n">env_at_stmt</span><span class="p">),</span>
+                        <span class="p">)</span>
+                        <span class="n">else_paths</span> <span class="o">=</span> <span class="n">walk</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_body_items</span><span class="p">(</span><span class="n">stmt</span><span class="o">.</span><span class="n">iffalse</span><span class="p">),</span>
+                            <span class="n">z3</span><span class="o">.</span><span class="n">And</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">z3</span><span class="o">.</span><span class="n">Not</span><span class="p">(</span><span class="n">cond</span><span class="p">)),</span>
+                            <span class="n">deepcopy</span><span class="p">(</span><span class="n">env_at_stmt</span><span class="p">),</span>
+                        <span class="p">)</span>
+                        <span class="n">new_paths</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">then_paths</span><span class="p">)</span>
+                        <span class="n">new_paths</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">else_paths</span><span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">new_paths</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_process_statement</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">env_at_stmt</span><span class="p">))</span>
+
+                <span class="n">paths</span> <span class="o">=</span> <span class="n">new_paths</span>
+
+            <span class="k">return</span> <span class="n">paths</span>
+
+        <span class="n">walk</span><span class="p">(</span><span class="n">stmts</span><span class="p">,</span> <span class="n">initial_guard</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">collected</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_as_bool</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">:</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">z3</span><span class="o">.</span><span class="n">ExprRef</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure integer expressions are treated as booleans.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">z3</span><span class="o">.</span><span class="n">is_bool</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">expr</span>
+        <span class="k">return</span> <span class="n">expr</span> <span class="o">!=</span> <span class="mi">0</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_func_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncCall</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the function name from a call node.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">call</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">ID</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">call</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_assert_call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">call</span><span class="p">:</span> <span class="n">c_ast</span><span class="o">.</span><span class="n">FuncCall</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check whether a function call represents an assertion.&quot;&quot;&quot;</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_func_name</span><span class="p">(</span><span class="n">call</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span>
+            <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;__VERIFIER_assert&quot;</span><span class="p">,</span> <span class="s2">&quot;assert&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">call</span><span class="o">.</span><span class="n">args</span> <span class="ow">and</span> <span class="n">call</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">exprs</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="c_to_efmc"><a class="viewcode-back" href="../../../frontend.html#efmc.frontends.c2efmc.c_to_efmc">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">c_to_efmc</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TransitionSystem</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convenience wrapper mirroring :func:`boogie_to_efmc`.&quot;&quot;&quot;</span>
+    <span class="n">converter</span> <span class="o">=</span> <span class="n">CToEFMCConverter</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">converter</span><span class="o">.</span><span class="n">convert_file_to_transition_system</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../frontends.html" >efmc.frontends</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.frontends.c2efmc</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,384 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>efmc.smttools.smtlib_solver &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.smttools.smtlib_solver</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for efmc.smttools.smtlib_solver</h1><div class="highlight"><pre>
+<span></span><span class="c1"># coding: utf-8</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">SMTLIB solver interface.</span>
+
+<span class="sd">Partially modified from https://github.com/trailofbits/manticore</span>
+<span class="sd">TODO: allow the user to select different modes</span>
+<span class="sd">1. Use the same process to first accept the whole formula, and then accept</span>
+<span class="sd">   multiple (check-sat-assuming) commands?</span>
+<span class="sd">2. Every time, create a new process the solve each individual instance</span>
+<span class="sd">   (including formulas and check-sat-assuming)</span>
+
+<span class="sd">TODO: we need to consider three &quot;incremental mode&quot;</span>
+<span class="sd">1. Every time build new assertions</span>
+<span class="sd">   - build new solver process + new assertions?</span>
+<span class="sd">   - reuse the solver process, but use `reset` command? (it seems that</span>
+<span class="sd">     `reset` can affect the tactic)</span>
+<span class="sd">2. Use push/pop</span>
+<span class="sd">3. Use assumption literal</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">fcntl</span>  <span class="c1"># seems that Windows does not have this lib.</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">subprocess</span><span class="w"> </span><span class="kn">import</span> <span class="n">PIPE</span><span class="p">,</span> <span class="n">Popen</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">List</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.smttools.smt_exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">SolverError</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SmtlibProc"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SmtlibProc">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">SmtlibProc</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Single SMTLIB interactive process.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_command</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Single smtlib interactive process</span>
+<span class="sd">        :param solver_command: the shell command to execute</span>
+<span class="sd">        :param debug: log all messaging</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Popen</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_command</span> <span class="o">=</span> <span class="n">solver_command</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span> <span class="o">=</span> <span class="n">debug</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_buf</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+<div class="viewcode-block" id="SmtlibProc.start"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SmtlibProc.start">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Spawns POpen solver process&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="c1"># bufsize=0: if we set input to unbuffered, we get syntax errors</span>
+        <span class="c1"># in large formulas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span> <span class="o">=</span> <span class="n">Popen</span><span class="p">(</span>
+            <span class="n">shlex</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_command</span><span class="p">),</span>
+            <span class="n">stdin</span><span class="o">=</span><span class="n">PIPE</span><span class="p">,</span>
+            <span class="n">stdout</span><span class="o">=</span><span class="n">PIPE</span><span class="p">,</span>
+            <span class="n">universal_newlines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">close_fds</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># stdout should be non-blocking</span>
+        <span class="n">fl</span> <span class="o">=</span> <span class="n">fcntl</span><span class="o">.</span><span class="n">fcntl</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">fcntl</span><span class="o">.</span><span class="n">F_GETFL</span><span class="p">)</span>
+        <span class="n">fcntl</span><span class="o">.</span><span class="n">fcntl</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">fcntl</span><span class="o">.</span><span class="n">F_SETFL</span><span class="p">,</span> <span class="n">fl</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">O_NONBLOCK</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_buf</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span></div>
+
+<div class="viewcode-block" id="SmtlibProc.stop"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SmtlibProc.stop">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Stops the solver process by:</span>
+<span class="sd">        - sending a SIGKILL signal,</span>
+<span class="sd">        - waiting till the process terminates (so we don&#39;t leave a zombie process)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="c1"># if it did not finished already</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">returncode</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="c1"># Kill the process</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+
+            <span class="c1"># No need to wait for termination, zombies avoided.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="SmtlibProc.send"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SmtlibProc.send">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Send a string to the solver.</span>
+<span class="sd">        :param cmd: a SMTLIBv2 command (ex. (check-sat))</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;&gt;</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">cmd</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">cmd</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">BrokenPipeError</span><span class="p">,</span> <span class="ne">IOError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span>
+                <span class="s2">&quot;Solver encountered an error trying to send commands: </span><span class="si">%s</span><span class="s2">.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">Output: </span><span class="si">%s</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">Stderr: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">e</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">raise</span></div>
+
+<div class="viewcode-block" id="SmtlibProc.recv"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SmtlibProc.recv">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reads the response from the smtlib solver</span>
+<span class="sd">        :param wait: a boolean that indicate to wait with a blocking call</span>
+<span class="sd">        until the results are available. Otherwise, it returns None if the solver</span>
+<span class="sd">        does not respond.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">tries</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">timeout</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="n">buf</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_buf</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>  <span class="c1"># we got a partial response last time, let&#39;s use it</span>
+            <span class="n">buf</span> <span class="o">=</span> <span class="n">buf</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_buf</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">buf</span> <span class="o">=</span> <span class="n">buf</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+                <span class="n">buf</span> <span class="o">=</span> <span class="n">buf</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">wait</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="p">(</span>
+                        <span class="n">buf</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span>
+                    <span class="p">):</span>  <span class="c1"># we got an error, but something was returned, let&#39;s save it</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_last_buf</span> <span class="o">=</span> <span class="n">buf</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">tries</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="k">if</span> <span class="n">buf</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># this verifies if the response from the solver is complete</span>
+            <span class="c1"># (it has balanced brackets)</span>
+            <span class="c1"># TODO: the results of some special queries might not be</span>
+            <span class="c1"># s-expression (e.g., it can be multiple e-expressions)</span>
+            <span class="n">lparen</span><span class="p">,</span> <span class="n">rparen</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">sum</span><span class="p">,</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">((</span><span class="n">c</span> <span class="o">==</span> <span class="s2">&quot;(&quot;</span><span class="p">,</span> <span class="n">c</span> <span class="o">==</span> <span class="s2">&quot;)&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">buf</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="n">lparen</span> <span class="o">==</span> <span class="n">rparen</span> <span class="ow">and</span> <span class="n">buf</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                <span class="k">break</span>
+
+            <span class="k">if</span> <span class="n">tries</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">timeout</span><span class="p">)</span>
+                <span class="n">timeout</span> <span class="o">+=</span> <span class="mf">0.1</span>
+                <span class="c1"># timeout += 0.5</span>
+
+        <span class="n">buf</span> <span class="o">=</span> <span class="n">buf</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_buf</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s2">&quot;(error&quot;</span> <span class="ow">in</span> <span class="n">buf</span> <span class="ow">or</span> <span class="s2">&quot;Fatal&quot;</span> <span class="ow">in</span> <span class="n">buf</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SolverError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Solver error: </span><span class="si">{</span><span class="n">buf</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_debug</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">buf</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">buf</span></div>
+
+<div class="viewcode-block" id="SmtlibProc.is_started"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SmtlibProc.is_started">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">is_started</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="SmtlibProc.clear_buffers"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SmtlibProc.clear_buffers">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">clear_buffers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_proc</span><span class="o">.</span><span class="n">stdin</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="SMTLIBSolver"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">SMTLIBSolver</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;SMTLIB solver interface using external solver via subprocess.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_command</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Build a smtlib solver instance.</span>
+<span class="sd">        This is implemented using an external solver (via a subprocess).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span> <span class="o">=</span> <span class="n">SmtlibProc</span><span class="p">(</span><span class="n">solver_command</span><span class="p">,</span> <span class="n">debug</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="c1"># run solver specific initializations</span>
+
+<div class="viewcode-block" id="SMTLIBSolver.check_sat"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">check_sat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        check sat</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(check-sat)&quot;</span><span class="p">)</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span>  <span class="c1"># is this correct?</span>
+        <span class="k">assert</span> <span class="n">status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Check took </span><span class="si">%s</span><span class="s2"> seconds (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="n">status</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">status</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;sat&quot;</span><span class="p">,</span> <span class="s2">&quot;unsat&quot;</span><span class="p">,</span> <span class="s2">&quot;unknown&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">status</span>
+        <span class="k">raise</span> <span class="n">SolverError</span><span class="p">(</span><span class="n">status</span><span class="p">)</span></div>
+        <span class="c1"># return False</span>
+
+<div class="viewcode-block" id="SMTLIBSolver.check_sat_assuming"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_assuming">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">check_sat_assuming</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">assumptions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param assumptions: a list of assumption literal</span>
+<span class="sd">        FIXME: implement and test; figure out what should &quot;assumptions&quot; look like</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="n">all_expressions_str</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">assumptions</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(check-sat-assuming (</span><span class="si">{</span><span class="n">all_expressions_str</span><span class="si">}</span><span class="s2">))&quot;</span><span class="p">)</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span>  <span class="c1"># is this correct?</span>
+        <span class="k">assert</span> <span class="n">status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Check took </span><span class="si">%s</span><span class="s2"> seconds (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="n">status</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">status</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;sat&quot;</span><span class="p">,</span> <span class="s2">&quot;unsat&quot;</span><span class="p">,</span> <span class="s2">&quot;unknown&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">status</span>
+        <span class="k">raise</span> <span class="n">SolverError</span><span class="p">(</span><span class="n">status</span><span class="p">)</span></div>
+        <span class="c1"># return False</span>
+
+<div class="viewcode-block" id="SMTLIBSolver.check_sat_with_pushpop_scope"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_with_pushpop_scope">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">check_sat_with_pushpop_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_assertions</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param new_assertions: is a tmp cnt</span>
+<span class="sd">        FIXME: implement and test</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">push</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">new_assertions</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="s2">&quot;(check-sat)&quot;</span><span class="p">)</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span>  <span class="c1"># is this correct?</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">push</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Check took </span><span class="si">%s</span><span class="s2"> seconds (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="n">status</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">status</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;sat&quot;</span><span class="p">,</span> <span class="s2">&quot;unsat&quot;</span><span class="p">,</span> <span class="s2">&quot;unknown&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">status</span>
+        <span class="k">raise</span> <span class="n">SolverError</span><span class="p">(</span><span class="n">status</span><span class="p">)</span></div>
+        <span class="c1"># return False</span>
+
+<div class="viewcode-block" id="SMTLIBSolver.check_sat_from_scratch"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.check_sat_from_scratch">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">check_sat_from_scratch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">whole_fml</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Check the satisfiability of the current state</span>
+<span class="sd">        :param whole_fml: should be a whole formula (with declaration,</span>
+<span class="sd">                         assertions, and check-sat)</span>
+<span class="sd">        :return: whether current state is satisfiable or not.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">whole_fml</span><span class="p">)</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Check took </span><span class="si">%s</span><span class="s2"> seconds (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="n">status</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">status</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;sat&quot;</span><span class="p">,</span> <span class="s2">&quot;unsat&quot;</span><span class="p">,</span> <span class="s2">&quot;unknown&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">status</span>
+        <span class="k">raise</span> <span class="n">SolverError</span><span class="p">(</span><span class="n">status</span><span class="p">)</span></div>
+        <span class="c1"># return False</span>
+
+<div class="viewcode-block" id="SMTLIBSolver.assert_assertions"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.assert_assertions">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">assert_assertions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">assertions</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add new assertions</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">assertions</span><span class="p">)</span></div>
+
+    <span class="c1"># push pop</span>
+<div class="viewcode-block" id="SMTLIBSolver.push"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.push">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">push</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pushes and save the current constraint store and state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="s2">&quot;(push 1)&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SMTLIBSolver.pop"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.pop">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">pop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recall the last pushed constraint store and state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="s2">&quot;(pop 1)&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SMTLIBSolver.get_expr_values"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.get_expr_values">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_expr_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expressions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        If satisfiable, fetch the values of expressions</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">all_expressions_str</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;(get-value (</span><span class="si">{</span><span class="n">all_expressions_str</span><span class="si">}</span><span class="s2">))&quot;</span><span class="p">)</span>
+        <span class="n">ret_solver</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">ret_solver</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">ret_solver</span>  <span class="c1"># return raw string</span></div>
+
+<div class="viewcode-block" id="SMTLIBSolver.get_unsat_core"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.get_unsat_core">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_unsat_core</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the unsat core.</span>
+<span class="sd">        FIXME: implement and test</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="s2">&quot;(get-unsat-core)&quot;</span>  <span class="c1"># core or cores?</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">ret</span></div>
+
+<div class="viewcode-block" id="SMTLIBSolver.reset"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.reset">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Auxiliary method to reset the smtlib external solver to initial defaults</span>
+<span class="sd">        TODO: Z3 and CVC5 supports the &quot;reset&quot; cmd. Maybe can use it</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>  <span class="c1"># does not do anything if already stopped</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">clear_buffers</span><span class="p">()</span>  <span class="c1"># need this?</span></div>
+
+<div class="viewcode-block" id="SMTLIBSolver.stop"><a class="viewcode-back" href="../../../smttools.html#efmc.smttools.smtlib_solver.SMTLIBSolver.stop">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Stop the solver process.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_smtlib</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span></div></div>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">EFMC Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">efmc.smttools.smtlib_solver</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>

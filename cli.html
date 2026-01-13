@@ -1,0 +1,337 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>Command-Line Interface &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css" />
+    
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Frontends" href="frontend.html" />
+    <link rel="prev" title="Program Verification" href="verification.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="frontend.html" title="Frontends"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="verification.html" title="Program Verification"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Command-Line Interface</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="command-line-interface">
+<span id="cli"></span><h1>Command-Line Interface<a class="headerlink" href="#command-line-interface" title="Permalink to this heading">¶</a></h1>
+<p>EFMC provides three main command-line tools:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">efmc</span></code> - The main software model checker</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">efsmt</span></code> - Exists-Forall SMT solver</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">polyhorn</span></code> - Ranking function synthesis for termination</p></li>
+</ol>
+<section id="efmc">
+<h2>efmc<a class="headerlink" href="#efmc" title="Permalink to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">efmc</span></code> command is the primary interface for software model checking. It supports multiple input formats and verification engines.</p>
+<section id="usage">
+<h3>Usage<a class="headerlink" href="#usage" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efmc<span class="w"> </span>--file<span class="w"> </span>&lt;input_file&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="input-formats">
+<h3>Input Formats<a class="headerlink" href="#input-formats" title="Permalink to this heading">¶</a></h3>
+<p>EFMC automatically detects the input format based on file extension:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">.smt2</span></code> - Constrained Horn Clauses (CHC) format</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.sy</span></code> or <code class="docutils literal notranslate"><span class="pre">.sl</span></code> - SyGuS invariant track format</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.bpl</span></code> - Boogie intermediate verification language</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.c</span></code> - C source code</p></li>
+</ul>
+<p>Alternatively, you can explicitly specify the language:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--lang<span class="w"> </span>chc
+efmc<span class="w"> </span>--file<span class="w"> </span>program.sy<span class="w"> </span>--lang<span class="w"> </span>sygus
+efmc<span class="w"> </span>--file<span class="w"> </span>program.bpl<span class="w"> </span>--lang<span class="w"> </span>boogie
+efmc<span class="w"> </span>--file<span class="w"> </span>program.c<span class="w"> </span>--lang<span class="w"> </span>c
+</pre></div>
+</div>
+</section>
+<section id="verification-engines">
+<h3>Verification Engines<a class="headerlink" href="#verification-engines" title="Permalink to this heading">¶</a></h3>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">--engine</span></code> option to select a verification engine:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>ef<span class="w">        </span><span class="c1"># Template-based (default)</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>pdr<span class="w">       </span><span class="c1"># Property-Directed Reachability</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>kind<span class="w">      </span><span class="c1"># K-Induction</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>qi<span class="w">        </span><span class="c1"># Quantifier Instantiation</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>houdini<span class="w">   </span><span class="c1"># Houdini algorithm</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>abduction<span class="w"> </span><span class="c1"># Abductive inference</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>bdd<span class="w">       </span><span class="c1"># BDD-based verification</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>predabs<span class="w">   </span><span class="c1"># Predicate abstraction</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>symabs<span class="w">    </span><span class="c1"># Symbolic abstraction</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w">   </span><span class="c1"># LLM-guided invariant synthesis</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>qe<span class="w">        </span><span class="c1"># Quantifier elimination</span>
+</pre></div>
+</div>
+</section>
+<section id="template-based-verification-options">
+<h3>Template-Based Verification Options<a class="headerlink" href="#template-based-verification-options" title="Permalink to this heading">¶</a></h3>
+<p>When using the <code class="docutils literal notranslate"><span class="pre">ef</span></code> engine, you can specify templates for invariant generation:</p>
+<p>Integer/Real templates:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>interval<span class="w">       </span><span class="c1"># Interval domain</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>power_interval<span class="w"> </span><span class="c1"># Powers of intervals</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>zone<span class="w">           </span><span class="c1"># Zone domain</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>octagon<span class="w">         </span><span class="c1"># Octagon domain</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>affine<span class="w">          </span><span class="c1"># Affine relations</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>power_affine<span class="w">    </span><span class="c1"># Powers of affine</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>poly<span class="w">            </span><span class="c1"># Polynomial</span>
+</pre></div>
+</div>
+<p>Bitvector templates:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>bv_interval<span class="w">      </span><span class="c1"># BV intervals</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>bv_zone<span class="w">          </span><span class="c1"># BV zones</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>bv_octagon<span class="w">       </span><span class="c1"># BV octagons</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>bv_poly<span class="w">          </span><span class="c1"># BV polynomials</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>bv_pattern<span class="w">       </span><span class="c1"># Bit patterns</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--template<span class="w"> </span>bv_xor_parity<span class="w">    </span><span class="c1"># XOR/parity properties</span>
+</pre></div>
+</div>
+</section>
+<section id="smt-solver-options">
+<h3>SMT Solver Options<a class="headerlink" href="#smt-solver-options" title="Permalink to this heading">¶</a></h3>
+<p>EFMC supports multiple SMT solvers for the exists-forall SMT problems:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Quantifier instantiation approaches</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--efsmt-solver<span class="w"> </span>z3api<span class="w">     </span><span class="c1"># Z3 Python API (default)</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--efsmt-solver<span class="w"> </span>z3<span class="w">        </span><span class="c1"># Z3 via SMT-LIB</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--efsmt-solver<span class="w"> </span>cvc5<span class="w">      </span><span class="c1"># CVC5</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--efsmt-solver<span class="w"> </span>yices2<span class="w">    </span><span class="c1"># Yices2</span>
+
+<span class="c1"># Bit-blasting approaches</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--efsmt-solver<span class="w"> </span>z3qbf<span class="w">     </span><span class="c1"># Z3 QBF</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--efsmt-solver<span class="w"> </span>caqe<span class="w">      </span><span class="c1"># CAQE</span>
+
+<span class="c1"># CEGIS approach</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--efsmt-solver<span class="w"> </span>cegis<span class="w">     </span><span class="c1"># CEGIS with PySMT</span>
+</pre></div>
+</div>
+</section>
+<section id="llm4inv-options">
+<h3>LLM4Inv Options<a class="headerlink" href="#llm4inv-options" title="Permalink to this heading">¶</a></h3>
+<p>For the LLM-guided invariant synthesis engine:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Local models</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w"> </span>--llm4inv-local-provider<span class="w"> </span>lm-studio
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w"> </span>--llm4inv-local-model<span class="w"> </span>qwen/qwen3-coder-30b
+
+<span class="c1"># Remote models</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w"> </span>--llm4inv-provider<span class="w"> </span>remote
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w"> </span>--llm4inv-remote-model<span class="w"> </span>deepseek-v3
+
+<span class="c1"># Generation parameters</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w"> </span>--llm4inv-temperature<span class="w"> </span><span class="m">0</span>.1
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w"> </span>--llm4inv-max-candidates-per-iter<span class="w"> </span><span class="m">5</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--engine<span class="w"> </span>llm4inv<span class="w"> </span>--llm4inv-max-iterations<span class="w"> </span><span class="m">10</span>
+</pre></div>
+</div>
+</section>
+<section id="logging">
+<h3>Logging<a class="headerlink" href="#logging" title="Permalink to this heading">¶</a></h3>
+<p>Control verbosity with <code class="docutils literal notranslate"><span class="pre">--log-level</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--log-level<span class="w"> </span>DEBUG
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--log-level<span class="w"> </span>INFO<span class="w">     </span><span class="c1"># default</span>
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--log-level<span class="w"> </span>WARNING
+efmc<span class="w"> </span>--file<span class="w"> </span>program.smt2<span class="w"> </span>--log-level<span class="w"> </span>ERROR
+</pre></div>
+</div>
+</section>
+</section>
+<section id="efsmt">
+<h2>efsmt<a class="headerlink" href="#efsmt" title="Permalink to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">efsmt</span></code> command is a specialized solver for Exists-Forall SMT problems.</p>
+<section id="id1">
+<h3>Usage<a class="headerlink" href="#id1" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efsmt<span class="w"> </span>--file<span class="w"> </span>&lt;query.smt2&gt;<span class="w"> </span>&lt;solver&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="example">
+<h3>Example<a class="headerlink" href="#example" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>efsmt<span class="w"> </span>--file<span class="w"> </span>query.smt2<span class="w"> </span>z3<span class="w"> </span>--logic<span class="w"> </span>BV
+efsmt<span class="w"> </span>--file<span class="w"> </span>query.smt2<span class="w"> </span>z3<span class="w"> </span>--dump-smt2
+efsmt<span class="w"> </span>--file<span class="w"> </span>query.smt2<span class="w"> </span>z3<span class="w"> </span>--parallel
+</pre></div>
+</div>
+</section>
+<section id="options">
+<h3>Options<a class="headerlink" href="#options" title="Permalink to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--logic</span></code>: The SMT logic (BV, UFBV, LIA, LRA, NIA, NRA, FP)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--parallel</span></code>: Use parallel solving (BV logic only)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--timeout</span></code>: Timeout in seconds</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dump-smt2</span></code>: Dump the EFSMT query in SMT2 format</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dump-qbf</span></code>: Dump the query in QBF format</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dump-cnf</span></code>: Dump bit-blasted formula in CNF format</p></li>
+</ul>
+</section>
+</section>
+<section id="polyhorn">
+<h2>polyhorn<a class="headerlink" href="#polyhorn" title="Permalink to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">polyhorn</span></code> command is used for ranking function synthesis and termination analysis.</p>
+<section id="id2">
+<h3>Usage<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>polyhorn<span class="w"> </span>--file<span class="w"> </span>&lt;program.bpl&gt;<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</pre></div>
+</div>
+<p>See <span class="xref std std-ref">polyhorn</span> for detailed documentation.</p>
+</section>
+</section>
+<section id="output">
+<h2>Output<a class="headerlink" href="#output" title="Permalink to this heading">¶</a></h2>
+<p>EFMC outputs verification results in a simple format:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">safe</span></code>: The property holds; an invariant may be printed</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unsafe</span></code>: A counterexample was found</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unknown</span></code>: Verification could not complete</p></li>
+</ul>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading">¶</a></h2>
+<p>Basic verification:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>efmc<span class="w"> </span>--file<span class="w"> </span>examples/loop.smt2
+safe
+Invariant:<span class="w"> </span>x<span class="w"> </span>&gt;<span class="o">=</span><span class="w"> </span><span class="m">0</span>
+</pre></div>
+</div>
+<p>Finding a counterexample:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>efmc<span class="w"> </span>--file<span class="w"> </span>examples/overflow.smt2
+unsafe
+Counterexample:<span class="w"> </span><span class="nv">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">18446744073709551615</span>
+</pre></div>
+</div>
+<p>Debugging with verbose output:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>efmc<span class="w"> </span>--file<span class="w"> </span>examples/loop.smt2<span class="w"> </span>--log-level<span class="w"> </span>DEBUG
+<span class="m">2024</span>-01-10<span class="w"> </span><span class="m">10</span>:30:00<span class="w"> </span>-<span class="w"> </span>efmc<span class="w"> </span>-<span class="w"> </span>INFO<span class="w"> </span>-<span class="w"> </span>Parsing<span class="w"> </span>CHC<span class="w"> </span>file...
+<span class="m">2024</span>-01-10<span class="w"> </span><span class="m">10</span>:30:00<span class="w"> </span>-<span class="w"> </span>efmc<span class="w"> </span>-<span class="w"> </span>INFO<span class="w"> </span>-<span class="w"> </span>CHC<span class="w"> </span>file<span class="w"> </span>parsing<span class="w"> </span>completed
+<span class="m">2024</span>-01-10<span class="w"> </span><span class="m">10</span>:30:00<span class="w"> </span>-<span class="w"> </span>efmc<span class="w"> </span>-<span class="w"> </span>INFO<span class="w"> </span>-<span class="w"> </span>Starting<span class="w"> </span>template-based<span class="w"> </span>verification...
+...
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Command-Line Interface</a><ul>
+<li><a class="reference internal" href="#efmc">efmc</a><ul>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#input-formats">Input Formats</a></li>
+<li><a class="reference internal" href="#verification-engines">Verification Engines</a></li>
+<li><a class="reference internal" href="#template-based-verification-options">Template-Based Verification Options</a></li>
+<li><a class="reference internal" href="#smt-solver-options">SMT Solver Options</a></li>
+<li><a class="reference internal" href="#llm4inv-options">LLM4Inv Options</a></li>
+<li><a class="reference internal" href="#logging">Logging</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#efsmt">efsmt</a><ul>
+<li><a class="reference internal" href="#id1">Usage</a></li>
+<li><a class="reference internal" href="#example">Example</a></li>
+<li><a class="reference internal" href="#options">Options</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#polyhorn">polyhorn</a><ul>
+<li><a class="reference internal" href="#id2">Usage</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#output">Output</a></li>
+<li><a class="reference internal" href="#examples">Examples</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="verification.html"
+                          title="previous chapter">Program Verification</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="frontend.html"
+                          title="next chapter">Frontends</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/cli.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="frontend.html" title="Frontends"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="verification.html" title="Program Verification"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Command-Line Interface</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>

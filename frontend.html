@@ -1,0 +1,628 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+    <title>Frontends &#8212; EFMC Documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css" />
+    
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="SMT Tools" href="smttools.html" />
+    <link rel="prev" title="Command-Line Interface" href="cli.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="smttools.html" title="SMT Tools"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="cli.html" title="Command-Line Interface"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Frontends</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="frontends">
+<span id="frontend"></span><h1>Frontends<a class="headerlink" href="#frontends" title="Permalink to this heading">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">frontends</span></code> module provides parsers for various input formats, converting them into EFMC’s internal transition system representation.</p>
+<section id="supported-formats">
+<h2>Supported Formats<a class="headerlink" href="#supported-formats" title="Permalink to this heading">¶</a></h2>
+<p>EFMC supports the following input formats:</p>
+<ol class="arabic simple">
+<li><p><strong>CHC (Constrained Horn Clauses)</strong> - <code class="docutils literal notranslate"><span class="pre">.smt2</span></code></p></li>
+<li><p><strong>SyGuS (Syntax-Guided Synthesis)</strong> - <code class="docutils literal notranslate"><span class="pre">.sy</span></code>, <code class="docutils literal notranslate"><span class="pre">.sl</span></code></p></li>
+<li><p><strong>Boogie</strong> - <code class="docutils literal notranslate"><span class="pre">.bpl</span></code></p></li>
+<li><p><strong>C</strong> - <code class="docutils literal notranslate"><span class="pre">.c</span></code></p></li>
+<li><p><strong>VMT</strong> - <code class="docutils literal notranslate"><span class="pre">.vmt</span></code> (planned)</p></li>
+<li><p><strong>Btor2</strong> - <code class="docutils literal notranslate"><span class="pre">.btor2</span></code> (planned)</p></li>
+</ol>
+</section>
+<section id="architecture">
+<h2>Architecture<a class="headerlink" href="#architecture" title="Permalink to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>efmc/frontends/
+├── chc_parser.py          # CHC format parser
+├── mini_sygus_parser.py   # SyGuS format parser
+├── boogie2efmc.py         # Boogie frontend
+├── c2efmc.py              # C frontend
+├── c2chc.py               # C to CHC converter
+├── chc2c.py               # CHC to C converter
+├── btor2chc.py            # Btor2 to CHC converter
+├── chc_parser.py          # CHC parser utilities
+└── chc2c/                 # CHC2C subpackage
+    ├── BaseCHC2C.py       # Base class
+    ├── LinearCHC2C.py     # Linear CHC handling
+    ├── NonLinearCHC2C.py  # Non-linear CHC handling
+    └── chc2c.py           # Main converter
+</pre></div>
+</div>
+</section>
+<section id="chc-parser">
+<h2>CHC Parser<a class="headerlink" href="#chc-parser" title="Permalink to this heading">¶</a></h2>
+<p>The CHC (Constrained Horn Clauses) parser handles SMT-LIB files with constrained Horn clauses.</p>
+<section id="usage">
+<h3>Usage<a class="headerlink" href="#usage" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.frontends</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_chc</span>
+
+<span class="c1"># Parse CHC file</span>
+<span class="n">all_vars</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">trans</span><span class="p">,</span> <span class="n">post</span> <span class="o">=</span> <span class="n">parse_chc</span><span class="p">(</span><span class="s2">&quot;program.smt2&quot;</span><span class="p">,</span> <span class="n">to_real_type</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Create transition system</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">efmc.sts</span><span class="w"> </span><span class="kn">import</span> <span class="n">TransitionSystem</span>
+<span class="n">sts</span> <span class="o">=</span> <span class="n">TransitionSystem</span><span class="p">()</span>
+<span class="n">sts</span><span class="o">.</span><span class="n">from_z3_cnts</span><span class="p">([</span><span class="n">all_vars</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">trans</span><span class="p">,</span> <span class="n">post</span><span class="p">])</span>
+</pre></div>
+</div>
+</section>
+<section id="chc-format">
+<h3>CHC Format<a class="headerlink" href="#chc-format" title="Permalink to this heading">¶</a></h3>
+<p>A typical CHC file has the following structure:</p>
+<div class="highlight-smt2 notranslate"><div class="highlight"><pre><span></span>(set-logic QF_LIA)
+(declare-fun x () Int)
+(declare-fun y () Int)
+
+; Init: x = 0
+(assert (= x 0))
+
+; Transition: y&#39; = y + x, x&#39; = x + 1
+(assert (=&gt; true (= y (+ y x))))
+
+; Query: y &lt; 0
+(query (=&gt; true (&lt; y 0)))
+</pre></div>
+</div>
+<p>The CHC representation consists of:
+- <code class="docutils literal notranslate"><span class="pre">all_vars</span></code>: All variables in the system
+- <code class="docutils literal notranslate"><span class="pre">init</span></code>: Initial state predicate
+- <code class="docutils literal notranslate"><span class="pre">trans</span></code>: Transition relation
+- <code class="docutils literal notranslate"><span class="pre">post</span></code>: Post-condition (query)</p>
+</section>
+</section>
+<section id="sygus-parser">
+<h2>SyGuS Parser<a class="headerlink" href="#sygus-parser" title="Permalink to this heading">¶</a></h2>
+<p>The SyGuS parser handles Syntax-Guided Synthesis files, specifically the invariant track.</p>
+<section id="id1">
+<h3>Usage<a class="headerlink" href="#id1" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.frontends</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_sygus</span>
+
+<span class="c1"># Parse SyGuS file</span>
+<span class="n">all_vars</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">trans</span><span class="p">,</span> <span class="n">post</span> <span class="o">=</span> <span class="n">parse_sygus</span><span class="p">(</span><span class="s2">&quot;invariant.sy&quot;</span><span class="p">,</span> <span class="n">to_real_type</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="sygus-format">
+<h3>SyGuS Format<a class="headerlink" href="#sygus-format" title="Permalink to this heading">¶</a></h3>
+<p>A typical SyGuS invariant file:</p>
+<div class="highlight-sygus notranslate"><div class="highlight"><pre><span></span>(set-logic QF_LIA)
+(set-option :syntax-restrictions :inv)
+(declare-fun x () Int)
+(declare-fun inv ((x Int)) Bool)
+(assert (inv 0))
+(assert (forall ((x Int)) (=&gt; (inv x) (inv (+ x 1)))))
+(check-synth)
+</pre></div>
+</div>
+</section>
+</section>
+<section id="boogie-frontend">
+<h2>Boogie Frontend<a class="headerlink" href="#boogie-frontend" title="Permalink to this heading">¶</a></h2>
+<p>The Boogie frontend handles Boogie intermediate verification language files.</p>
+<section id="id2">
+<h3>Usage<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.frontends</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_boogie</span>
+
+<span class="c1"># Parse Boogie file</span>
+<span class="n">sts</span> <span class="o">=</span> <span class="n">parse_boogie</span><span class="p">(</span><span class="s2">&quot;program.bpl&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="boogie-format">
+<h3>Boogie Format<a class="headerlink" href="#boogie-format" title="Permalink to this heading">¶</a></h3>
+<p>A typical Boogie program:</p>
+<div class="highlight-boogie notranslate"><div class="highlight"><pre><span></span><span class="k">var</span> <span class="n">x</span><span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+<span class="k">var</span> <span class="n">y</span><span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+
+<span class="k">procedure</span> <span class="n">main</span><span class="p">()</span>
+  <span class="k">requires</span> <span class="n">x</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="k">ensures</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">{</span>
+  <span class="n">y</span> <span class="o">:=</span> <span class="n">x</span><span class="p">;</span>
+  <span class="k">while</span> <span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">invariant</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="p">{</span>
+    <span class="n">y</span> <span class="o">:=</span> <span class="n">y</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="n">x</span> <span class="o">:=</span> <span class="n">x</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="c-frontend">
+<h2>C Frontend<a class="headerlink" href="#c-frontend" title="Permalink to this heading">¶</a></h2>
+<p>The C frontend parses C programs with annotations for verification.</p>
+<section id="id3">
+<h3>Usage<a class="headerlink" href="#id3" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.frontends</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_c</span>
+
+<span class="c1"># Parse C file</span>
+<span class="n">sts</span> <span class="o">=</span> <span class="n">parse_c</span><span class="p">(</span><span class="s2">&quot;program.c&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="c-format">
+<h3>C Format<a class="headerlink" href="#c-format" title="Permalink to this heading">¶</a></h3>
+<p>A typical annotated C program:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/*@</span>
+<span class="cm">  requires x &gt;= 0;</span>
+<span class="cm">  ensures \result &gt;= 0;</span>
+<span class="cm">@*/</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">foo</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">;</span>
+<span class="w">  </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">y</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="conversion-tools">
+<h2>Conversion Tools<a class="headerlink" href="#conversion-tools" title="Permalink to this heading">¶</a></h2>
+<section id="c-to-chc">
+<h3>C to CHC<a class="headerlink" href="#c-to-chc" title="Permalink to this heading">¶</a></h3>
+<p>Convert C programs to Constrained Horn Clauses:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.frontends.c2chc</span><span class="w"> </span><span class="kn">import</span> <span class="n">C2CHC</span>
+
+<span class="n">converter</span> <span class="o">=</span> <span class="n">C2CHC</span><span class="p">()</span>
+<span class="n">converter</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;program.c&quot;</span><span class="p">,</span> <span class="s2">&quot;output.smt2&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="chc-to-c">
+<h3>CHC to C<a class="headerlink" href="#chc-to-c" title="Permalink to this heading">¶</a></h3>
+<p>Convert CHC back to C:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.frontends.chc2c</span><span class="w"> </span><span class="kn">import</span> <span class="n">CHC2C</span>
+
+<span class="n">converter</span> <span class="o">=</span> <span class="n">CHC2C</span><span class="p">()</span>
+<span class="n">converter</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;program.smt2&quot;</span><span class="p">,</span> <span class="s2">&quot;output.c&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="btor2-to-chc">
+<h3>Btor2 to CHC<a class="headerlink" href="#btor2-to-chc" title="Permalink to this heading">¶</a></h3>
+<p>Convert Btor2 (hardware description) to CHC:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">efmc.frontends.btor2chc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Btor2CHC</span>
+
+<span class="n">converter</span> <span class="o">=</span> <span class="n">Btor2CHC</span><span class="p">()</span>
+<span class="n">converter</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;design.btor2&quot;</span><span class="p">,</span> <span class="s2">&quot;output.smt2&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="module-efmc.frontends">
+<span id="api-reference"></span><h2>API Reference<a class="headerlink" href="#module-efmc.frontends" title="Permalink to this heading">¶</a></h2>
+<p>Wrappers for the frontends
+- Constraint Horn Clause (CHC)
+- SyGuS invariant track
+- VMT: TBD
+- Btor2: TBD</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.parse_boogie">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.</span></span><span class="sig-name descname"><span class="pre">parse_boogie</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_real_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends.html#parse_boogie"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.parse_boogie" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse Boogie file</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.parse_c">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.</span></span><span class="sig-name descname"><span class="pre">parse_c</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_real_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends.html#parse_c"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.parse_c" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse C file</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.parse_chc">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.</span></span><span class="sig-name descname"><span class="pre">parse_chc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_real_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends.html#parse_chc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.parse_chc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse CHC file</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.parse_sygus">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.</span></span><span class="sig-name descname"><span class="pre">parse_sygus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_real_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends.html#parse_sygus"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.parse_sygus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse SyGuS file</p>
+</dd></dl>
+
+<span class="target" id="module-efmc.frontends.chc_parser"></span><p>Parser for Constraint Horn Clause (CHC) files based on Z3’s Python API</p>
+<dl class="simple">
+<dt>NOTE: this file provides a few other functionalities. For example,</dt><dd><p>we also support replacing “inv” by a function body</p>
+</dd>
+</dl>
+<dl class="py class">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.CHCParser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.frontends.chc_parser.</span></span><span class="sig-name descname"><span class="pre">CHCParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_real</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#CHCParser"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.CHCParser" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl>
+<dt>NOTE: we assume that the input strictly follows the SyGuS(invariant) style</dt><dd><blockquote>
+<div><p>The first assertion: pre
+The second assertion: trans
+The third assertion (or “goal”): post</p>
+</div></blockquote>
+<dl class="simple">
+<dt>Besides, the goal should be in the form of</dt><dd><p>inv =&gt; post</p>
+</dd>
+<dt>Instead of</dt><dd><p>inv and P =&gt; post (this can be transformed to the above form)</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.CHCParser.fmls">
+<span class="sig-name descname"><span class="pre">fmls</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#efmc.frontends.chc_parser.CHCParser.fmls" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.CHCParser.get_transition_system">
+<span class="sig-name descname"><span class="pre">get_transition_system</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#CHCParser.get_transition_system"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.CHCParser.get_transition_system" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.CHCParser.parse_chc_string">
+<span class="sig-name descname"><span class="pre">parse_chc_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#CHCParser.parse_chc_string"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.CHCParser.parse_chc_string" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.CHCParser.solve_with_pdr">
+<span class="sig-name descname"><span class="pre">solve_with_pdr</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#CHCParser.solve_with_pdr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.CHCParser.solve_with_pdr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.ground_quantifier">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.chc_parser.</span></span><span class="sig-name descname"><span class="pre">ground_quantifier</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">qexpr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#ground_quantifier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.ground_quantifier" title="Permalink to this definition">¶</a></dt>
+<dd><p>Seems this can only handle exists x . fml, or forall x.fml?</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.test_parse">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.chc_parser.</span></span><span class="sig-name descname"><span class="pre">test_parse</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#test_parse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.test_parse" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.test_parse2">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.chc_parser.</span></span><span class="sig-name descname"><span class="pre">test_parse2</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#test_parse2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.test_parse2" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.chc_parser.test_parse3">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.chc_parser.</span></span><span class="sig-name descname"><span class="pre">test_parse3</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/chc_parser.html#test_parse3"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.chc_parser.test_parse3" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<span class="target" id="module-efmc.frontends.mini_sygus_parser"></span><p>Parser for SyGuS files based on a simple S-expression parser</p>
+<p>NOTE: I only this file for inputs in the style of the SyGuS invariant track.
+It could be used for SyGuS(PBE). To keep this file independent,
+I do not important other files in this project.</p>
+<p>This parser handles:
+- S-expression parsing
+- Grammar extraction
+- Transition system conversion
+- Support for multiple data types (Int, Real, Array, BitVec)</p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.SyGuSParsingError">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">SyGuSParsingError</span></span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#SyGuSParsingError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.SyGuSParsingError" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
+<p>Custom exception for SyGuS parsing errors</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.SyGusInVParser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">SyGusInVParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_real</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#SyGusInVParser"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.SyGusInVParser" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Parser for SyGuS Invariant Track problems.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.SyGusInVParser.get_transition_system">
+<span class="sig-name descname"><span class="pre">get_transition_system</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#SyGusInVParser.get_transition_system"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.SyGusInVParser.get_transition_system" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the format of our trivial transition system</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.SyGusInVParser.init_symbols">
+<span class="sig-name descname"><span class="pre">init_symbols</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#SyGusInVParser.init_symbols"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.SyGusInVParser.init_symbols" title="Permalink to this definition">¶</a></dt>
+<dd><p>TODO: this is not robust (as an sexpr can have several lines)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.SyGusInVParser.process_func">
+<span class="sig-name descname"><span class="pre">process_func</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">slist</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#SyGusInVParser.process_func"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.SyGusInVParser.process_func" title="Permalink to this definition">¶</a></dt>
+<dd><p>Process a ‘define-fun’ command to extract function bodies and variables.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.SyGusInVParser.to_sexpr">
+<span class="sig-name descname"><span class="pre">to_sexpr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#SyGusInVParser.to_sexpr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.SyGusInVParser.to_sexpr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.SyGusInVParser.to_sexpr_misc">
+<span class="sig-name descname"><span class="pre">to_sexpr_misc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#SyGusInVParser.to_sexpr_misc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.SyGusInVParser.to_sexpr_misc" title="Permalink to this definition">¶</a></dt>
+<dd><p>E.g.,
+[‘and’, [‘=’, ‘x’, 1], [‘=’, ‘y’, 1]]
+[‘and’, [‘=’, ‘x!’, [‘+’, ‘x’, ‘y’]], [‘=’, ‘y!’, [‘+’, ‘x’, ‘y’]]]</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.atom">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">atom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#atom"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.atom" title="Permalink to this definition">¶</a></dt>
+<dd><p>Numbers become numbers; every other token is a symbol.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.demo_parser">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">demo_parser</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#demo_parser"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.demo_parser" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.get_grammar">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">get_grammar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#get_grammar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.get_grammar" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.get_nonterminals">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">get_nonterminals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#get_nonterminals"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.get_nonterminals" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.get_start">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">get_start</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#get_start"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.get_start" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.get_terms_prods">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">get_terms_prods</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#get_terms_prods"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.get_terms_prods" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.input_to_list">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">input_to_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#input_to_list"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.input_to_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse a .sl file into a list of S-Expressions.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.parse_sexpression">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">parse_sexpression</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">program</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#parse_sexpression"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.parse_sexpression" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read an S-expression from a string.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.read_from_tokens">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">read_from_tokens</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#read_from_tokens"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.read_from_tokens" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read an expression from a sequence of tokens.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.mini_sygus_parser.tokenize">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.mini_sygus_parser.</span></span><span class="sig-name descname"><span class="pre">tokenize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chars</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/efmc/frontends/mini_sygus_parser.html#tokenize"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.mini_sygus_parser.tokenize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a string of characters into a list of tokens.</p>
+</dd></dl>
+
+<span class="target" id="module-efmc.frontends.boogie2efmc"></span><p>Boogie to EFMC Transition System Converter</p>
+<p>This module converts Boogie programs (specifically loops) to EFMC’s transition system format,
+allowing verification using EFMC’s engines.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="efmc.frontends.boogie2efmc.BoogieToEFMCConverter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.frontends.boogie2efmc.</span></span><span class="sig-name descname"><span class="pre">BoogieToEFMCConverter</span></span><a class="reference internal" href="_modules/efmc/frontends/boogie2efmc.html#BoogieToEFMCConverter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.boogie2efmc.BoogieToEFMCConverter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Converts Boogie programs to EFMC transition systems.</p>
+<p>This converter focuses on extracting loops from Boogie programs and converting
+them to transition systems that can be verified using EFMC’s engines.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.boogie2efmc.BoogieToEFMCConverter.convert_file_to_transition_system">
+<span class="sig-name descname"><span class="pre">convert_file_to_transition_system</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionSystem</span></span></span><a class="reference internal" href="_modules/efmc/frontends/boogie2efmc.html#BoogieToEFMCConverter.convert_file_to_transition_system"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.convert_file_to_transition_system" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a Boogie file to a transition system (main entry point).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.boogie2efmc.BoogieToEFMCConverter.convert_loop_to_transition_system">
+<span class="sig-name descname"><span class="pre">convert_loop_to_transition_system</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loop</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Loop</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">BB</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionSystem</span></span></span><a class="reference internal" href="_modules/efmc/frontends/boogie2efmc.html#BoogieToEFMCConverter.convert_loop_to_transition_system"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.convert_loop_to_transition_system" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert a single Boogie loop to an EFMC transition system.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.boogie2efmc.BoogieToEFMCConverter.extract_loops_from_program">
+<span class="sig-name descname"><span class="pre">extract_loops_from_program</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ast_program</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="verifytools.html#efmc.verifytools.boogie.ast.AstProgram" title="efmc.verifytools.boogie.ast.AstProgram"><span class="pre">AstProgram</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Loop</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">BB</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/frontends/boogie2efmc.html#BoogieToEFMCConverter.extract_loops_from_program"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.extract_loops_from_program" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract loops from a Boogie program AST.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.boogie2efmc.BoogieToEFMCConverter.parse_boogie_file">
+<span class="sig-name descname"><span class="pre">parse_boogie_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="verifytools.html#efmc.verifytools.boogie.ast.AstProgram" title="efmc.verifytools.boogie.ast.AstProgram"><span class="pre">AstProgram</span></a></span></span><a class="reference internal" href="_modules/efmc/frontends/boogie2efmc.html#BoogieToEFMCConverter.parse_boogie_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.boogie2efmc.BoogieToEFMCConverter.parse_boogie_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse a Boogie file and return the AST.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.boogie2efmc.boogie_to_efmc">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.boogie2efmc.</span></span><span class="sig-name descname"><span class="pre">boogie_to_efmc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionSystem</span></span></span><a class="reference internal" href="_modules/efmc/frontends/boogie2efmc.html#boogie_to_efmc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.boogie2efmc.boogie_to_efmc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convenience function to convert a Boogie file to EFMC transition system.</p>
+</dd></dl>
+
+<span class="target" id="module-efmc.frontends.c2efmc"></span><p>C to EFMC transition system converter.</p>
+<p>This frontend parses a (loop-centric) C program with <code class="docutils literal notranslate"><span class="pre">pycparser</span></code> and
+builds an EFMC <code class="xref py py-class docutils literal notranslate"><span class="pre">TransitionSystem</span></code>. The translation is
+lightweight and currently focuses on integer variables and the first loop
+encountered in the selected function (default: <code class="docutils literal notranslate"><span class="pre">main</span></code>).</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="efmc.frontends.c2efmc.CToEFMCConverter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.frontends.c2efmc.</span></span><span class="sig-name descname"><span class="pre">CToEFMCConverter</span></span><a class="reference internal" href="_modules/efmc/frontends/c2efmc.html#CToEFMCConverter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.c2efmc.CToEFMCConverter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Convert simple C programs into EFMC transition systems.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.c2efmc.CToEFMCConverter.convert_file_to_transition_system">
+<span class="sig-name descname"><span class="pre">convert_file_to_transition_system</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_cpp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpp_args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionSystem</span></span></span><a class="reference internal" href="_modules/efmc/frontends/c2efmc.html#CToEFMCConverter.convert_file_to_transition_system"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.c2efmc.CToEFMCConverter.convert_file_to_transition_system" title="Permalink to this definition">¶</a></dt>
+<dd><p>Main entry point for converting a C file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="efmc.frontends.c2efmc.CToEFMCConverter.parse_c_file">
+<span class="sig-name descname"><span class="pre">parse_c_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_cpp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cpp_args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">FileAST</span></span></span><a class="reference internal" href="_modules/efmc/frontends/c2efmc.html#CToEFMCConverter.parse_c_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.c2efmc.CToEFMCConverter.parse_c_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse a C file into a <code class="docutils literal notranslate"><span class="pre">pycparser</span></code> AST.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="efmc.frontends.c2efmc.c_to_efmc">
+<span class="sig-prename descclassname"><span class="pre">efmc.frontends.c2efmc.</span></span><span class="sig-name descname"><span class="pre">c_to_efmc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TransitionSystem</span></span></span><a class="reference internal" href="_modules/efmc/frontends/c2efmc.html#c_to_efmc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.frontends.c2efmc.c_to_efmc" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convenience wrapper mirroring <code class="xref py py-func docutils literal notranslate"><span class="pre">boogie_to_efmc()</span></code>.</p>
+</dd></dl>
+
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Frontends</a><ul>
+<li><a class="reference internal" href="#supported-formats">Supported Formats</a></li>
+<li><a class="reference internal" href="#architecture">Architecture</a></li>
+<li><a class="reference internal" href="#chc-parser">CHC Parser</a><ul>
+<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#chc-format">CHC Format</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sygus-parser">SyGuS Parser</a><ul>
+<li><a class="reference internal" href="#id1">Usage</a></li>
+<li><a class="reference internal" href="#sygus-format">SyGuS Format</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#boogie-frontend">Boogie Frontend</a><ul>
+<li><a class="reference internal" href="#id2">Usage</a></li>
+<li><a class="reference internal" href="#boogie-format">Boogie Format</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#c-frontend">C Frontend</a><ul>
+<li><a class="reference internal" href="#id3">Usage</a></li>
+<li><a class="reference internal" href="#c-format">C Format</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#conversion-tools">Conversion Tools</a><ul>
+<li><a class="reference internal" href="#c-to-chc">C to CHC</a></li>
+<li><a class="reference internal" href="#chc-to-c">CHC to C</a></li>
+<li><a class="reference internal" href="#btor2-to-chc">Btor2 to CHC</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-efmc.frontends">API Reference</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="cli.html"
+                          title="previous chapter">Command-Line Interface</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="smttools.html"
+                          title="next chapter">SMT Tools</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/frontend.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="smttools.html" title="SMT Tools"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="cli.html" title="Command-Line Interface"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">EFMC Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Frontends</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2024, rainoftime.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.0.0.
+    </div>
+  </body>
+</html>
