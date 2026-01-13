@@ -7,6 +7,11 @@ Welcome to EFMC's documentation
 
    
    verification
+   cli
+   frontend
+   smttools
+   llmtools
+   verifytools
    boogie_frontend
    c_frontend
    absint
