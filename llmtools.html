@@ -324,40 +324,6 @@ DeepSeek uses OpenAI-compatible API format</p>
 
 </dd></dl>
 
-<span class="target" id="module-efmc.llmtools.llm_opencode"></span><p>Using opencode as the LLM provider (to access different models)</p>
-<p>A possible solution: call opencode server, which offers OpenAPI</p>
-<p><a class="reference external" href="https://opencode.ai/docs/server">https://opencode.ai/docs/server</a></p>
-<p>(If we use TypeScript/JavaScript, we can use its SDK, <a class="reference external" href="https://opencode.ai/docs/sdk/">https://opencode.ai/docs/sdk/</a>)</p>
-<dl class="py class">
-<dt class="sig sig-object py" id="efmc.llmtools.llm_opencode.LLMOpenCode">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">efmc.llmtools.llm_opencode.</span></span><span class="sig-name descname"><span class="pre">LLMOpenCode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#efmc.llmtools.logger.Logger" title="efmc.llmtools.logger.Logger"><span class="pre">Logger</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">temperature</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">system_role</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'You</span> <span class="pre">are</span> <span class="pre">an</span> <span class="pre">experienced</span> <span class="pre">programmer</span> <span class="pre">and</span> <span class="pre">good</span> <span class="pre">at</span> <span class="pre">understanding</span> <span class="pre">programs</span> <span class="pre">written</span> <span class="pre">in</span> <span class="pre">mainstream</span> <span class="pre">programming</span> <span class="pre">languages.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">server_url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'http://127.0.0.1:4096'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/llmtools/llm_opencode.html#LLMOpenCode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.llmtools.llm_opencode.LLMOpenCode" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>LLM inference using OpenCode server API.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="efmc.llmtools.llm_opencode.LLMOpenCode.infer">
-<span class="sig-name descname"><span class="pre">infer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_measure_cost</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/efmc/llmtools/llm_opencode.html#LLMOpenCode.infer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.llmtools.llm_opencode.LLMOpenCode.infer" title="Permalink to this definition">¶</a></dt>
-<dd><p>Infer using OpenCode server.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>message</strong> – Input message</p></li>
-<li><p><strong>is_measure_cost</strong> – Whether to measure token cost</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Tuple of (output, input_token_cost, output_token_cost)</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="efmc.llmtools.llm_opencode.LLMOpenCode.run_with_timeout">
-<span class="sig-name descname"><span class="pre">run_with_timeout</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout_seconds</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/efmc/llmtools/llm_opencode.html#LLMOpenCode.run_with_timeout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#efmc.llmtools.llm_opencode.LLMOpenCode.run_with_timeout" title="Permalink to this definition">¶</a></dt>
-<dd><p>Run a function with timeout.</p>
-</dd></dl>
-
-</dd></dl>
-
 <span class="target" id="module-efmc.llmtools.logger"></span><p>Logger module for EFMC LLM tools.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="efmc.llmtools.logger.Logger">
