@@ -1,5 +1,5 @@
 #pylint: disable=no-self-argument,unused-argument, multiple-statements
-from pyparsing import delimitedList,nums, ParserElement, infixNotation, \
+from pyparsing import DelimitedList,nums, ParserElement, infix_notation, \
         opAssoc, StringEnd
 from efmc.verifytools.common.parser import InfixExprParser
 from pyparsing import ZeroOrMore as ZoM,\
@@ -13,8 +13,8 @@ from pyparsing import ZeroOrMore as ZoM,\
     Word as W,\
     Group as G
 
-ParserElement.enablePackrat()
-csl = delimitedList
+ParserElement.enable_packrat()
+csl = DelimitedList
 
 class BoogieParser(InfixExprParser):
   # Statements
@@ -60,10 +60,10 @@ class BoogieParser(InfixExprParser):
     s.RETURNS = K("returns")
     s.FUNCTION = K("function")
     s.FALSE = K("false")
-    s.FALSE.setParseAction(\
+    s.FALSE.set_parse_action(\
             lambda st, loc, toks:  s.onAtom(s.FALSE, st, loc, toks))
     s.TRUE = K("true")
-    s.TRUE.setParseAction(\
+    s.TRUE.set_parse_action(\
             lambda st, loc, toks:  s.onAtom(s.TRUE, st, loc, toks))
     s.OLD = K("old")
     s.AXIOM = K("axiom")
@@ -94,7 +94,7 @@ class BoogieParser(InfixExprParser):
     s.IMPLEMENTATION = K("implementation")
 
     s.Id = R("[a-zA-Z_][a-zA-Z0-9_#]*")
-    s.Id.setParseAction(lambda st, loc, toks:  s.onAtom(s.Id, st, loc, toks))
+    s.Id.set_parse_action(lambda st, loc, toks:  s.onAtom(s.Id, st, loc, toks))
     s.ParentEdge = O(s.UNIQUE) + s.Id
     s.ParentInfo = S("<:") + csl(s.ParentEdge)
     s.OrderSpec = O(s.ParentInfo) + O(s.COMPLETE)
@@ -121,18 +121,18 @@ class BoogieParser(InfixExprParser):
     s.Expr = F();
 
     s.Number = W(nums)
-    s.Number.setParseAction(
+    s.Number.set_parse_action(
             lambda st, loc, toks:  s.onAtom(s.Number, st, loc, toks))
     s.BitVector = R("[0-9][0-9]*bv[0-9][0-9]*")
-    s.BitVector.setParseAction(
+    s.BitVector.set_parse_action(
             lambda st, loc, toks:  s.onAtom(s.BitVector, st, loc, toks))
     # TODO
     # TrigAttr = Trigger | Attribute
     s.Fun_App = s.Id + s.LPARN + csl(s.Expr) + s.RPARN
-    s.Fun_App.setParseAction(
+    s.Fun_App.set_parse_action(
             lambda st, loc, toks:  s.onAtom(s.Fun_App, st, loc, toks))
     s.Old = s.OLD + s.LPARN + s.Expr + s.RPARN
-    s.Old.setParseAction(
+    s.Old.set_parse_action(
             lambda st, loc, toks:  s.onAtom(s.Old, st, loc, toks))
     s.Primitive = s.FALSE | s.TRUE | s.Number | s.BitVector
     # TODO: Handle TriggerAttrs in Quantified expressions
@@ -142,7 +142,7 @@ class BoogieParser(InfixExprParser):
     #        csl(s.IdsType) + s.QSep + s.Expr  +  s.RPARN
 
     s.Atom = s.Primitive | s.Fun_App | s.Old | s.Id #| s.Quantified
-    s.ArithExpr = infixNotation(s.Atom, [
+    s.ArithExpr = infix_notation(s.Atom, [
       (s.ArithUnOp, 1, opAssoc.RIGHT, \
            lambda st, loc, toks:  s.onUnaryOp(s.ArithUnOp, st, loc, toks[0])),
       (s.MulOp, 2, opAssoc.LEFT, \
@@ -158,10 +158,10 @@ class BoogieParser(InfixExprParser):
     # TODO: Add support for ConcatOp
     #E4 << E5 + ZoM(ConcatOp + E4)
     s.RelExpr = s.ArithExpr + s.RelOp + s.ArithExpr
-    s.RelExpr.setParseAction(
+    s.RelExpr.set_parse_action(
             lambda st, loc, toks: s.onNABinOp(s.RelExpr, st, loc, toks))
 
-    s.BoolExpr = infixNotation((s.RelExpr | s.Atom), [
+    s.BoolExpr = infix_notation((s.RelExpr | s.Atom), [
       (s.BoolUnOp, 1, opAssoc.RIGHT, \
               lambda st, loc, toks:  s.onUnaryOp(s.BoolUnOp, st, loc, toks[0])),
       (s.AndOrOp, 2, opAssoc.LEFT, \
@@ -192,7 +192,7 @@ class BoogieParser(InfixExprParser):
                    s.MapType
 
     s.Type << (s.TypeAtom | s.MapType | s.Id + O(s.TypeCtorArgs)) #pylint: disable=expression-not-assigned
-    s.Type.setParseAction(lambda st, loc, toks: s.onType(s.Type, st, loc, toks))
+    s.Type.set_parse_action(lambda st, loc, toks: s.onType(s.Type, st, loc, toks))
     s.IdsType = csl(s.Id) + s.COLN + s.Type
 
 
@@ -234,7 +234,7 @@ class BoogieParser(InfixExprParser):
 
     s.LocalVarDecl = S(s.VAR) + ZoM(s.Attribute) + csl(s.IdsTypeWhere) + \
             S(s.SEMI);
-    s.LocalVarDecl.setParseAction(
+    s.LocalVarDecl.set_parse_action(
             lambda st, loc, toks: s.onLocalVarDecl(s.LocalVarDecl,
                                                    st, loc, toks))
 
@@ -256,23 +256,23 @@ class BoogieParser(InfixExprParser):
     s.Label = s.Id | s.Number
 
     s.AssertStmt = S(s.ASSERT) + s.Expr + S(s.SEMI)
-    s.AssertStmt.setParseAction(
+    s.AssertStmt.set_parse_action(
             lambda st, loc, toks: s.onAssert(s.AssertStmt, st, loc, toks))
     s.AssumeStmt = S(s.ASSUME) + O(S("{:partition}")) + s.Expr + S(s.SEMI)
-    s.AssumeStmt.setParseAction(
+    s.AssumeStmt.set_parse_action(
             lambda st, loc, toks: s.onAssume(s.AssumeStmt, st, loc, toks))
     s.ReturnStmt = S(s.RETURN) + S(s.SEMI)
-    s.ReturnStmt.setParseAction(
+    s.ReturnStmt.set_parse_action(
             lambda st, loc, toks: s.onReturn(s.ReturnStmt, st, loc, toks))
     s.GotoStmt = S(s.GOTO) + csl(s.Label) + S(s.SEMI)
-    s.GotoStmt.setParseAction(
+    s.GotoStmt.set_parse_action(
             lambda st, loc, toks: s.onGoto(s.GotoStmt, st, loc, toks))
     s.AssignmentStmt = G(csl(s.Lhs)) + S(s.ASSGN) + G(csl(s.Expr)) + S(s.SEMI)
-    s.AssignmentStmt.setParseAction(
+    s.AssignmentStmt.set_parse_action(
             lambda st, loc, toks: s.onAssignment(s.AssignmentStmt, st,
                                                  loc, toks))
     s.HavocStmt = S(s.HAVOC) + csl(s.Id) + S(s.SEMI)
-    s.HavocStmt.setParseAction(
+    s.HavocStmt.set_parse_action(
             lambda st, loc, toks: s.onHavoc(s.HavocStmt, st, loc, toks))
 
     s.CallAssignStmt = s.CALL + O(s.CallLhs) + s.Id + s.LPARN + csl(s.Expr) +\
@@ -282,9 +282,9 @@ class BoogieParser(InfixExprParser):
 
     s.WhileStmt = s.WHILE + s.LPARN + s.WildcardExpr + s.RPARN + \
             ZoM(s.LoopInv) + s.BlockStmt
-    s.WhileStmt.setParseAction(
+    s.WhileStmt.set_parse_action(
             lambda st, loc, toks: s.onWhile(s.WhileStmt, st, loc, toks))
-    s.BlockStmt.setParseAction(
+    s.BlockStmt.set_parse_action(
             lambda st, loc, toks: s.onBlock(s.BlockStmt, st, loc, toks))
     s.BreakStmt = s.BREAK + O(s.Id) + S(s.SEMI)
 
@@ -305,7 +305,7 @@ class BoogieParser(InfixExprParser):
     s.LStmt << (s.Stmt | s.LabeledStatement) #pylint: disable=pointless-statement
     s.LEmpty = F();
     s.LEmpty <<(s.Id + s.COLN + O(s.LEmpty)) #pylint: disable=expression-not-assigned
-    s.LabeledStatement.setParseAction(
+    s.LabeledStatement.set_parse_action(
       lambda st, loc, toks: s.onLabeledStatement(s.LabeledStatement,
                                                  st, loc, toks))
 
@@ -313,7 +313,7 @@ class BoogieParser(InfixExprParser):
 
 
     s.Body = S(s.LBRAC) + G(ZoM(s.LocalVarDecl)) + G(s.StmtList) + S(s.RBRAC)
-    s.Body.setParseAction(lambda st, loc, toks: s.onBody(s.Body, st, loc, toks))
+    s.Body.set_parse_action(lambda st, loc, toks: s.onBody(s.Body, st, loc, toks))
 
     s.ProcedureDecl = \
         s.PROCEDURE + ZoM(s.Attribute) + s.Id + s.PSig + s.SEMI + ZoM(s.Spec) |\
@@ -324,7 +324,7 @@ class BoogieParser(InfixExprParser):
             G(O(s.IOutParameters))
     s.ImplementationDecl = S(s.IMPLEMENTATION) + G(ZoM(s.Attribute)) + s.Id +\
             G(s.ISig) + G(ZoM(s.Body))
-    s.ImplementationDecl.setParseAction(
+    s.ImplementationDecl.set_parse_action(
       lambda st, loc, toks: s.onImplementationDecl(s.ImplementationDecl,
                                                    st, loc, toks))
 
@@ -338,11 +338,11 @@ class BoogieParser(InfixExprParser):
              s.ImplementationDecl
 
     s.Program = ZoM(s.Decl);
-    s.Program.setParseAction(
+    s.Program.set_parse_action(
             lambda st, loc, toks: s.onProgram(s.Program, st, loc, toks))
 
   def parseExpr(s, st):
-    return (s.Expr + StringEnd()).parseString(st)[0]
+    return (s.Expr + StringEnd()).parse_string(st)[0]
 
   def parseProgram(s, st):
-    return (s.Program + StringEnd()).parseString(st)[0]
+    return (s.Program + StringEnd()).parse_string(st)[0]

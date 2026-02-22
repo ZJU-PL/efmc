@@ -106,7 +106,7 @@ def filterCandidateInvariants(bbs, preCond, postCond, cutPoints, timeout=None):
     violations = checkInvNetwork(bbs, preCond, postCond, sound, timeout)
     for v in violations:
       if (not v.isSafety()):
-        print v
+        print(v)
       assert (v.isSafety()) # sound should be an inductive network
 
     return (overfitted, nonind, sound, violations)

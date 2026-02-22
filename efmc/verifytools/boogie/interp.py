@@ -218,7 +218,7 @@ def trace_n(bbs, state, nsteps, rand, filt):
   active_traces = [ [state] ] 
   inactive_traces = []
 
-  for step in xrange(nsteps):
+  for step in range(nsteps):
     new_traces = [ ]
 
     for t in active_traces:
@@ -305,9 +305,9 @@ if __name__ == "__main__":
     return "->\n".join(map(pp_state, t))
 
 
-  print "Active({}):".format(len(active))
+  print("Active({}):".format(len(active)))
   for t in active:
-    print pp_trace(t)
-  print "Inactive({}):".format(len(inactive))
+    print(pp_trace(t))
+  print("Inactive({}):".format(len(inactive)))
   for t in inactive:
-    print pp_trace(t)
+    print(pp_trace(t))
