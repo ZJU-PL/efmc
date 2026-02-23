@@ -8,7 +8,7 @@ from typing import Any, Optional, List, Dict
 from loguru import logger
 from openai import AsyncOpenAI
 
-from efmc.llm_providers.base import LLMResponse, ToolCallRequest
+from efmc.llmtools.cli_providers.base import LLMResponse, ToolCallRequest
 
 
 # OpenCode Zen endpoint

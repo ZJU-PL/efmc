@@ -1,6 +1,8 @@
 """
 Using Kilo or OpenCode CLI to call free LLMs as the LLM provider.
 
+Note: this file is differnet from kilocode.py and opencode.py. Those files do not require installing kilocode or opencode locally.
+
 Requires one of:
   - kilo: npm install -g @kilocode/cli
   - opencode: npm install -g @opencode/cli (or similar)

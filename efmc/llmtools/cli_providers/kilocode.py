@@ -4,7 +4,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from efmc.llm_providers.base import LLMResponse, ToolCallRequest
+from efmc.llmtools.cli_providers.base import LLMResponse, ToolCallRequest
 
 
 # Kilo Code endpoint

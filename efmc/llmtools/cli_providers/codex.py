@@ -11,7 +11,7 @@ import httpx
 from loguru import logger
 
 from oauth_cli_kit import get_token as get_codex_token
-from efmc.llm_providers.base import LLMProvider, LLMResponse, ToolCallRequest
+from efmc.llmtools.cli_providers.base import LLMProvider, LLMResponse, ToolCallRequest
 
 DEFAULT_CODEX_URL = "https://chatgpt.com/backend-api/codex/responses"
 DEFAULT_ORIGINATOR = "efmc"
