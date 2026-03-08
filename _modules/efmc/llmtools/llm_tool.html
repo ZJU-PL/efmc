@@ -58,7 +58,7 @@
         <span class="k">pass</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__hash__</span><span class="p">()</span> <span class="o">==</span> <span class="n">value</span><span class="o">.</span><span class="fm">__hash__</span><span class="p">()</span></div>
+        <span class="k">return</span> <span class="bp">self</span> <span class="ow">is</span> <span class="n">value</span></div>
 
 
 <div class="viewcode-block" id="LLMToolOutput"><a class="viewcode-back" href="../../../llmtools.html#efmc.llmtools.llm_tool.LLMToolOutput">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">LLMToolOutput</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
@@ -123,9 +123,7 @@
 
         <span class="n">single_query_num</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">output</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">single_query_num</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_query_num</span><span class="p">:</span>
-                <span class="k">break</span>
+        <span class="k">while</span> <span class="n">single_query_num</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_query_num</span><span class="p">:</span>
             <span class="n">single_query_num</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="n">response</span><span class="p">,</span> <span class="n">input_token_cost</span><span class="p">,</span> <span class="n">output_token_cost</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">infer</span><span class="p">(</span>
                 <span class="n">prompt</span><span class="p">,</span> <span class="kc">True</span>
