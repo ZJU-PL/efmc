@@ -66,6 +66,8 @@ async def chat_opencode(
     
     Retries on 500 errors with exponential backoff and timeline updates.
     """
+    model = strip_opencode_prefix(model)
+
     # Kimi model prefers temperature 1.0
     if "kimi-k2.5" in model.lower():
         temperature = 1.0

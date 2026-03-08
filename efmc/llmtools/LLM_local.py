@@ -60,6 +60,7 @@ class LLMLocal:
         """
         self.measure_cost = measure_cost
         self.offline_model_name = offline_model_name
+        self.encoding = None
         if self.measure_cost:
             self.encoding = tiktoken.encoding_for_model(
                 "gpt-3.5-turbo-0125"
@@ -89,14 +90,18 @@ class LLMLocal:
         else:
             raise ValueError("Unsupported model name")
 
+        encoding = None
+        if is_measure_cost:
+            encoding = self.encoding or tiktoken.encoding_for_model("gpt-3.5-turbo-0125")
+
         input_token_cost = (
             0
             if not is_measure_cost
-            else len(self.encoding.encode(self.system_role))
-            + len(self.encoding.encode(message))
+            else len(encoding.encode(self.system_role))
+            + len(encoding.encode(message))
         )
         output_token_cost = (
-            0 if not is_measure_cost else len(self.encoding.encode(output))
+            0 if not is_measure_cost else len(encoding.encode(output))
         )
         return output, input_token_cost, output_token_cost
 

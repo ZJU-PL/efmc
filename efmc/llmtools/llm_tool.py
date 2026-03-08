@@ -17,7 +17,7 @@ class LLMToolInput(ABC):
         pass
 
     def __eq__(self, value):
-        return self.__hash__() == value.__hash__()
+        return self is value
 
 
 class LLMToolOutput(ABC):
@@ -82,9 +82,7 @@ class LLMTool(ABC):
 
         single_query_num = 0
         output = None
-        while True:
-            if single_query_num > self.max_query_num:
-                break
+        while single_query_num < self.max_query_num:
             single_query_num += 1
             response, input_token_cost, output_token_cost = self.model.infer(
                 prompt, True

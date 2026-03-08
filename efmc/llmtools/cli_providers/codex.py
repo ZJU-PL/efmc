@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Awaitable, Callable
 
 import httpx
 from loguru import logger
@@ -31,6 +31,7 @@ class OpenAICodexProvider(LLMProvider):
         model: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.7,
+        on_retry: Callable[[int, int, float], Awaitable[None]] | None = None,
     ) -> LLMResponse:
         model = model or self.default_model
         system_prompt, input_items = _convert_messages(messages)
@@ -62,6 +63,8 @@ class OpenAICodexProvider(LLMProvider):
             except Exception as e:
                 if "CERTIFICATE_VERIFY_FAILED" not in str(e):
                     raise
+                if on_retry is not None:
+                    await on_retry(1, 2, 0.0)
                 logger.warning("SSL certificate verification failed for Codex API; retrying with verify=False")
                 content, tool_calls, finish_reason = await _request_codex(url, headers, body, verify=False)
             return LLMResponse(
