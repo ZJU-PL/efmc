@@ -3,10 +3,12 @@ Calling local LLMs
   - vLLM
   - sglang
   - LMStudio
+  - Tingly OpenAI proxy (set TINGLY_API_KEY)
 """
 
 import concurrent.futures
 import logging
+import os
 import time
 from typing import Any, Tuple
 
@@ -45,6 +47,9 @@ class LLMLocal:
         max_output_length: int = 4096,
         measure_cost: bool = False,
         provider: str = "lm-studio",  # vllm, sglang, lm-studio, etc.
+        base_url: str = None,
+        api_key: str = None,
+        max_retries: int = 3,
     ) -> None:
         """
         Initialize local LLM.
@@ -56,7 +61,10 @@ class LLMLocal:
             system_role: System role message
             max_output_length: Maximum output length
             measure_cost: Whether to measure token cost
-            provider: Provider name (unused, kept for compatibility)
+            provider: Provider name for endpoint defaults
+            base_url: OpenAI-compatible base URL
+            api_key: API key for the compatible endpoint
+            max_retries: Maximum number of request retries
         """
         self.measure_cost = measure_cost
         self.offline_model_name = offline_model_name
@@ -69,6 +77,22 @@ class LLMLocal:
         self.system_role = system_role
         self.logger = logger
         self.max_output_length = max_output_length
+        self.provider = provider
+        self.base_url = base_url or self._get_default_base_url(provider)
+        self.api_key = api_key or self._get_default_api_key(provider)
+        self.max_retries = max_retries
+
+    def _get_default_base_url(self, provider: str) -> str:
+        """Get provider-specific default base URL."""
+        if provider == "tingly":
+            return "http://localhost:12580/tingly/openai"
+        return "http://localhost:1234/v1"
+
+    def _get_default_api_key(self, provider: str) -> str:
+        """Get provider-specific API key from environment or fallback."""
+        if provider == "tingly":
+            return os.environ.get("TINGLY_API_KEY", "")
+        return os.environ.get("LOCAL_OPENAI_API_KEY", "lm-studio")
 
     def infer(
         self, message: str, is_measure_cost: bool = False
@@ -84,11 +108,7 @@ class LLMLocal:
             Tuple of (output, input_token_cost, output_token_cost)
         """
         self.logger.print_log(self.offline_model_name, "is running")
-        output = ""
-        if "qwen" in self.offline_model_name:
-            output = self.infer_with_qwen_model(message)
-        else:
-            raise ValueError("Unsupported model name")
+        output = self.infer_with_openai_compatible_model(message)
 
         encoding = None
         if is_measure_cost:
@@ -127,9 +147,9 @@ class LLMLocal:
                 self.logger.print_log(f"Operation failed: {e}")
                 return ""
 
-    def infer_with_qwen_model(self, message):
+    def infer_with_openai_compatible_model(self, message):
         """
-        Infer using the Qwen model via OpenAI-compatible API.
+        Infer using an OpenAI-compatible API endpoint.
 
         Args:
             message: Input message
@@ -137,14 +157,13 @@ class LLMLocal:
         Returns:
             Model output or empty string on failure
         """
-        api_key = "lm-studio"
         model_input = [
             {"role": "system", "content": self.system_role},
             {"role": "user", "content": message},
         ]
 
         def call_api():
-            client = OpenAI(base_url="http://localhost:1234/v1", api_key=api_key)
+            client = OpenAI(base_url=self.base_url, api_key=self.api_key)
             response = client.chat.completions.create(
                 model=self.offline_model_name,
                 messages=model_input,
@@ -154,15 +173,16 @@ class LLMLocal:
             return response.choices[0].message.content
 
         try_count = 0
-        while try_count < 5:
-            try_count += 1
+        while try_count < self.max_retries:
             try:
+                try_count += 1
                 output = self.run_with_timeout(call_api, timeout_seconds=100)
                 if output:
                     return output
-            except (ValueError, RuntimeError, ConnectionError) as e:
+            except Exception as e:
                 self.logger.print_log(f"API error: {e}")
-            time.sleep(2)
+            if try_count < self.max_retries:
+                time.sleep(2 ** (try_count - 1))
 
         return ""
 
